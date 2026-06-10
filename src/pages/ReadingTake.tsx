@@ -127,7 +127,7 @@ export function ReadingTake() {
                     }}
                     className="mt-1"
                   />
-                  <span className="text-sm text-slate-700 w-5">{['①', '②', '③', '④'][ci]}</span>
+                  <span className="text-sm text-slate-700 w-5">{['①', '②', '③', '④', '⑤'][ci]}</span>
                   <span className="text-sm text-slate-700 flex-1">{c}</span>
                 </label>
               ))}

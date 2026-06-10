@@ -12,7 +12,7 @@ interface DraftQuestion {
 }
 
 function emptyQuestion(): DraftQuestion {
-  return { q: '', choices: ['', '', '', ''], answer: 0 }
+  return { q: '', choices: ['', '', '', '', ''], answer: 0 }
 }
 
 export function ReadingNew() {
@@ -170,7 +170,7 @@ export function ReadingNew() {
                       onChange={() => updateQuestion(i, { answer: ci })}
                       className="mt-1.5"
                     />
-                    <span className="text-sm text-slate-600 w-5 mt-1">{['①', '②', '③', '④'][ci]}</span>
+                    <span className="text-sm text-slate-600 w-5 mt-1">{['①', '②', '③', '④', '⑤'][ci]}</span>
                     <input
                       type="text"
                       value={c}
@@ -180,7 +180,7 @@ export function ReadingNew() {
                   </label>
                 ))}
               </div>
-              <p className="text-xs text-slate-500">정답: {['①', '②', '③', '④'][q.answer]}</p>
+              <p className="text-xs text-slate-500">정답: {['①', '②', '③', '④', '⑤'][q.answer]}</p>
             </div>
           ))}
         </div>

@@ -78,7 +78,7 @@ export function ReadingResult() {
                           : ''
                     }`}
                   >
-                    <span className="text-slate-500 w-5">{['①', '②', '③', '④'][ci]}</span>
+                    <span className="text-slate-500 w-5">{['①', '②', '③', '④', '⑤'][ci]}</span>
                     <span className="flex-1 text-slate-700">{c}</span>
                     {isAnswer && <span className="text-xs text-emerald-800 font-medium">정답</span>}
                     {isUser && !isAnswer && (
