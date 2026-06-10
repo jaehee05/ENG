@@ -25,6 +25,7 @@ export interface Reading {
   title: string
   passage: string
   glossary: WordEntry[]
+  choicesGlossary: WordEntry[]
   questions: ReadingQuestion[]
   createdBy: string
   createdByName: string

@@ -15,6 +15,7 @@ import { ReadingNew } from './pages/ReadingNew'
 import { ReadingDetail } from './pages/ReadingDetail'
 import { ReadingTake } from './pages/ReadingTake'
 import { ReadingResult } from './pages/ReadingResult'
+import { ReadingSheet } from './pages/ReadingSheet'
 
 function App() {
   return (
@@ -36,6 +37,7 @@ function App() {
               <Route path="/reading" element={<ReadingList />} />
               <Route path="/reading/:id" element={<ReadingDetail />} />
               <Route path="/reading/:id/take" element={<ReadingTake />} />
+              <Route path="/reading/:id/sheet" element={<ReadingSheet />} />
               <Route path="/reading/:id/result/:attemptId" element={<ReadingResult />} />
             </Route>
           </Route>

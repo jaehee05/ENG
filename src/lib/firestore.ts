@@ -60,6 +60,7 @@ export async function createReading(input: {
   title: string
   passage: string
   glossary: WordEntry[]
+  choicesGlossary: WordEntry[]
   questions: ReadingQuestion[]
   createdBy: string
   createdByName: string
