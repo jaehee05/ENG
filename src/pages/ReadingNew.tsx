@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
+import { useAuth } from '../contexts/useAuth'
 import { createReading } from '../lib/firestore'
 import { extractGlossary, wordsToText } from '../lib/api'
 import { parseWordList } from '../lib/types'

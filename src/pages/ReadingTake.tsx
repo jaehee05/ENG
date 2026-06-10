@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
+import { useAuth } from '../contexts/useAuth'
 import { createReadingAttempt, getReading } from '../lib/firestore'
 import { GlossedPassage } from '../components/GlossedPassage'
 import type { Reading } from '../lib/types'

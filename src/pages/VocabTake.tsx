@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
+import { useAuth } from '../contexts/useAuth'
 import { createVocabAttempt, getVocabSet } from '../lib/firestore'
 import { isCorrectKo } from '../lib/types'
 import type { VocabSet } from '../lib/types'

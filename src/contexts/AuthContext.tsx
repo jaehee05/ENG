@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
@@ -9,33 +9,7 @@ import {
 } from 'firebase/auth'
 import { doc, getDoc, runTransaction, serverTimestamp } from 'firebase/firestore'
 import { auth, db } from '../lib/firebase'
-
-export type UserRole = 'admin' | 'student'
-
-export interface UserProfile {
-  uid: string
-  email: string
-  displayName: string
-  role: UserRole
-  createdAt: unknown
-}
-
-interface AuthContextValue {
-  user: User | null
-  profile: UserProfile | null
-  loading: boolean
-  signUp: (email: string, password: string, displayName: string) => Promise<void>
-  signIn: (email: string, password: string) => Promise<void>
-  logOut: () => Promise<void>
-}
-
-const AuthContext = createContext<AuthContextValue | null>(null)
-
-export function useAuth() {
-  const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider')
-  return ctx
-}
+import { AuthContext, type UserProfile, type UserRole } from './authContextValue'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
