@@ -120,7 +120,7 @@ export function GlossedPassage({ passage, glossary, editable = false, onAddWord 
         ref={containerRef}
         onMouseUp={editable ? handleSelection : undefined}
         onTouchEnd={editable ? handleSelection : undefined}
-        className="text-base sm:text-lg leading-8 sm:leading-9 text-slate-900 break-words whitespace-pre-wrap"
+        className="text-base sm:text-lg leading-8 sm:leading-9 text-slate-900 break-words whitespace-pre-wrap text-justify"
       >
         {lines.map((line, li) => (
           <span key={li}>
