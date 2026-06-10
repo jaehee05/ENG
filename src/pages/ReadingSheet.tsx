@@ -49,7 +49,7 @@ export function ReadingSheet() {
 
   return (
     <div className="space-y-4">
-      <div className="no-print flex items-center justify-between gap-3">
+      <div className="no-print flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h1 className="text-xl font-semibold text-slate-900">{r.title} · 시험지</h1>
         <div className="flex gap-2">
           <Link
@@ -67,7 +67,8 @@ export function ReadingSheet() {
         </div>
       </div>
 
-      <div className="sheet bg-white border border-slate-200 print:border-0 mx-auto max-w-[210mm] p-8 print:p-0 font-serif text-slate-900">
+      <div className="-mx-4 px-4 overflow-x-auto print:mx-0 print:px-0 print:overflow-visible">
+      <div className="sheet bg-white border border-slate-200 print:border-0 mx-auto min-w-[680px] max-w-[210mm] p-8 print:p-0 font-serif text-slate-900">
         {r.questions.map((q, qi) => (
           <section key={qi} className={qi > 0 ? 'mt-10 print:break-before-page' : ''}>
             <p className="text-[12pt] font-semibold mb-2">
@@ -93,6 +94,7 @@ export function ReadingSheet() {
             </div>
           </section>
         ))}
+      </div>
       </div>
 
       <style>{`

@@ -8,6 +8,7 @@ import {
   query,
   serverTimestamp,
   Timestamp,
+  updateDoc,
   where,
 } from 'firebase/firestore'
 import { db } from './firebase'
@@ -70,6 +71,13 @@ export async function createReading(input: {
     createdAt: serverTimestamp(),
   })
   return ref.id
+}
+
+export async function updateReadingGlossary(
+  id: string,
+  glossary: WordEntry[],
+): Promise<void> {
+  await updateDoc(doc(db, 'readings', id), { glossary })
 }
 
 export async function createVocabAttempt(input: {

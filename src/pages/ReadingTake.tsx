@@ -1,13 +1,14 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
-import { createReadingAttempt, getReading } from '../lib/firestore'
+import { createReadingAttempt, getReading, updateReadingGlossary } from '../lib/firestore'
 import { GlossedPassage } from '../components/GlossedPassage'
 import type { Reading } from '../lib/types'
 
 export function ReadingTake() {
   const { id } = useParams<{ id: string }>()
   const { user, profile } = useAuth()
+  const isAdmin = profile?.role === 'admin'
   const navigate = useNavigate()
   const [r, setR] = useState<Reading | null>(null)
   const [answers, setAnswers] = useState<number[]>([])
@@ -30,6 +31,16 @@ export function ReadingTake() {
       .catch((e) => setError(e.message ?? '불러오기 실패'))
       .finally(() => setLoading(false))
   }, [id])
+
+  async function handleAddWord(en: string, ko: string) {
+    if (!r) return
+    const exists = r.glossary.some((g) => g.en.toLowerCase() === en.toLowerCase())
+    const nextGlossary = exists
+      ? r.glossary.map((g) => (g.en.toLowerCase() === en.toLowerCase() ? { en: g.en, ko } : g))
+      : [...r.glossary, { en, ko }]
+    await updateReadingGlossary(r.id, nextGlossary)
+    setR({ ...r, glossary: nextGlossary })
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -71,7 +82,8 @@ export function ReadingTake() {
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">{r.title}</h1>
         <p className="text-sm text-slate-500 mt-1">
-          지문 안 밑줄 단어에 마우스를 올리면 뜻이 표시됩니다.
+          지문 안 밑줄 단어를 누르면(또는 마우스를 올리면) 뜻이 표시됩니다.
+          {isAdmin && ' 관리자는 단어를 드래그해 뜻을 추가할 수 있습니다.'}
         </p>
       </div>
 
@@ -96,8 +108,13 @@ export function ReadingTake() {
         )}
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white p-5">
-        <GlossedPassage passage={r.passage} glossary={r.glossary} />
+      <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
+        <GlossedPassage
+          passage={r.passage}
+          glossary={r.glossary}
+          editable={isAdmin}
+          onAddWord={handleAddWord}
+        />
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
