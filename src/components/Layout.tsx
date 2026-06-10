@@ -32,11 +32,6 @@ export function Layout() {
             <NavLink to="/reading" className={linkClass}>
               지문 문제풀이
             </NavLink>
-            {profile?.role === 'admin' && (
-              <NavLink to="/admin" className={linkClass}>
-                관리
-              </NavLink>
-            )}
           </nav>
           <div className="flex items-center gap-3">
             <span className="text-sm text-slate-600 hidden sm:inline">

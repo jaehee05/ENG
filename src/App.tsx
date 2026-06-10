@@ -5,9 +5,16 @@ import { Layout } from './components/Layout'
 import { Login } from './pages/Login'
 import { Signup } from './pages/Signup'
 import { Dashboard } from './pages/Dashboard'
-import { VocabTests } from './pages/VocabTests'
-import { ReadingPractice } from './pages/ReadingPractice'
-import { Admin } from './pages/Admin'
+import { VocabList } from './pages/VocabList'
+import { VocabNew } from './pages/VocabNew'
+import { VocabDetail } from './pages/VocabDetail'
+import { VocabTake } from './pages/VocabTake'
+import { VocabResult } from './pages/VocabResult'
+import { ReadingList } from './pages/ReadingList'
+import { ReadingNew } from './pages/ReadingNew'
+import { ReadingDetail } from './pages/ReadingDetail'
+import { ReadingTake } from './pages/ReadingTake'
+import { ReadingResult } from './pages/ReadingResult'
 
 function App() {
   return (
@@ -20,14 +27,23 @@ function App() {
           <Route element={<ProtectedRoute />}>
             <Route element={<Layout />}>
               <Route path="/" element={<Dashboard />} />
-              <Route path="/vocab" element={<VocabTests />} />
-              <Route path="/reading" element={<ReadingPractice />} />
+
+              <Route path="/vocab" element={<VocabList />} />
+              <Route path="/vocab/:id" element={<VocabDetail />} />
+              <Route path="/vocab/:id/take" element={<VocabTake />} />
+              <Route path="/vocab/:id/result/:attemptId" element={<VocabResult />} />
+
+              <Route path="/reading" element={<ReadingList />} />
+              <Route path="/reading/:id" element={<ReadingDetail />} />
+              <Route path="/reading/:id/take" element={<ReadingTake />} />
+              <Route path="/reading/:id/result/:attemptId" element={<ReadingResult />} />
             </Route>
           </Route>
 
           <Route element={<ProtectedRoute adminOnly />}>
             <Route element={<Layout />}>
-              <Route path="/admin" element={<Admin />} />
+              <Route path="/vocab/new" element={<VocabNew />} />
+              <Route path="/reading/new" element={<ReadingNew />} />
             </Route>
           </Route>
 
