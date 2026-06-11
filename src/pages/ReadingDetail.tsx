@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { getReading, updateReadingGlossaries } from '../lib/firestore'
 import { useAuth } from '../contexts/useAuth'
 import { GlossedPassage } from '../components/GlossedPassage'
+import { GlossaryEditor } from '../components/GlossaryEditor'
 import { useGlossQueue, type GlossEntry } from '../components/useGlossQueue'
 import type { Reading, WordEntry } from '../lib/types'
 
@@ -59,6 +60,18 @@ export function ReadingDetail() {
     showTargets: true,
     onSave: handleSave,
   })
+
+  async function handleReplaceGlossary(next: WordEntry[]) {
+    if (!r) return
+    await updateReadingGlossaries(r.id, next, r.choicesGlossary ?? [])
+    setR({ ...r, glossary: next })
+  }
+
+  async function handleReplaceChoicesGlossary(next: WordEntry[]) {
+    if (!r) return
+    await updateReadingGlossaries(r.id, r.glossary, next)
+    setR({ ...r, choicesGlossary: next })
+  }
 
   if (loading) return <p className="text-slate-500 text-sm">불러오는 중...</p>
   if (error) return <p className="text-red-600 text-sm">{error}</p>
@@ -126,6 +139,22 @@ export function ReadingDetail() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {isAdmin && (
+        <div className="space-y-3">
+          <h2 className="text-sm font-semibold text-slate-700">단어장 수정</h2>
+          <GlossaryEditor
+            title="지문 단어장"
+            words={r.glossary}
+            onSave={handleReplaceGlossary}
+          />
+          <GlossaryEditor
+            title="보기 단어장"
+            words={choicesGlossary}
+            onSave={handleReplaceChoicesGlossary}
+          />
         </div>
       )}
 
