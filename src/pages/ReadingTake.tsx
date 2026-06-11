@@ -185,7 +185,7 @@ export function ReadingTake() {
                   key={ci}
                   className={`flex items-start gap-3 rounded border px-3 py-2 cursor-pointer transition ${
                     answers[i] === ci
-                      ? 'border-indigo-500 bg-indigo-50/50'
+                      ? 'border-brand-500 bg-brand-50/50'
                       : 'border-slate-200 hover:bg-slate-50'
                   }`}
                 >
@@ -198,7 +198,7 @@ export function ReadingTake() {
                       next[i] = ci
                       setAnswers(next)
                     }}
-                    className="mt-1 accent-indigo-600"
+                    className="mt-1 accent-brand-600"
                   />
                   <span className="text-sm text-slate-700 w-5 mt-0.5">{CHOICE_MARKS[ci]}</span>
                   <span className="text-sm flex-1">
@@ -222,7 +222,7 @@ export function ReadingTake() {
           <button
             type="submit"
             disabled={submitting}
-            className="rounded-md bg-indigo-600 text-white text-sm font-medium px-5 py-2 hover:bg-indigo-700 transition disabled:opacity-60"
+            className="rounded-md bg-brand-600 text-white text-sm font-medium px-5 py-2 hover:bg-brand-700 transition disabled:opacity-60"
           >
             {submitting ? '채점 중...' : '제출하기'}
           </button>

@@ -16,9 +16,9 @@ html, body {
 
 body {
   font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', system-ui, sans-serif;
-  background: radial-gradient(900px 600px at 12% -10%, rgba(99, 102, 241, 0.10), transparent 60%),
-              radial-gradient(700px 500px at 100% 0%, rgba(168, 85, 247, 0.10), transparent 55%),
-              linear-gradient(180deg, #f9fafb 0%, #f1f5fb 100%);
+  background: radial-gradient(900px 600px at 12% -10%, rgba(11, 146, 18, 0.08), transparent 60%),
+              radial-gradient(700px 500px at 100% 0%, rgba(11, 146, 18, 0.06), transparent 55%),
+              #ffffff;
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

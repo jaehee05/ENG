@@ -16,8 +16,8 @@ const STATUS_LABEL: Record<UserStatus, string> = {
 }
 
 const STATUS_CLASS: Record<UserStatus, string> = {
-  pending: 'bg-amber-100 text-amber-800',
-  active: 'bg-emerald-100 text-emerald-800',
+  pending: 'bg-brand-100 text-brand-700',
+  active: 'bg-brand-100 text-brand-700',
   rejected: 'bg-slate-200 text-slate-600',
 }
 
@@ -109,10 +109,10 @@ export function AdminStudents() {
       {error && <p className="text-red-600 text-sm">{error}</p>}
 
       {me && (
-        <div className="rounded-lg border border-indigo-200 bg-indigo-50/40 p-4 text-sm text-slate-700">
+        <div className="rounded-lg border border-brand-200 bg-brand-50/40 p-4 text-sm text-slate-700">
           <span className="font-medium">{me.displayName}</span>
           <span className="text-slate-500"> · {me.email}</span>
-          <span className="ml-2 inline-block rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800">
+          <span className="ml-2 inline-block rounded bg-brand-100 px-2 py-0.5 text-xs text-brand-700">
             나 (관리자)
           </span>
         </div>
@@ -178,7 +178,7 @@ export function AdminStudents() {
                       {a.status !== 'active' && (
                         <button
                           onClick={() => changeStatus(a.id, 'active')}
-                          className="rounded bg-emerald-600 text-white text-xs font-medium px-2 py-1 hover:bg-emerald-700"
+                          className="rounded bg-brand-600 text-white text-xs font-medium px-2 py-1 hover:bg-brand-700"
                         >
                           승인
                         </button>

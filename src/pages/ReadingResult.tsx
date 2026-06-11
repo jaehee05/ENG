@@ -46,7 +46,7 @@ export function ReadingResult() {
           <div
             key={i}
             className={`rounded-md border p-4 ${
-              r.correct ? 'border-emerald-200 bg-emerald-50/40' : 'border-red-200 bg-red-50/40'
+              r.correct ? 'border-brand-200 bg-brand-50/40' : 'border-red-200 bg-red-50/40'
             }`}
           >
             <div className="flex items-start justify-between gap-3">
@@ -54,7 +54,7 @@ export function ReadingResult() {
                 {i + 1}. {r.q}
               </p>
               {r.correct ? (
-                <span className="inline-block rounded bg-emerald-100 text-emerald-800 text-xs px-2 py-0.5 whitespace-nowrap">
+                <span className="inline-block rounded bg-brand-100 text-brand-700 text-xs px-2 py-0.5 whitespace-nowrap">
                   정답
                 </span>
               ) : (
@@ -72,7 +72,7 @@ export function ReadingResult() {
                     key={ci}
                     className={`flex items-start gap-2 rounded px-2 py-1 ${
                       isAnswer
-                        ? 'bg-emerald-100/70'
+                        ? 'bg-brand-100/70'
                         : isUser
                           ? 'bg-red-100/70'
                           : ''
@@ -80,7 +80,7 @@ export function ReadingResult() {
                   >
                     <span className="text-slate-500 w-5">{['①', '②', '③', '④', '⑤'][ci]}</span>
                     <span className="flex-1 text-slate-700">{c}</span>
-                    {isAnswer && <span className="text-xs text-emerald-800 font-medium">정답</span>}
+                    {isAnswer && <span className="text-xs text-brand-700 font-medium">정답</span>}
                     {isUser && !isAnswer && (
                       <span className="text-xs text-red-800 font-medium">선택</span>
                     )}

@@ -7,24 +7,24 @@ const cards = [
     title: '단어 시험지',
     desc: '단어셋으로 시험지를 만들고 풀어봅니다.',
     initial: '단',
-    gradient: 'from-indigo-500 to-blue-500',
-    ring: 'group-hover:ring-indigo-200',
+    gradient: 'from-brand-500 to-brand-500',
+    ring: 'group-hover:ring-brand-200',
   },
   {
     to: '/reading',
     title: '지문 문제풀이',
     desc: '단어 뜻을 함께 제공해 어휘·독해 약점을 가립니다.',
     initial: '지',
-    gradient: 'from-violet-500 to-fuchsia-500',
-    ring: 'group-hover:ring-violet-200',
+    gradient: 'from-brand-500 to-brand-700',
+    ring: 'group-hover:ring-brand-200',
   },
   {
     to: '/wordbook',
     title: '내 단어장',
     desc: '지문에서 누른 단어가 자동으로 모입니다.',
     initial: '내',
-    gradient: 'from-emerald-500 to-teal-500',
-    ring: 'group-hover:ring-emerald-200',
+    gradient: 'from-brand-500 to-brand-500',
+    ring: 'group-hover:ring-brand-200',
   },
 ]
 
@@ -40,7 +40,7 @@ export function Dashboard() {
 
   return (
     <div className="space-y-8">
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 p-8 sm:p-10 text-white shadow-lift">
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 via-brand-700 to-brand-700 p-8 sm:p-10 text-white shadow-lift">
         <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/10 blur-2xl" />
         <div className="absolute -left-10 -bottom-10 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
         <p className="relative text-xs uppercase tracking-[0.18em] text-white/70">

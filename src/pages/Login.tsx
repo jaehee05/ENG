@@ -38,7 +38,7 @@ export function Login() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
           </div>
           <div>
@@ -49,7 +49,7 @@ export function Login() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
           </div>
 
@@ -58,7 +58,7 @@ export function Login() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full rounded-md bg-indigo-600 text-white text-sm font-medium py-2.5 hover:bg-indigo-700 disabled:opacity-60"
+            className="w-full rounded-md bg-brand-600 text-white text-sm font-medium py-2.5 hover:bg-brand-700 disabled:opacity-60"
           >
             {submitting ? '로그인 중...' : '로그인'}
           </button>
@@ -66,7 +66,7 @@ export function Login() {
 
         <p className="mt-4 text-sm text-slate-600 text-center">
           계정이 없으신가요?{' '}
-          <Link to="/signup" className="text-indigo-600 font-medium hover:underline">
+          <Link to="/signup" className="text-brand-600 font-medium hover:underline">
             회원가입
           </Link>
         </p>

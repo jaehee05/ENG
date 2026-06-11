@@ -63,7 +63,7 @@ export function GlossaryEditor({ title, words, onSave }: Props) {
         <span>
           {title} 편집 <span className="text-slate-400 font-normal">({words.length})</span>
           {dirty && (
-            <span className="ml-2 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[10px] text-amber-800 font-medium align-middle">
+            <span className="ml-2 inline-block rounded-full bg-brand-100 px-2 py-0.5 text-[10px] text-brand-700 font-medium align-middle">
               미저장
             </span>
           )}
@@ -83,13 +83,13 @@ export function GlossaryEditor({ title, words, onSave }: Props) {
                     type="text"
                     value={w.en}
                     onChange={(e) => updateRow(i, 'en', e.target.value)}
-                    className="col-span-4 rounded border border-slate-300 px-2 py-1 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="col-span-4 rounded border border-slate-300 px-2 py-1 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
                   <input
                     type="text"
                     value={w.ko}
                     onChange={(e) => updateRow(i, 'ko', e.target.value)}
-                    className="col-span-7 rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="col-span-7 rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
                   <button
                     type="button"
@@ -108,7 +108,7 @@ export function GlossaryEditor({ title, words, onSave }: Props) {
             <div className="border-t border-slate-200 px-5 py-3 flex items-center justify-end gap-2">
               {error && <p className="text-sm text-red-600 mr-auto">{error}</p>}
               {savedNote && !dirty && (
-                <p className="text-sm text-emerald-700 mr-auto">{savedNote}</p>
+                <p className="text-sm text-brand-700 mr-auto">{savedNote}</p>
               )}
               {dirty && (
                 <button
@@ -125,7 +125,7 @@ export function GlossaryEditor({ title, words, onSave }: Props) {
                   type="button"
                   onClick={handleSave}
                   disabled={saving}
-                  className="rounded-md bg-indigo-600 text-white text-sm font-medium px-3 py-1.5 hover:bg-indigo-700 transition disabled:opacity-60"
+                  className="rounded-md bg-brand-600 text-white text-sm font-medium px-3 py-1.5 hover:bg-brand-700 transition disabled:opacity-60"
                 >
                   {saving ? '저장 중...' : '저장'}
                 </button>

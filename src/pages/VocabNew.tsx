@@ -52,7 +52,7 @@ export function VocabNew() {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="예: 수능 어휘 Day 1"
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
         </div>
 
@@ -65,7 +65,7 @@ export function VocabNew() {
             onChange={(e) => setRaw(e.target.value)}
             placeholder={PLACEHOLDER}
             rows={14}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-900"
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
           <p className="text-xs text-slate-500 mt-1">현재 인식된 단어: {words.length}개</p>
         </div>

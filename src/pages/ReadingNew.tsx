@@ -113,7 +113,7 @@ export function ReadingNew() {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="예: 2024학년도 6월 모평 31번"
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
         </div>
 
@@ -123,7 +123,7 @@ export function ReadingNew() {
             value={passage}
             onChange={(e) => setPassage(e.target.value)}
             rows={10}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
         </div>
 
@@ -158,7 +158,7 @@ export function ReadingNew() {
                 onChange={(e) => updateQuestion(i, { q: e.target.value })}
                 placeholder="질문 (예: 윗글의 주제로 가장 적절한 것은?)"
                 rows={2}
-                className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                className="w-full rounded border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
               <div className="space-y-2">
                 {q.choices.map((c, ci) => (
@@ -175,7 +175,7 @@ export function ReadingNew() {
                       type="text"
                       value={c}
                       onChange={(e) => updateChoice(i, ci, e.target.value)}
-                      className="flex-1 rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                      className="flex-1 rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                     />
                   </label>
                 ))}
@@ -192,7 +192,7 @@ export function ReadingNew() {
               type="button"
               onClick={handleExtract}
               disabled={extracting || !passage.trim()}
-              className="rounded-md bg-indigo-600 text-white text-sm font-medium px-4 py-2 hover:bg-indigo-700 disabled:opacity-50"
+              className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700 disabled:opacity-50"
             >
               {extracting ? '추출 중...' : 'AI로 단어 추출'}
             </button>
@@ -207,7 +207,7 @@ export function ReadingNew() {
               onChange={(e) => setGlossaryRaw(e.target.value)}
               rows={10}
               placeholder="abandon - 버리다, 포기하다"
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-900"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
           </div>
 
@@ -220,7 +220,7 @@ export function ReadingNew() {
               onChange={(e) => setChoicesGlossaryRaw(e.target.value)}
               rows={6}
               placeholder="paradigm - 패러다임, 인식 틀"
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-900"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
           </div>
         </div>

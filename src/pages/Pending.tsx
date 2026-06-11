@@ -18,9 +18,9 @@ export function Pending() {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-md text-center bg-white rounded-2xl shadow-lg shadow-indigo-900/5 border border-slate-200 p-8">
+      <div className="w-full max-w-md text-center bg-white rounded-2xl shadow-lg shadow-brand-900/5 border border-slate-200 p-8">
         <div className="text-center mb-4">
-          <p className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
+          <p className="text-3xl font-bold bg-gradient-to-r from-brand-600 to-brand-700 bg-clip-text text-transparent">
             KJHEDU
           </p>
         </div>
@@ -35,7 +35,7 @@ export function Pending() {
           </button>
           <button
             onClick={handleLogout}
-            className="rounded-md bg-indigo-600 text-white text-sm font-medium px-4 py-2 hover:bg-indigo-700 transition"
+            className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700 transition"
           >
             로그아웃
           </button>

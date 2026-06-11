@@ -1,6 +1,7 @@
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -78,6 +79,17 @@ export async function updateReadingGlossary(
   glossary: WordEntry[],
 ): Promise<void> {
   await updateDoc(doc(db, 'readings', id), { glossary })
+}
+
+export async function updateReadingContent(
+  id: string,
+  input: { title: string; passage: string; questions: ReadingQuestion[] },
+): Promise<void> {
+  await updateDoc(doc(db, 'readings', id), input)
+}
+
+export async function deleteReading(id: string): Promise<void> {
+  await deleteDoc(doc(db, 'readings', id))
 }
 
 export async function updateReadingGlossaries(

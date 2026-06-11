@@ -110,7 +110,7 @@ export function useGlossQueue(opts: {
                 <span
                   className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${
                     q.target === 'choices'
-                      ? 'bg-violet-100 text-violet-700'
+                      ? 'bg-brand-100 text-brand-800'
                       : 'bg-sky-100 text-sky-700'
                   }`}
                 >
@@ -127,7 +127,7 @@ export function useGlossQueue(opts: {
                 value={q.ko}
                 onChange={(e) => updateKo(i, e.target.value)}
                 placeholder={fetching ? '불러오는 중…' : '뜻 (AI 추천/직접 입력)'}
-                className="flex-1 rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                className="flex-1 rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
               <button
                 type="button"
@@ -147,7 +147,7 @@ export function useGlossQueue(opts: {
             type="button"
             onClick={() => void fetchAll()}
             disabled={fetching || saving}
-            className="flex-1 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+            className="flex-1 rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
           >
             {fetching ? 'AI 찾는 중…' : `AI로 뜻 찾기 (${queue.length})`}
           </button>

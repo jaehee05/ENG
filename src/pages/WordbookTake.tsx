@@ -96,7 +96,7 @@ export function WordbookTake() {
                     next[i] = e.target.value
                     setAnswers(next)
                   }}
-                  className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
               </div>
             </div>
@@ -110,7 +110,7 @@ export function WordbookTake() {
           <button
             type="submit"
             disabled={submitting}
-            className="rounded-md bg-indigo-600 text-white text-sm font-medium px-5 py-2 hover:bg-indigo-700 transition disabled:opacity-60"
+            className="rounded-md bg-brand-600 text-white text-sm font-medium px-5 py-2 hover:bg-brand-700 transition disabled:opacity-60"
           >
             {submitting ? '채점 중...' : '제출하기'}
           </button>

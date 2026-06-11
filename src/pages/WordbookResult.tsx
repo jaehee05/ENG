@@ -64,7 +64,7 @@ export function WordbookResult() {
             <div className="col-span-3 text-slate-600">{r.ko}</div>
             <div className="col-span-1 text-center">
               {r.correct ? (
-                <span className="inline-block rounded bg-emerald-100 text-emerald-800 text-xs px-2 py-0.5">
+                <span className="inline-block rounded bg-brand-100 text-brand-700 text-xs px-2 py-0.5">
                   정답
                 </span>
               ) : (

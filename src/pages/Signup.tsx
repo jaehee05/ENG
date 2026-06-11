@@ -36,13 +36,13 @@ export function Signup() {
   }
 
   const inputCls =
-    'w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500'
+    'w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500'
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-10">
-      <div className="w-full max-w-sm bg-white rounded-2xl shadow-lg shadow-indigo-900/5 border border-slate-200 p-8">
+      <div className="w-full max-w-sm bg-white rounded-2xl shadow-lg shadow-brand-900/5 border border-slate-200 p-8">
         <div className="text-center mb-6">
-          <p className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
+          <p className="text-3xl font-bold bg-gradient-to-r from-brand-600 to-brand-700 bg-clip-text text-transparent">
             KJHEDU
           </p>
         </div>
@@ -122,7 +122,7 @@ export function Signup() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full rounded-md bg-indigo-600 text-white text-sm font-medium py-2.5 hover:bg-indigo-700 transition disabled:opacity-60"
+            className="w-full rounded-md bg-brand-600 text-white text-sm font-medium py-2.5 hover:bg-brand-700 transition disabled:opacity-60"
           >
             {submitting ? '가입 중...' : '가입하기'}
           </button>
@@ -130,7 +130,7 @@ export function Signup() {
 
         <p className="mt-4 text-sm text-slate-600 text-center">
           이미 계정이 있으신가요?{' '}
-          <Link to="/login" className="text-indigo-600 font-medium hover:underline">
+          <Link to="/login" className="text-brand-600 font-medium hover:underline">
             로그인
           </Link>
         </p>

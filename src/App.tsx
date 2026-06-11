@@ -12,6 +12,7 @@ import { VocabTake } from './pages/VocabTake'
 import { VocabResult } from './pages/VocabResult'
 import { ReadingList } from './pages/ReadingList'
 import { ReadingNew } from './pages/ReadingNew'
+import { ReadingEdit } from './pages/ReadingEdit'
 import { ReadingDetail } from './pages/ReadingDetail'
 import { ReadingTake } from './pages/ReadingTake'
 import { ReadingResult } from './pages/ReadingResult'
@@ -59,6 +60,7 @@ function App() {
             <Route element={<Layout />}>
               <Route path="/vocab/new" element={<VocabNew />} />
               <Route path="/reading/new" element={<ReadingNew />} />
+              <Route path="/reading/:id/edit" element={<ReadingEdit />} />
               <Route path="/admin/students" element={<AdminStudents />} />
               <Route path="/admin/students/:id" element={<AdminStudentDetail />} />
             </Route>

@@ -23,9 +23,9 @@ const TYPE_LABEL: Record<Attempt['type'], string> = {
 }
 
 const TYPE_CLASS: Record<Attempt['type'], string> = {
-  vocab: 'bg-indigo-50 text-indigo-700',
-  reading: 'bg-violet-50 text-violet-700',
-  wordbook: 'bg-emerald-50 text-emerald-700',
+  vocab: 'bg-brand-50 text-brand-700',
+  reading: 'bg-brand-50 text-brand-800',
+  wordbook: 'bg-brand-50 text-brand-700',
 }
 
 type TypeFilter = 'all' | Attempt['type']
@@ -205,9 +205,9 @@ export function AdminStudentDetail() {
                         <span
                           className={`text-sm font-medium ${
                             ratio >= 80
-                              ? 'text-emerald-700'
+                              ? 'text-brand-700'
                               : ratio >= 50
-                                ? 'text-amber-700'
+                                ? 'text-brand-700'
                                 : 'text-red-700'
                           }`}
                         >
@@ -248,7 +248,7 @@ export function AdminStudentDetail() {
                     <p className="font-medium text-slate-900 truncate">{w.en}</p>
                     <p className="text-slate-500 truncate text-xs">{w.ko}</p>
                   </div>
-                  <span className="inline-block rounded-full bg-yellow-50 text-yellow-800 text-xs font-medium px-2 py-0.5 whitespace-nowrap">
+                  <span className="inline-block rounded-full bg-brand-50 text-brand-700 text-xs font-medium px-2 py-0.5 whitespace-nowrap">
                     {w.count}회
                   </span>
                 </div>

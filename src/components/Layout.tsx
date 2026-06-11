@@ -34,7 +34,7 @@ export function Layout() {
           <div className="h-16 flex items-center justify-between gap-4">
             <Link
               to="/"
-              className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent"
+              className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-brand-600 to-brand-700 bg-clip-text text-transparent"
             >
               KJHEDU
             </Link>
@@ -56,7 +56,7 @@ export function Layout() {
               <span className="text-sm text-slate-600">
                 {profile?.displayName}
                 {profile?.role === 'admin' && (
-                  <span className="ml-2 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800 align-middle">
+                  <span className="ml-2 inline-block rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-medium text-brand-700 align-middle">
                     관리자
                   </span>
                 )}
@@ -125,7 +125,7 @@ export function Layout() {
                 <span className="text-sm text-slate-600">
                   {profile?.displayName}
                   {profile?.role === 'admin' && (
-                    <span className="ml-2 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800 align-middle">
+                    <span className="ml-2 inline-block rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-medium text-brand-700 align-middle">
                       관리자
                     </span>
                   )}
