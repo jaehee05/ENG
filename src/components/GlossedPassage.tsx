@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { WordEntry } from '../lib/types'
+import { defineWord } from '../lib/api'
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -32,6 +33,8 @@ export function GlossedPassage({ passage, glossary, editable = false, onAddWord 
   const [sel, setSel] = useState<{ text: string; x: number; y: number } | null>(null)
   const [koInput, setKoInput] = useState('')
   const [saving, setSaving] = useState(false)
+  const [defining, setDefining] = useState(false)
+  const [defineError, setDefineError] = useState<string | null>(null)
 
   const lines = useMemo<Line[]>(() => {
     if (glossary.length === 0) {
@@ -92,11 +95,27 @@ export function GlossedPassage({ passage, glossary, editable = false, onAddWord 
     const rect = range.getBoundingClientRect()
     const crect = containerRef.current.getBoundingClientRect()
     setKoInput('')
+    setDefineError(null)
     setSel({
       text: word,
       x: rect.left - crect.left + rect.width / 2,
       y: rect.bottom - crect.top,
     })
+    void fetchDefinition(word)
+  }
+
+  // ask the AI for the context-appropriate Korean meaning and pre-fill it
+  async function fetchDefinition(word: string) {
+    setDefining(true)
+    setDefineError(null)
+    try {
+      const ko = await defineWord({ word, passage })
+      setKoInput(ko)
+    } catch (err) {
+      setDefineError(err instanceof Error ? err.message : 'AI 뜻 찾기 실패')
+    } finally {
+      setDefining(false)
+    }
   }
 
   async function handleSaveDefinition() {
@@ -162,7 +181,9 @@ export function GlossedPassage({ passage, glossary, editable = false, onAddWord 
           onMouseUp={(e) => e.stopPropagation()}
         >
           <p className="px-1 pb-1 text-xs text-slate-500">
-            <span className="font-semibold text-slate-900">{sel.text}</span> 뜻 추가
+            <span className="font-semibold text-slate-900">{sel.text}</span>
+            {' '}
+            {defining ? 'AI가 맥락에 맞는 뜻 찾는 중…' : '뜻 (AI 추천, 수정 가능)'}
           </p>
           <div className="flex items-center gap-1.5">
             <input
@@ -177,13 +198,22 @@ export function GlossedPassage({ passage, glossary, editable = false, onAddWord 
                   setSel(null)
                 }
               }}
-              placeholder="한글 뜻"
-              className="w-40 rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+              placeholder={defining ? '불러오는 중…' : '한글 뜻'}
+              className="w-44 rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
             />
             <button
               type="button"
+              onClick={() => void fetchDefinition(sel.text)}
+              disabled={defining}
+              title="AI 다시 추천"
+              className="rounded px-1.5 py-1 text-sm text-slate-500 hover:text-slate-900 disabled:opacity-50"
+            >
+              ↻
+            </button>
+            <button
+              type="button"
               onClick={() => void handleSaveDefinition()}
-              disabled={saving || !koInput.trim()}
+              disabled={saving || defining || !koInput.trim()}
               className="rounded bg-slate-900 px-2.5 py-1 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
             >
               {saving ? '...' : '추가'}
@@ -196,6 +226,9 @@ export function GlossedPassage({ passage, glossary, editable = false, onAddWord 
               ✕
             </button>
           </div>
+          {defineError && (
+            <p className="px-1 pt-1 text-xs text-red-600">{defineError} · 직접 입력하거나 ↻로 재시도</p>
+          )}
         </div>
       )}
     </div>

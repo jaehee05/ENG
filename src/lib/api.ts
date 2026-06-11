@@ -34,3 +34,26 @@ export async function extractGlossary(input: {
 export function wordsToText(words: WordEntry[]): string {
   return words.map((w) => `${w.en} - ${w.ko}`).join('\n')
 }
+
+export async function defineWord(input: {
+  word: string
+  passage: string
+}): Promise<string> {
+  const res = await fetch('/api/define-word', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!res.ok) {
+    let message = `요청 실패 (HTTP ${res.status})`
+    try {
+      const body = (await res.json()) as { error?: string }
+      if (body.error) message = body.error
+    } catch {
+      // ignore
+    }
+    throw new Error(message)
+  }
+  const data = (await res.json()) as { ko?: string }
+  return data.ko ?? ''
+}
