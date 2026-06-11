@@ -75,7 +75,7 @@ export function ReadingNew() {
     if (questions.length === 0) return setError('문제를 1개 이상 입력하세요.')
     for (const [i, q] of questions.entries()) {
       if (!q.q.trim()) return setError(`${i + 1}번 문제의 질문을 입력하세요.`)
-      if (q.choices.some((c) => !c.trim())) return setError(`${i + 1}번 문제의 보기를 모두 채우세요.`)
+      if (q.choices.some((c) => !c.trim())) return setError(`${i + 1}번 문제의 선지를 모두 채우세요.`)
     }
 
     setSubmitting(true)
@@ -213,7 +213,7 @@ export function ReadingNew() {
 
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">
-              보기 단어풀이 ({choicesGlossary.length}개)
+              선지 단어풀이 ({choicesGlossary.length}개)
             </label>
             <textarea
               value={choicesGlossaryRaw}

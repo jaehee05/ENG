@@ -13,7 +13,7 @@ type QueueItem = GlossEntry
 
 const TARGET_LABEL: Record<GlossTarget, string> = {
   glossary: '지문',
-  choices: '보기',
+  choices: '선지',
 }
 
 /**
