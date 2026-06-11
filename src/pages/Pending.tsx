@@ -25,10 +25,7 @@ export function Pending() {
           </p>
         </div>
         <h1 className="text-xl font-semibold text-slate-900">승인 대기 중</h1>
-        <p className="text-slate-600 mt-3 leading-relaxed">
-          가입이 완료되었습니다.<br />
-          관리자({profile.displayName}님 본인 아님)가 승인하면 사용 가능합니다.
-        </p>
+        <p className="text-slate-600 mt-3 leading-relaxed">관리자 승인 후 사용 가능합니다.</p>
         <div className="mt-6 flex gap-2 justify-center">
           <button
             onClick={() => refreshProfile()}

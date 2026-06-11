@@ -103,7 +103,7 @@ export function WordbookTake() {
           ))}
         </div>
 
-        <div className="sticky bottom-0 bg-slate-50 -mx-4 px-4 py-3 border-t border-slate-200 flex items-center justify-between">
+        <div className="sticky bottom-0 bg-white/90 backdrop-blur-sm rounded-b-lg py-3 px-4 border-t border-slate-200 flex items-center justify-between">
           <p className="text-sm text-slate-600">
             작성 {answered} / {words.length}
           </p>
