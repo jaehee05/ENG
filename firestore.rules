@@ -1,55 +1,17 @@
 rules_version = '2';
 
+// IMPORTANT: This project intentionally bypasses Firebase Authentication.
+// Account credentials live in the `users` collection as PLAINTEXT (by
+// explicit user request), and all sessions are local-only (localStorage).
+// As a consequence, Firestore Security Rules cannot enforce per-user
+// access at the rule layer (there is no request.auth). Anyone with the
+// Firebase web config — which is public — can read or write the entire
+// database. Do not store anything sensitive here.
+
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isAdmin() {
-      return isSignedIn()
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-    }
-
-    // meta/app: bootstrap doc, written only via signup transaction.
-    // Client may read to display state; writes are constrained.
-    match /meta/{docId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn();
-    }
-
-    // Users may read/write their own profile on signup; admin can read all.
-    match /users/{userId} {
-      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      allow create: if isSignedIn() && request.auth.uid == userId;
-      allow update, delete: if isAdmin();
-
-      // Per-student personal wordbook (auto-recorded glossary lookups).
-      match /wordLookups/{lookupId} {
-        allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-        allow create, update: if isSignedIn() && request.auth.uid == userId;
-        allow delete: if isAdmin();
-      }
-    }
-
-    // Vocab tests and reading content: admin writes, signed-in reads.
-    match /vocabSets/{docId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-
-    match /readings/{docId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-
-    // Student attempts/results.
-    match /attempts/{docId} {
-      allow read: if isSignedIn() && (resource.data.studentUid == request.auth.uid || isAdmin());
-      allow create: if isSignedIn() && request.resource.data.studentUid == request.auth.uid;
-      allow update, delete: if isAdmin();
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }

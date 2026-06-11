@@ -16,7 +16,7 @@ function emptyQuestion(): DraftQuestion {
 }
 
 export function ReadingNew() {
-  const { user, profile } = useAuth()
+  const { profile } = useAuth()
   const navigate = useNavigate()
   const [title, setTitle] = useState('')
   const [passage, setPassage] = useState('')
@@ -69,7 +69,7 @@ export function ReadingNew() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
-    if (!user || !profile) return
+    if (!profile) return
     if (!title.trim()) return setError('제목을 입력하세요.')
     if (!passage.trim()) return setError('지문을 입력하세요.')
     if (questions.length === 0) return setError('문제를 1개 이상 입력하세요.')
@@ -90,7 +90,7 @@ export function ReadingNew() {
           choices: q.choices.map((c) => c.trim()),
           answer: q.answer,
         })),
-        createdBy: user.uid,
+        createdBy: profile.id,
         createdByName: profile.displayName,
       })
       navigate(`/reading/${id}`)

@@ -9,7 +9,7 @@ brilliant - 훌륭한, 빛나는
 emerge - 나타나다, 부각되다`
 
 export function VocabNew() {
-  const { user, profile } = useAuth()
+  const { profile } = useAuth()
   const navigate = useNavigate()
   const [title, setTitle] = useState('')
   const [raw, setRaw] = useState('')
@@ -21,7 +21,7 @@ export function VocabNew() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
-    if (!user || !profile) return
+    if (!profile) return
     if (!title.trim()) return setError('제목을 입력하세요.')
     if (words.length === 0) return setError('단어를 1개 이상 입력하세요.')
     setSubmitting(true)
@@ -29,7 +29,7 @@ export function VocabNew() {
       const id = await createVocabSet({
         title: title.trim(),
         words,
-        createdBy: user.uid,
+        createdBy: profile.id,
         createdByName: profile.displayName,
       })
       navigate(`/vocab/${id}`)

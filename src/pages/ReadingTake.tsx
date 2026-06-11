@@ -11,7 +11,7 @@ const CHOICE_MARKS = ['①', '②', '③', '④', '⑤']
 
 export function ReadingTake() {
   const { id } = useParams<{ id: string }>()
-  const { user, profile } = useAuth()
+  const { profile } = useAuth()
   const isAdmin = profile?.role === 'admin'
   const navigate = useNavigate()
   const [r, setR] = useState<Reading | null>(null)
@@ -38,13 +38,13 @@ export function ReadingTake() {
   }, [id])
 
   useEffect(() => {
-    if (!user) return
-    listMyWordbookKeys(user.uid).then(setViewedWords).catch(() => {})
-  }, [user])
+    if (!profile) return
+    listMyWordbookKeys(profile.id).then(setViewedWords).catch(() => {})
+  }, [profile])
 
   const handleWordLookup = useCallback(
     (en: string, ko: string) => {
-      if (!user || !r) return
+      if (!profile || !r) return
       const lower = en.toLowerCase()
       setViewedWords((prev) => {
         if (prev.has(lower)) return prev
@@ -53,14 +53,14 @@ export function ReadingTake() {
         return next
       })
       lookupWord({
-        uid: user.uid,
+        uid: profile.id,
         en,
         ko,
         readingId: r.id,
         readingTitle: r.title,
       }).catch(() => {})
     },
-    [user, r],
+    [profile, r],
   )
 
   async function handleSave(entries: GlossEntry[]) {
@@ -83,7 +83,7 @@ export function ReadingTake() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!r || !user || !profile) return
+    if (!r || !profile) return
     if (answers.some((a) => a < 0)) {
       setError('모든 문제에 답하세요.')
       return
@@ -99,7 +99,7 @@ export function ReadingTake() {
         correct: answers[i] === q.answer,
       }))
       const attemptId = await createReadingAttempt({
-        studentUid: user.uid,
+        studentUid: profile.id,
         studentName: profile.displayName,
         refId: r.id,
         refTitle: r.title,

@@ -54,6 +54,11 @@ export function Layout() {
             <NavLink to="/wordbook" className={linkClass}>
               내 단어장
             </NavLink>
+            {profile?.role === 'admin' && (
+              <NavLink to="/admin/students" className={linkClass}>
+                학생 관리
+              </NavLink>
+            )}
           </nav>
         </div>
       </header>

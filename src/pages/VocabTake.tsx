@@ -7,7 +7,7 @@ import type { VocabSet } from '../lib/types'
 
 export function VocabTake() {
   const { id } = useParams<{ id: string }>()
-  const { user, profile } = useAuth()
+  const { profile } = useAuth()
   const navigate = useNavigate()
   const [set, setSet] = useState<VocabSet | null>(null)
   const [order, setOrder] = useState<number[]>([])
@@ -41,7 +41,7 @@ export function VocabTake() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!set || !user || !profile) return
+    if (!set || !profile) return
     setSubmitting(true)
     try {
       const results = order.map((wordIdx, slotIdx) => {
@@ -55,7 +55,7 @@ export function VocabTake() {
         }
       })
       const attemptId = await createVocabAttempt({
-        studentUid: user.uid,
+        studentUid: profile.id,
         studentName: profile.displayName,
         refId: set.id,
         refTitle: set.title,

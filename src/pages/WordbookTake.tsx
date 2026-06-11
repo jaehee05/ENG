@@ -6,7 +6,7 @@ import { listMyWordbook } from '../lib/wordbook'
 import { isCorrectKo, type WordEntry } from '../lib/types'
 
 export function WordbookTake() {
-  const { user, profile } = useAuth()
+  const { profile } = useAuth()
   const navigate = useNavigate()
   const [words, setWords] = useState<WordEntry[]>([])
   const [answers, setAnswers] = useState<string[]>([])
@@ -15,8 +15,8 @@ export function WordbookTake() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!user) return
-    listMyWordbook(user.uid)
+    if (!profile) return
+    listMyWordbook(profile.id)
       .then((all) => {
         const ws: WordEntry[] = all.map((w) => ({ en: w.en, ko: w.ko }))
         for (let i = ws.length - 1; i > 0; i--) {
@@ -28,13 +28,13 @@ export function WordbookTake() {
       })
       .catch((e) => setError(e.message ?? '단어장을 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
-  }, [user])
+  }, [profile])
 
   const answered = useMemo(() => answers.filter((a) => a.trim()).length, [answers])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!user || !profile) return
+    if (!profile) return
     setSubmitting(true)
     try {
       const results = words.map((w, i) => ({
@@ -44,7 +44,7 @@ export function WordbookTake() {
         correct: isCorrectKo(answers[i] ?? '', w.ko),
       }))
       const attemptId = await createWordbookAttempt({
-        studentUid: user.uid,
+        studentUid: profile.id,
         studentName: profile.displayName,
         vocabResults: results,
       })

@@ -19,6 +19,9 @@ import { ReadingSheet } from './pages/ReadingSheet'
 import { Wordbook } from './pages/Wordbook'
 import { WordbookTake } from './pages/WordbookTake'
 import { WordbookResult } from './pages/WordbookResult'
+import { Pending } from './pages/Pending'
+import { Rejected } from './pages/Rejected'
+import { AdminStudents } from './pages/AdminStudents'
 
 function App() {
   return (
@@ -27,6 +30,8 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/pending" element={<Pending />} />
+          <Route path="/rejected" element={<Rejected />} />
 
           <Route element={<ProtectedRoute />}>
             <Route element={<Layout />}>
@@ -53,6 +58,7 @@ function App() {
             <Route element={<Layout />}>
               <Route path="/vocab/new" element={<VocabNew />} />
               <Route path="/reading/new" element={<ReadingNew />} />
+              <Route path="/admin/students" element={<AdminStudents />} />
             </Route>
           </Route>
 

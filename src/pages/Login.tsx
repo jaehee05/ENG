@@ -1,6 +1,5 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { FirebaseError } from 'firebase/app'
 import { useAuth } from '../contexts/useAuth'
 
 export function Login() {
@@ -19,11 +18,7 @@ export function Login() {
       await signIn(email, password)
       navigate('/')
     } catch (err) {
-      const msg =
-        err instanceof FirebaseError
-          ? '이메일 또는 비밀번호가 올바르지 않습니다.'
-          : '로그인에 실패했습니다.'
-      setError(msg)
+      setError(err instanceof Error ? err.message : '로그인에 실패했습니다.')
     } finally {
       setSubmitting(false)
     }

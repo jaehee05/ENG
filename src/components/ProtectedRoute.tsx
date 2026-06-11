@@ -2,7 +2,7 @@ import { Navigate, Outlet } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 
 export function ProtectedRoute({ adminOnly = false }: { adminOnly?: boolean }) {
-  const { user, profile, loading } = useAuth()
+  const { profile, loading } = useAuth()
 
   if (loading) {
     return (
@@ -12,8 +12,10 @@ export function ProtectedRoute({ adminOnly = false }: { adminOnly?: boolean }) {
     )
   }
 
-  if (!user) return <Navigate to="/login" replace />
-  if (adminOnly && profile?.role !== 'admin') return <Navigate to="/" replace />
+  if (!profile) return <Navigate to="/login" replace />
+  if (profile.status === 'pending') return <Navigate to="/pending" replace />
+  if (profile.status === 'rejected') return <Navigate to="/rejected" replace />
+  if (adminOnly && profile.role !== 'admin') return <Navigate to="/" replace />
 
   return <Outlet />
 }

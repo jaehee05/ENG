@@ -1,76 +1,78 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { AuthContext } from './authContextValue'
 import {
-  createUserWithEmailAndPassword,
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  signOut,
-  updateProfile,
-  type User,
-} from 'firebase/auth'
-import { doc, getDoc, runTransaction, serverTimestamp } from 'firebase/firestore'
-import { auth, db } from '../lib/firebase'
-import { AuthContext, type UserProfile, type UserRole } from './authContextValue'
+  getAccount,
+  signInAccount,
+  signUpAccount,
+} from '../lib/account'
+import type { UserAccount } from '../lib/types'
+
+const STORAGE_KEY = 'eng_account_id'
+
+function stripPassword(a: UserAccount): UserAccount {
+  const { password: _omit, ...rest } = a
+  void _omit
+  return rest
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [profile, setProfile] = useState<UserAccount | null>(null)
+  const [loading, setLoading] = useState<boolean>(
+    () => typeof window !== 'undefined' && !!localStorage.getItem(STORAGE_KEY),
+  )
 
   useEffect(() => {
-    return onAuthStateChanged(auth, async (u) => {
-      setUser(u)
-      if (u) {
-        const snap = await getDoc(doc(db, 'users', u.uid))
-        setProfile(snap.exists() ? (snap.data() as UserProfile) : null)
-      } else {
-        setProfile(null)
-      }
-      setLoading(false)
-    })
+    const id = localStorage.getItem(STORAGE_KEY)
+    if (!id) return
+    let cancelled = false
+    getAccount(id)
+      .then((acc) => {
+        if (cancelled) return
+        if (acc) setProfile(stripPassword(acc))
+        else localStorage.removeItem(STORAGE_KEY)
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
+  function persist(acc: UserAccount | null) {
+    if (acc) {
+      localStorage.setItem(STORAGE_KEY, acc.id)
+      setProfile(stripPassword(acc))
+    } else {
+      localStorage.removeItem(STORAGE_KEY)
+      setProfile(null)
+    }
+  }
+
   async function signUp(email: string, password: string, displayName: string) {
-    const cred = await createUserWithEmailAndPassword(auth, email, password)
-    await updateProfile(cred.user, { displayName })
-
-    const role: UserRole = await runTransaction(db, async (tx) => {
-      const metaRef = doc(db, 'meta', 'app')
-      const metaSnap = await tx.get(metaRef)
-      const initialized = metaSnap.exists() && metaSnap.data()?.initialized === true
-      const assigned: UserRole = initialized ? 'student' : 'admin'
-
-      tx.set(doc(db, 'users', cred.user.uid), {
-        uid: cred.user.uid,
-        email,
-        displayName,
-        role: assigned,
-        createdAt: serverTimestamp(),
-      })
-      if (!initialized) {
-        tx.set(metaRef, { initialized: true, firstUserUid: cred.user.uid }, { merge: true })
-      }
-      return assigned
-    })
-
-    setProfile({
-      uid: cred.user.uid,
-      email,
-      displayName,
-      role,
-      createdAt: null,
-    })
+    const acc = await signUpAccount({ email, password, displayName })
+    persist(acc)
   }
 
   async function signIn(email: string, password: string) {
-    await signInWithEmailAndPassword(auth, email, password)
+    const acc = await signInAccount(email, password)
+    persist(acc)
   }
 
   async function logOut() {
-    await signOut(auth)
+    persist(null)
   }
 
+  const refreshProfile = useCallback(async () => {
+    if (!profile) return
+    const acc = await getAccount(profile.id)
+    if (acc) setProfile(stripPassword(acc))
+    else persist(null)
+  }, [profile])
+
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signUp, signIn, logOut }}>
+    <AuthContext.Provider value={{ profile, loading, signUp, signIn, logOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   )

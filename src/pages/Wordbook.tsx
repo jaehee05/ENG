@@ -5,19 +5,19 @@ import { listMyWordbook } from '../lib/wordbook'
 import type { WordLookup } from '../lib/types'
 
 export function Wordbook() {
-  const { user } = useAuth()
+  const { profile } = useAuth()
   const [words, setWords] = useState<WordLookup[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState<'recent' | 'count' | 'alpha'>('recent')
 
   useEffect(() => {
-    if (!user) return
-    listMyWordbook(user.uid)
+    if (!profile) return
+    listMyWordbook(profile.id)
       .then(setWords)
       .catch((e) => setError(e.message ?? '단어장을 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
-  }, [user])
+  }, [profile])
 
   const sorted = [...words].sort((a, b) => {
     if (sortKey === 'count') return b.count - a.count
