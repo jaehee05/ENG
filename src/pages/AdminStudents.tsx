@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import {
   deleteAccount,
@@ -144,7 +145,11 @@ export function AdminStudents() {
               const open = revealed.has(a.id)
               return (
                 <tr key={a.id}>
-                  <td className="px-4 py-3 font-medium text-slate-900 whitespace-nowrap">{a.displayName}</td>
+                  <td className="px-4 py-3 font-medium text-slate-900 whitespace-nowrap">
+                    <Link to={`/admin/students/${a.id}`} className="hover:underline">
+                      {a.displayName}
+                    </Link>
+                  </td>
                   <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{a.school || '-'}</td>
                   <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{a.phone || '-'}</td>
                   <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{a.parentPhone || '-'}</td>

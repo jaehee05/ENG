@@ -22,6 +22,7 @@ import { WordbookResult } from './pages/WordbookResult'
 import { Pending } from './pages/Pending'
 import { Rejected } from './pages/Rejected'
 import { AdminStudents } from './pages/AdminStudents'
+import { AdminStudentDetail } from './pages/AdminStudentDetail'
 
 function App() {
   return (
@@ -59,6 +60,7 @@ function App() {
               <Route path="/vocab/new" element={<VocabNew />} />
               <Route path="/reading/new" element={<ReadingNew />} />
               <Route path="/admin/students" element={<AdminStudents />} />
+              <Route path="/admin/students/:id" element={<AdminStudentDetail />} />
             </Route>
           </Route>
 
