@@ -80,6 +80,14 @@ export async function updateReadingGlossary(
   await updateDoc(doc(db, 'readings', id), { glossary })
 }
 
+export async function updateReadingGlossaries(
+  id: string,
+  glossary: WordEntry[],
+  choicesGlossary: WordEntry[],
+): Promise<void> {
+  await updateDoc(doc(db, 'readings', id), { glossary, choicesGlossary })
+}
+
 export async function createVocabAttempt(input: {
   studentUid: string
   studentName: string

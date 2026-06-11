@@ -3,7 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import { createReadingAttempt, getReading, updateReadingGlossary } from '../lib/firestore'
 import { GlossedPassage } from '../components/GlossedPassage'
-import type { Reading, WordEntry } from '../lib/types'
+import { useGlossQueue, type GlossEntry } from '../components/useGlossQueue'
+import type { Reading } from '../lib/types'
 
 export function ReadingTake() {
   const { id } = useParams<{ id: string }>()
@@ -32,7 +33,7 @@ export function ReadingTake() {
       .finally(() => setLoading(false))
   }, [id])
 
-  async function handleAddWords(entries: WordEntry[]) {
+  async function handleSave(entries: GlossEntry[]) {
     if (!r || entries.length === 0) return
     const next = [...r.glossary]
     for (const { en, ko } of entries) {
@@ -43,6 +44,12 @@ export function ReadingTake() {
     await updateReadingGlossary(r.id, next)
     setR({ ...r, glossary: next })
   }
+
+  const { addWord, panel } = useGlossQueue({
+    aiContext: r?.passage ?? '',
+    showTargets: false,
+    onSave: handleSave,
+  })
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -114,8 +121,7 @@ export function ReadingTake() {
         <GlossedPassage
           passage={r.passage}
           glossary={r.glossary}
-          editable={isAdmin}
-          onAddWords={handleAddWords}
+          onSelectWord={isAdmin ? (w) => addWord(w, 'glossary') : undefined}
         />
       </div>
 
@@ -166,6 +172,8 @@ export function ReadingTake() {
           </button>
         </div>
       </form>
+
+      {isAdmin && panel}
     </div>
   )
 }

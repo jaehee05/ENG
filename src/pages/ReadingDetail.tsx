@@ -1,9 +1,22 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { getReading, updateReadingGlossary } from '../lib/firestore'
+import { getReading, updateReadingGlossaries } from '../lib/firestore'
 import { useAuth } from '../contexts/useAuth'
 import { GlossedPassage } from '../components/GlossedPassage'
+import { useGlossQueue, type GlossEntry } from '../components/useGlossQueue'
 import type { Reading, WordEntry } from '../lib/types'
+
+const CHOICE_MARKS = ['①', '②', '③', '④', '⑤']
+
+function mergeEntries(base: WordEntry[], adds: { en: string; ko: string }[]): WordEntry[] {
+  const next = [...base]
+  for (const { en, ko } of adds) {
+    const idx = next.findIndex((g) => g.en.toLowerCase() === en.toLowerCase())
+    if (idx >= 0) next[idx] = { en: next[idx].en, ko }
+    else next.push({ en, ko })
+  }
+  return next
+}
 
 export function ReadingDetail() {
   const { id } = useParams<{ id: string }>()
@@ -25,30 +38,33 @@ export function ReadingDetail() {
       .finally(() => setLoading(false))
   }, [id])
 
-  async function handleAddWords(entries: WordEntry[]) {
-    if (!r || entries.length === 0) return
-    const next = [...r.glossary]
-    let added = 0
-    let updated = 0
-    for (const { en, ko } of entries) {
-      const idx = next.findIndex((g) => g.en.toLowerCase() === en.toLowerCase())
-      if (idx >= 0) {
-        next[idx] = { en: next[idx].en, ko }
-        updated++
-      } else {
-        next.push({ en, ko })
-        added++
-      }
-    }
-    await updateReadingGlossary(r.id, next)
-    setR({ ...r, glossary: next })
-    setSavedNote(`단어 ${added}개 추가${updated ? `, ${updated}개 수정` : ''}했습니다.`)
+  async function handleSave(entries: GlossEntry[]) {
+    if (!r) return
+    const nextGlossary = mergeEntries(
+      r.glossary,
+      entries.filter((e) => e.target === 'glossary'),
+    )
+    const nextChoices = mergeEntries(
+      r.choicesGlossary ?? [],
+      entries.filter((e) => e.target === 'choices'),
+    )
+    await updateReadingGlossaries(r.id, nextGlossary, nextChoices)
+    setR({ ...r, glossary: nextGlossary, choicesGlossary: nextChoices })
+    setSavedNote(`단어 ${entries.length}개를 단어장에 반영했습니다.`)
     window.setTimeout(() => setSavedNote(null), 2500)
   }
+
+  const { addWord, panel } = useGlossQueue({
+    aiContext: r?.passage ?? '',
+    showTargets: true,
+    onSave: handleSave,
+  })
 
   if (loading) return <p className="text-slate-500 text-sm">불러오는 중...</p>
   if (error) return <p className="text-red-600 text-sm">{error}</p>
   if (!r) return null
+
+  const choicesGlossary = r.choicesGlossary ?? []
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -56,7 +72,7 @@ export function ReadingDetail() {
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">{r.title}</h1>
           <p className="text-sm text-slate-500 mt-1">
-            {r.questions.length}문항 · 단어 {r.glossary.length}개
+            {r.questions.length}문항 · 지문 단어 {r.glossary.length}개 · 보기 단어 {choicesGlossary.length}개
           </p>
         </div>
         <div className="flex gap-2">
@@ -77,21 +93,48 @@ export function ReadingDetail() {
 
       <p className="text-sm text-slate-500">
         지문 안 단어를 누르면(또는 마우스를 올리면) 뜻이 표시됩니다.
-        {isAdmin && ' 관리자는 지문에서 단어들을 드래그해 모아둔 뒤, AI로 뜻을 한 번에 찾아 추가할 수 있습니다.'}
+        {isAdmin && ' 관리자는 지문과 보기에서 단어들을 드래그해 모아둔 뒤, AI로 뜻을 한 번에 찾아 추가할 수 있습니다.'}
       </p>
 
       {savedNote && (
         <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{savedNote}</p>
       )}
 
-      <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
-        <GlossedPassage
-          passage={r.passage}
-          glossary={r.glossary}
-          editable={isAdmin}
-          onAddWords={handleAddWords}
-        />
+      <div>
+        <h2 className="text-sm font-semibold text-slate-700 mb-2">지문</h2>
+        <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
+          <GlossedPassage
+            passage={r.passage}
+            glossary={r.glossary}
+            onSelectWord={isAdmin ? (w) => addWord(w, 'glossary') : undefined}
+          />
+        </div>
       </div>
+
+      {isAdmin && (
+        <div>
+          <h2 className="text-sm font-semibold text-slate-700 mb-2">
+            보기(선지) · 단어를 드래그하면 보기 단어장에 추가됩니다
+          </h2>
+          <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5 space-y-4">
+            {r.questions.map((q, qi) => (
+              <div key={qi} className="space-y-1">
+                <p className="text-sm font-medium text-slate-800 whitespace-pre-wrap">
+                  {qi + 1}. {q.q}
+                </p>
+                <GlossedPassage
+                  passage={q.choices.map((c, ci) => `${CHOICE_MARKS[ci]} ${c}`).join('\n')}
+                  glossary={choicesGlossary}
+                  onSelectWord={(w) => addWord(w, 'choices')}
+                  className="text-sm sm:text-base leading-7 text-slate-700 break-words whitespace-pre-wrap"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {isAdmin && panel}
     </div>
   )
 }
