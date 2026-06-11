@@ -15,6 +15,7 @@ export function VocabTake() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showHints, setShowHints] = useState(true)
 
   useEffect(() => {
     if (!id) return
@@ -38,6 +39,10 @@ export function VocabTake() {
   }, [id])
 
   const answered = useMemo(() => answers.filter((a) => a.trim()).length, [answers])
+  const hasHints = useMemo(
+    () => set?.words.some((w) => w.example || w.definitionEn) ?? false,
+    [set],
+  )
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -74,45 +79,72 @@ export function VocabTake() {
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">{set.title}</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          영단어의 뜻을 한국어로 입력하세요. 총 {set.words.length}문항
-        </p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900">{set.title}</h1>
+          <p className="text-sm text-slate-500 mt-1">
+            영단어의 뜻을 한국어로 입력하세요. 총 {set.words.length}문항
+          </p>
+        </div>
+        {hasHints && (
+          <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showHints}
+              onChange={(e) => setShowHints(e.target.checked)}
+              className="accent-brand-600"
+            />
+            예문·영영 힌트 보기
+          </label>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-2">
-        <div className="rounded-md border border-slate-200 bg-white overflow-hidden">
-          <div className="grid grid-cols-12 px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-50 border-b border-slate-200">
-            <div className="col-span-1">#</div>
-            <div className="col-span-5">영단어</div>
-            <div className="col-span-6">뜻</div>
-          </div>
+        <ul className="rounded-lg border border-slate-200 bg-white divide-y divide-slate-100">
           {order.map((wordIdx, slotIdx) => {
             const w = set.words[wordIdx]
+            const showHintRow = showHints && (w.example || w.definitionEn)
             return (
-              <div
-                key={slotIdx}
-                className="grid grid-cols-12 px-4 py-2 items-center border-b border-slate-100 last:border-b-0"
-              >
-                <div className="col-span-1 text-sm text-slate-500">{slotIdx + 1}</div>
-                <div className="col-span-5 text-sm font-medium text-slate-900">{w.en}</div>
-                <div className="col-span-6">
-                  <input
-                    type="text"
-                    value={answers[slotIdx] ?? ''}
-                    onChange={(e) => {
-                      const next = [...answers]
-                      next[slotIdx] = e.target.value
-                      setAnswers(next)
-                    }}
-                    className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  />
+              <li key={slotIdx} className="px-4 py-3 space-y-1.5">
+                <div className="grid grid-cols-12 items-center gap-2">
+                  <div className="col-span-1 text-sm text-slate-500">{slotIdx + 1}</div>
+                  <div className="col-span-5 text-sm font-medium text-slate-900 break-words">
+                    {w.en}
+                  </div>
+                  <div className="col-span-6">
+                    <input
+                      type="text"
+                      value={answers[slotIdx] ?? ''}
+                      onChange={(e) => {
+                        const next = [...answers]
+                        next[slotIdx] = e.target.value
+                        setAnswers(next)
+                      }}
+                      placeholder="한국어 뜻"
+                      className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    />
+                  </div>
                 </div>
-              </div>
+                {showHintRow && (
+                  <div className="pl-[calc(8.333%+8px)] space-y-0.5">
+                    {w.definitionEn && (
+                      <p className="text-xs text-slate-600">
+                        <span className="text-slate-400 mr-1">[영영]</span>
+                        {w.definitionEn}
+                      </p>
+                    )}
+                    {w.example && (
+                      <p className="text-xs text-slate-600 italic">
+                        <span className="text-slate-400 mr-1 not-italic">[예문]</span>
+                        {w.example}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </li>
             )
           })}
-        </div>
+        </ul>
 
         <div className="sticky bottom-0 bg-white/90 backdrop-blur-sm rounded-b-lg py-3 px-4 border-t border-slate-200 flex items-center justify-between">
           <p className="text-sm text-slate-600">

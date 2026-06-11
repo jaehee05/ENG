@@ -70,6 +70,33 @@ export async function importReadingsFromPdf(input: {
   return data.readings ?? []
 }
 
+export interface EnrichedWord {
+  en: string
+  ko: string
+  example: string
+  definitionEn: string
+}
+
+export async function enrichVocab(words: { en: string; ko: string }[]): Promise<EnrichedWord[]> {
+  const res = await fetch('/api/enrich-vocab', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ words }),
+  })
+  if (!res.ok) {
+    let message = `요청 실패 (HTTP ${res.status})`
+    try {
+      const body = (await res.json()) as { error?: string }
+      if (body.error) message = body.error
+    } catch {
+      // ignore
+    }
+    throw new Error(message)
+  }
+  const data = (await res.json()) as { words: EnrichedWord[] }
+  return data.words ?? []
+}
+
 export function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()

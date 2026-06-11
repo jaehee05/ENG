@@ -41,23 +41,29 @@ export function VocabDetail() {
         </Link>
       </div>
 
-      <div className="rounded-md border border-slate-200 bg-white overflow-hidden">
-        <div className="grid grid-cols-12 px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-50 border-b border-slate-200">
-          <div className="col-span-1">#</div>
-          <div className="col-span-5">영단어</div>
-          <div className="col-span-6">뜻</div>
-        </div>
+      <ul className="rounded-lg border border-slate-200 bg-white divide-y divide-slate-100">
         {set.words.map((w, i) => (
-          <div
-            key={i}
-            className="grid grid-cols-12 px-4 py-2 text-sm items-center border-b border-slate-100 last:border-b-0"
-          >
-            <div className="col-span-1 text-slate-500">{i + 1}</div>
-            <div className="col-span-5 font-medium text-slate-900">{w.en}</div>
-            <div className="col-span-6 text-slate-600">{w.ko}</div>
-          </div>
+          <li key={i} className="px-4 py-3 space-y-1.5">
+            <div className="flex items-baseline gap-3 flex-wrap">
+              <span className="text-xs text-slate-400 w-6">{i + 1}.</span>
+              <span className="font-semibold text-slate-900">{w.en}</span>
+              <span className="text-slate-600">{w.ko}</span>
+            </div>
+            {w.definitionEn && (
+              <p className="pl-9 text-sm text-slate-700">
+                <span className="text-xs text-slate-400 mr-1">[영영]</span>
+                {w.definitionEn}
+              </p>
+            )}
+            {w.example && (
+              <p className="pl-9 text-sm text-slate-700 italic">
+                <span className="text-xs text-slate-400 not-italic mr-1">[예문]</span>
+                {w.example}
+              </p>
+            )}
+          </li>
         ))}
-      </div>
+      </ul>
     </div>
   )
 }

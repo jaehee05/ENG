@@ -19,6 +19,8 @@ export interface UserAccount {
 export interface WordEntry {
   en: string
   ko: string
+  example?: string
+  definitionEn?: string
 }
 
 export interface VocabSet {
