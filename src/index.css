@@ -1,3 +1,5 @@
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -13,8 +15,13 @@ html, body {
 }
 
 body {
-  background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 60%, #f5f3ff 100%);
+  font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', system-ui, sans-serif;
+  background: radial-gradient(900px 600px at 12% -10%, rgba(99, 102, 241, 0.10), transparent 60%),
+              radial-gradient(700px 500px at 100% 0%, rgba(168, 85, 247, 0.10), transparent 55%),
+              linear-gradient(180deg, #f9fafb 0%, #f1f5fb 100%);
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.01em;
+  color: #1e293b;
 }
