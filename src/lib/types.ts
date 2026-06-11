@@ -30,10 +30,49 @@ export interface VocabSet {
   createdAt: Timestamp | null
 }
 
+export type ReadingQuestionType =
+  | 'standard'
+  | 'cloze'
+  | 'order'
+  | 'insert'
+  | 'summary'
+  | 'irrelevant'
+  | 'underline-grammar'
+  | 'underline-vocab'
+
 export interface ReadingQuestion {
+  type?: ReadingQuestionType
   q: string
+  /** Question-specific body text. Falls back to reading.passage if omitted. */
+  body?: string
+  /** Boxed "given" content shown above the body (order/insert types). */
+  intro?: string
+  /** Summary panel shown below the body (summary type, with (A)/(B) blanks). */
+  summaryBox?: string
   choices: string[]
   answer: number
+}
+
+export const READING_TYPE_LABEL: Record<ReadingQuestionType, string> = {
+  standard: '일반 (제목·주제·주장 등)',
+  cloze: '빈칸 추론',
+  order: '글의 순서',
+  insert: '문장 위치',
+  summary: '요약문 빈칸',
+  irrelevant: '흐름 무관 문장',
+  'underline-grammar': '어법상 틀린 것',
+  'underline-vocab': '문맥상 낱말 쓰임',
+}
+
+export const READING_TYPE_PROMPT: Record<ReadingQuestionType, string> = {
+  standard: '윗글의 주제로 가장 적절한 것은?',
+  cloze: '다음 빈칸에 들어갈 말로 가장 적절한 것은?',
+  order: '주어진 글 다음에 이어질 글의 순서로 가장 적절한 것은?',
+  insert: '글의 흐름으로 보아, 주어진 문장이 들어가기에 가장 적절한 곳은?',
+  summary: '다음 글의 내용을 한 문장으로 요약하고자 한다. 빈칸 (A), (B)에 들어갈 말로 가장 적절한 것은?',
+  irrelevant: '다음 글에서 전체 흐름과 관계 없는 문장은?',
+  'underline-grammar': '다음 글의 밑줄 친 부분 중, 어법상 틀린 것은?',
+  'underline-vocab': '다음 글의 밑줄 친 부분 중, 문맥상 낱말의 쓰임이 적절하지 않은 것은?',
 }
 
 export interface Reading {

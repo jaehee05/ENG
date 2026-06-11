@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getReading } from '../lib/firestore'
-import type { Reading } from '../lib/types'
+import type { Reading, ReadingQuestion } from '../lib/types'
 
 const CHOICE_MARKS = ['①', '②', '③', '④', '⑤']
 
@@ -22,6 +22,10 @@ function GlossaryColumn({ items, label }: { items: { en: string; ko: string }[];
       </ul>
     </div>
   )
+}
+
+function bodyFor(q: ReadingQuestion, fallbackPassage: string): string {
+  return q.body?.trim() ? q.body : fallbackPassage
 }
 
 export function ReadingSheet() {
@@ -68,33 +72,56 @@ export function ReadingSheet() {
       </div>
 
       <div className="-mx-4 px-4 overflow-x-auto print:mx-0 print:px-0 print:overflow-visible">
-      <div className="sheet bg-white border border-slate-200 print:border-0 mx-auto min-w-[680px] max-w-[210mm] p-8 print:p-0 font-serif text-slate-900">
-        {r.questions.map((q, qi) => (
-          <section key={qi} className={qi > 0 ? 'mt-10 print:break-before-page' : ''}>
-            <p className="text-[12pt] font-semibold mb-2">
-              {qi + 1}. {q.q}
-            </p>
+        <div className="sheet bg-white border border-slate-200 print:border-0 mx-auto min-w-[680px] max-w-[210mm] p-8 print:p-0 font-serif text-slate-900">
+          {r.questions.map((q, qi) => {
+            const body = bodyFor(q, r.passage)
+            return (
+              <section key={qi} className={qi > 0 ? 'mt-10 print:break-before-page' : ''}>
+                <p className="text-[12pt] font-semibold mb-2">
+                  {qi + 1}. {q.q}
+                </p>
 
-            <div className="grid grid-cols-3 gap-6">
-              <div className="col-span-2 text-[11.5pt] leading-[1.7] whitespace-pre-wrap text-justify">
-                {r.passage}
-              </div>
-              <GlossaryColumn items={r.glossary} />
-            </div>
+                {q.intro && q.intro.trim() && (
+                  <div className="grid grid-cols-3 gap-6 mb-3">
+                    <div className="col-span-2 border border-slate-400 p-3 text-[11pt] leading-[1.6] whitespace-pre-wrap">
+                      {q.intro}
+                    </div>
+                    <div />
+                  </div>
+                )}
 
-            <div className="grid grid-cols-3 gap-6 mt-4">
-              <ol className="col-span-2 space-y-1 text-[11pt] leading-[1.6]">
-                {q.choices.map((c, ci) => (
-                  <li key={ci}>
-                    {CHOICE_MARKS[ci]} {c}
-                  </li>
-                ))}
-              </ol>
-              <GlossaryColumn items={choicesGlossary} />
-            </div>
-          </section>
-        ))}
-      </div>
+                {body && body.trim() && (
+                  <div className="grid grid-cols-3 gap-6">
+                    <div className="col-span-2 text-[11.5pt] leading-[1.7] whitespace-pre-wrap text-justify">
+                      {body}
+                    </div>
+                    <GlossaryColumn items={r.glossary} />
+                  </div>
+                )}
+
+                {q.summaryBox && q.summaryBox.trim() && (
+                  <div className="grid grid-cols-3 gap-6 mt-3">
+                    <div className="col-span-2 border border-slate-400 p-3 text-[11pt] leading-[1.6] whitespace-pre-wrap">
+                      {q.summaryBox}
+                    </div>
+                    <div />
+                  </div>
+                )}
+
+                <div className="grid grid-cols-3 gap-6 mt-4">
+                  <ol className="col-span-2 space-y-1 text-[11pt] leading-[1.6]">
+                    {q.choices.map((c, ci) => (
+                      <li key={ci}>
+                        {CHOICE_MARKS[ci]} {c}
+                      </li>
+                    ))}
+                  </ol>
+                  <GlossaryColumn items={choicesGlossary} />
+                </div>
+              </section>
+            )
+          })}
+        </div>
       </div>
 
       <style>{`

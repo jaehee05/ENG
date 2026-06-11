@@ -1,18 +1,14 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
-import { createReadingAttempt, getReading, updateReadingGlossary } from '../lib/firestore'
+import { createReadingAttempt, getReading } from '../lib/firestore'
 import { listMyWordbookKeys, lookupWord } from '../lib/wordbook'
-import { GlossedPassage } from '../components/GlossedPassage'
-import { useGlossQueue, type GlossEntry } from '../components/useGlossQueue'
+import { QuestionView } from '../components/QuestionView'
 import type { Reading } from '../lib/types'
-
-const CHOICE_MARKS = ['①', '②', '③', '④', '⑤']
 
 export function ReadingTake() {
   const { id } = useParams<{ id: string }>()
   const { profile } = useAuth()
-  const isAdmin = profile?.role === 'admin'
   const navigate = useNavigate()
   const [r, setR] = useState<Reading | null>(null)
   const [answers, setAnswers] = useState<number[]>([])
@@ -62,24 +58,6 @@ export function ReadingTake() {
     },
     [profile, r],
   )
-
-  async function handleSave(entries: GlossEntry[]) {
-    if (!r || entries.length === 0) return
-    const next = [...r.glossary]
-    for (const { en, ko } of entries) {
-      const idx = next.findIndex((g) => g.en.toLowerCase() === en.toLowerCase())
-      if (idx >= 0) next[idx] = { en: next[idx].en, ko }
-      else next.push({ en, ko })
-    }
-    await updateReadingGlossary(r.id, next)
-    setR({ ...r, glossary: next })
-  }
-
-  const { addWord, panel } = useGlossQueue({
-    aiContext: r?.passage ?? '',
-    showTargets: false,
-    onSave: handleSave,
-  })
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -163,57 +141,24 @@ export function ReadingTake() {
         )}
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
-        <GlossedPassage
-          passage={r.passage}
-          glossary={r.glossary}
-          onSelectWord={isAdmin ? (w) => addWord(w, 'glossary') : undefined}
-          onWordLookup={isAdmin ? undefined : handleWordLookup}
-          viewedWords={viewedWords}
-        />
-      </div>
-
       <form onSubmit={handleSubmit} className="space-y-4">
         {r.questions.map((q, i) => (
-          <div key={i} className="rounded-md border border-slate-200 bg-white p-4 space-y-3">
-            <p className="text-sm font-semibold text-slate-900 whitespace-pre-wrap">
-              {i + 1}. {q.q}
-            </p>
-            <div className="space-y-2">
-              {q.choices.map((c, ci) => (
-                <label
-                  key={ci}
-                  className={`flex items-start gap-3 rounded border px-3 py-2 cursor-pointer transition ${
-                    answers[i] === ci
-                      ? 'border-brand-500 bg-brand-50/50'
-                      : 'border-slate-200 hover:bg-slate-50'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name={`q-${i}`}
-                    checked={answers[i] === ci}
-                    onChange={() => {
-                      const next = [...answers]
-                      next[i] = ci
-                      setAnswers(next)
-                    }}
-                    className="mt-1 accent-brand-600"
-                  />
-                  <span className="text-sm text-slate-700 w-5 mt-0.5">{CHOICE_MARKS[ci]}</span>
-                  <span className="text-sm flex-1">
-                    <GlossedPassage
-                      passage={c}
-                      glossary={choicesGlossary}
-                      onWordLookup={isAdmin ? undefined : handleWordLookup}
-                      viewedWords={viewedWords}
-                      className="text-sm leading-6 text-slate-700 break-words whitespace-pre-wrap"
-                    />
-                  </span>
-                </label>
-              ))}
-            </div>
-          </div>
+          <QuestionView
+            key={i}
+            index={i}
+            question={q}
+            fallbackPassage={r.passage}
+            passageGlossary={r.glossary}
+            choicesGlossary={choicesGlossary}
+            viewedWords={viewedWords}
+            onWordLookup={handleWordLookup}
+            selected={answers[i]}
+            onSelect={(v) => {
+              const next = [...answers]
+              next[i] = v
+              setAnswers(next)
+            }}
+          />
         ))}
 
         {error && <p className="text-sm text-red-600">{error}</p>}
@@ -228,8 +173,6 @@ export function ReadingTake() {
           </button>
         </div>
       </form>
-
-      {isAdmin && panel}
     </div>
   )
 }

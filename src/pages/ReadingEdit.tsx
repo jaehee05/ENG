@@ -2,21 +2,42 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { deleteReading, getReading, updateReadingContent } from '../lib/firestore'
 import type { Reading, ReadingQuestion } from '../lib/types'
-
-interface DraftQuestion {
-  q: string
-  choices: string[]
-  answer: number
-}
+import { QuestionEditor } from '../components/QuestionEditor'
+import { emptyDraftQuestion, type DraftQuestion } from '../components/draftQuestion'
 
 function fromQuestion(q: ReadingQuestion): DraftQuestion {
   const choices = [...q.choices]
   while (choices.length < 5) choices.push('')
-  return { q: q.q, choices: choices.slice(0, 5), answer: q.answer }
+  return {
+    type: q.type ?? 'standard',
+    q: q.q,
+    body: q.body ?? '',
+    intro: q.intro ?? '',
+    summaryBox: q.summaryBox ?? '',
+    choices: choices.slice(0, 5),
+    answer: q.answer,
+  }
 }
 
-function emptyQuestion(): DraftQuestion {
-  return { q: '', choices: ['', '', '', '', ''], answer: 0 }
+function trimDraft(q: DraftQuestion) {
+  const out: {
+    type: DraftQuestion['type']
+    q: string
+    choices: string[]
+    answer: number
+    body?: string
+    intro?: string
+    summaryBox?: string
+  } = {
+    type: q.type,
+    q: q.q.trim(),
+    choices: q.choices.map((c) => c.trim()),
+    answer: q.answer,
+  }
+  if (q.body.trim()) out.body = q.body.trim()
+  if (q.intro.trim()) out.intro = q.intro.trim()
+  if (q.summaryBox.trim()) out.summaryBox = q.summaryBox.trim()
+  return out
 }
 
 export function ReadingEdit() {
@@ -27,7 +48,7 @@ export function ReadingEdit() {
   const [error, setError] = useState<string | null>(null)
   const [title, setTitle] = useState('')
   const [passage, setPassage] = useState('')
-  const [questions, setQuestions] = useState<DraftQuestion[]>([emptyQuestion()])
+  const [questions, setQuestions] = useState<DraftQuestion[]>([emptyDraftQuestion()])
   const [submitting, setSubmitting] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -44,7 +65,9 @@ export function ReadingEdit() {
         setOriginal(r)
         setTitle(r.title)
         setPassage(r.passage)
-        setQuestions(r.questions.length > 0 ? r.questions.map(fromQuestion) : [emptyQuestion()])
+        setQuestions(
+          r.questions.length > 0 ? r.questions.map(fromQuestion) : [emptyDraftQuestion()],
+        )
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : '불러오기에 실패했습니다.')
@@ -57,31 +80,19 @@ export function ReadingEdit() {
     }
   }, [id])
 
-  function updateQuestion(i: number, patch: Partial<DraftQuestion>) {
-    setQuestions((prev) => prev.map((q, idx) => (idx === i ? { ...q, ...patch } : q)))
-  }
-  function updateChoice(i: number, ci: number, value: string) {
-    setQuestions((prev) =>
-      prev.map((q, idx) =>
-        idx === i ? { ...q, choices: q.choices.map((c, cidx) => (cidx === ci ? value : c)) } : q,
-      ),
-    )
-  }
-  function removeQuestion(i: number) {
-    setQuestions((prev) => prev.filter((_, idx) => idx !== i))
-  }
-
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
     if (!original) return
     if (!title.trim()) return setError('제목을 입력하세요.')
-    if (!passage.trim()) return setError('지문을 입력하세요.')
     if (questions.length === 0) return setError('문제를 1개 이상 입력하세요.')
     for (const [i, q] of questions.entries()) {
-      if (!q.q.trim()) return setError(`${i + 1}번 문제의 질문을 입력하세요.`)
+      if (!q.q.trim()) return setError(`${i + 1}번 문제의 발문을 입력하세요.`)
       if (q.choices.some((c) => !c.trim()))
         return setError(`${i + 1}번 문제의 선지를 모두 채우세요.`)
+    }
+    if (!passage.trim() && questions.some((q) => !q.body.trim() && q.type === 'standard')) {
+      return setError('일반 유형 문제가 있으면 지문을 입력하거나 문제별 본문을 채워주세요.')
     }
 
     setSubmitting(true)
@@ -89,11 +100,7 @@ export function ReadingEdit() {
       await updateReadingContent(original.id, {
         title: title.trim(),
         passage: passage.trim(),
-        questions: questions.map((q) => ({
-          q: q.q.trim(),
-          choices: q.choices.map((c) => c.trim()),
-          answer: q.answer,
-        })),
+        questions: questions.map(trimDraft),
       })
       navigate(`/reading/${original.id}`)
     } catch (err) {
@@ -129,7 +136,9 @@ export function ReadingEdit() {
     <div className="space-y-6 max-w-3xl">
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">지문 수정</h1>
-        <p className="text-sm text-slate-500 mt-1">단어장 항목은 상세 페이지의 "단어장 수정"에서 관리합니다.</p>
+        <p className="text-sm text-slate-500 mt-1">
+          단어장 항목은 상세 페이지의 "단어장 수정"에서 관리합니다.
+        </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -144,7 +153,12 @@ export function ReadingEdit() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">지문</label>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            지문{' '}
+            <span className="font-normal text-slate-500">
+              (일반 유형 문제의 공용 본문)
+            </span>
+          </label>
           <textarea
             value={passage}
             onChange={(e) => setPassage(e.target.value)}
@@ -158,7 +172,7 @@ export function ReadingEdit() {
             <label className="block text-sm font-medium text-slate-700">문제</label>
             <button
               type="button"
-              onClick={() => setQuestions((prev) => [...prev, emptyQuestion()])}
+              onClick={() => setQuestions((prev) => [...prev, emptyDraftQuestion()])}
               className="text-sm text-slate-700 hover:text-slate-900 underline"
             >
               + 문제 추가
@@ -166,51 +180,16 @@ export function ReadingEdit() {
           </div>
 
           {questions.map((q, i) => (
-            <div key={i} className="rounded-md border border-slate-200 bg-white p-4 space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-semibold text-slate-700">{i + 1}번 문제</span>
-                {questions.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeQuestion(i)}
-                    className="text-xs text-red-600 hover:underline"
-                  >
-                    삭제
-                  </button>
-                )}
-              </div>
-              <textarea
-                value={q.q}
-                onChange={(e) => updateQuestion(i, { q: e.target.value })}
-                rows={2}
-                className={`${inputCls} rounded`}
-              />
-              <div className="space-y-2">
-                {q.choices.map((c, ci) => (
-                  <label key={ci} className="flex items-start gap-2">
-                    <input
-                      type="radio"
-                      name={`answer-${i}`}
-                      checked={q.answer === ci}
-                      onChange={() => updateQuestion(i, { answer: ci })}
-                      className="mt-1.5 accent-brand-600"
-                    />
-                    <span className="text-sm text-slate-600 w-5 mt-1">
-                      {['①', '②', '③', '④', '⑤'][ci]}
-                    </span>
-                    <input
-                      type="text"
-                      value={c}
-                      onChange={(e) => updateChoice(i, ci, e.target.value)}
-                      className="flex-1 rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                    />
-                  </label>
-                ))}
-              </div>
-              <p className="text-xs text-slate-500">
-                정답: {['①', '②', '③', '④', '⑤'][q.answer]}
-              </p>
-            </div>
+            <QuestionEditor
+              key={i}
+              index={i}
+              question={q}
+              canRemove={questions.length > 1}
+              onChange={(next) =>
+                setQuestions((prev) => prev.map((x, idx) => (idx === i ? next : x)))
+              }
+              onRemove={() => setQuestions((prev) => prev.filter((_, idx) => idx !== i))}
+            />
           ))}
         </div>
 
