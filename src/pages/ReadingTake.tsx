@@ -148,7 +148,7 @@ export function ReadingTake() {
             )}
             {choicesGlossary.length > 0 && (
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">보기</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">선지</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
                   {choicesGlossary.map((g, i) => (
                     <div key={i} className="flex gap-2">

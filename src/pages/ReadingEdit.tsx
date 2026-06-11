@@ -81,7 +81,7 @@ export function ReadingEdit() {
     for (const [i, q] of questions.entries()) {
       if (!q.q.trim()) return setError(`${i + 1}번 문제의 질문을 입력하세요.`)
       if (q.choices.some((c) => !c.trim()))
-        return setError(`${i + 1}번 문제의 보기를 모두 채우세요.`)
+        return setError(`${i + 1}번 문제의 선지를 모두 채우세요.`)
     }
 
     setSubmitting(true)

@@ -85,7 +85,7 @@ export function ReadingDetail() {
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">{r.title}</h1>
           <p className="text-sm text-slate-500 mt-1">
-            {r.questions.length}문항 · 지문 단어 {r.glossary.length}개 · 보기 단어 {choicesGlossary.length}개
+            {r.questions.length}문항 · 지문 단어 {r.glossary.length}개 · 선지 단어 {choicesGlossary.length}개
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -130,7 +130,7 @@ export function ReadingDetail() {
       {isAdmin && (
         <div>
           <h2 className="text-sm font-semibold text-slate-700 mb-2">
-            보기(선지) · 단어를 드래그하면 보기 단어장에 추가됩니다
+            선지 · 단어를 드래그하면 선지 단어장에 추가됩니다
           </h2>
           <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5 space-y-4">
             {r.questions.map((q, qi) => (
@@ -159,7 +159,7 @@ export function ReadingDetail() {
             onSave={handleReplaceGlossary}
           />
           <GlossaryEditor
-            title="보기 단어장"
+            title="선지 단어장"
             words={choicesGlossary}
             onSave={handleReplaceChoicesGlossary}
           />
