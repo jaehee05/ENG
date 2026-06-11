@@ -21,7 +21,7 @@ export function Pending() {
       <div className="w-full max-w-md text-center bg-white rounded-2xl shadow-lg shadow-indigo-900/5 border border-slate-200 p-8">
         <div className="text-center mb-4">
           <p className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
-            ENG
+            KJHEDU
           </p>
         </div>
         <h1 className="text-xl font-semibold text-slate-900">승인 대기 중</h1>

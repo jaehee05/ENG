@@ -23,7 +23,7 @@ export function Layout() {
             to="/"
             className="text-lg font-bold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent"
           >
-            ENG
+            KJHEDU
           </Link>
           <div className="flex items-center gap-2 sm:gap-3 order-2 sm:order-3">
             <span className="text-sm text-slate-600 hidden sm:inline">

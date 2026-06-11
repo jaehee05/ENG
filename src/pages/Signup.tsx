@@ -43,9 +43,8 @@ export function Signup() {
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-lg shadow-indigo-900/5 border border-slate-200 p-8">
         <div className="text-center mb-6">
           <p className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
-            ENG
+            KJHEDU
           </p>
-          <p className="text-xs text-slate-500 mt-1">영어 과외 도우미</p>
         </div>
         <h1 className="text-xl font-semibold text-slate-900 mb-5">회원가입</h1>
 
