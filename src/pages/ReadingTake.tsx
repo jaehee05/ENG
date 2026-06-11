@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import { createReadingAttempt, getReading, updateReadingGlossary } from '../lib/firestore'
 import { GlossedPassage } from '../components/GlossedPassage'
-import type { Reading } from '../lib/types'
+import type { Reading, WordEntry } from '../lib/types'
 
 export function ReadingTake() {
   const { id } = useParams<{ id: string }>()
@@ -32,14 +32,16 @@ export function ReadingTake() {
       .finally(() => setLoading(false))
   }, [id])
 
-  async function handleAddWord(en: string, ko: string) {
-    if (!r) return
-    const exists = r.glossary.some((g) => g.en.toLowerCase() === en.toLowerCase())
-    const nextGlossary = exists
-      ? r.glossary.map((g) => (g.en.toLowerCase() === en.toLowerCase() ? { en: g.en, ko } : g))
-      : [...r.glossary, { en, ko }]
-    await updateReadingGlossary(r.id, nextGlossary)
-    setR({ ...r, glossary: nextGlossary })
+  async function handleAddWords(entries: WordEntry[]) {
+    if (!r || entries.length === 0) return
+    const next = [...r.glossary]
+    for (const { en, ko } of entries) {
+      const idx = next.findIndex((g) => g.en.toLowerCase() === en.toLowerCase())
+      if (idx >= 0) next[idx] = { en: next[idx].en, ko }
+      else next.push({ en, ko })
+    }
+    await updateReadingGlossary(r.id, next)
+    setR({ ...r, glossary: next })
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -83,7 +85,7 @@ export function ReadingTake() {
         <h1 className="text-2xl font-semibold text-slate-900">{r.title}</h1>
         <p className="text-sm text-slate-500 mt-1">
           지문 안 밑줄 단어를 누르면(또는 마우스를 올리면) 뜻이 표시됩니다.
-          {isAdmin && ' 관리자는 단어를 드래그해 뜻을 추가할 수 있습니다.'}
+          {isAdmin && ' 관리자는 단어들을 드래그해 모아둔 뒤 AI로 한 번에 뜻을 추가할 수 있습니다.'}
         </p>
       </div>
 
@@ -113,7 +115,7 @@ export function ReadingTake() {
           passage={r.passage}
           glossary={r.glossary}
           editable={isAdmin}
-          onAddWord={handleAddWord}
+          onAddWords={handleAddWords}
         />
       </div>
 

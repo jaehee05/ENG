@@ -35,11 +35,11 @@ export function wordsToText(words: WordEntry[]): string {
   return words.map((w) => `${w.en} - ${w.ko}`).join('\n')
 }
 
-export async function defineWord(input: {
-  word: string
+export async function defineWords(input: {
+  words: string[]
   passage: string
-}): Promise<string> {
-  const res = await fetch('/api/define-word', {
+}): Promise<WordEntry[]> {
+  const res = await fetch('/api/define-words', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(input),
@@ -54,6 +54,6 @@ export async function defineWord(input: {
     }
     throw new Error(message)
   }
-  const data = (await res.json()) as { ko?: string }
-  return data.ko ?? ''
+  const data = (await res.json()) as { entries?: WordEntry[] }
+  return data.entries ?? []
 }
