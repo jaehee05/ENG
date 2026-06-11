@@ -51,7 +51,7 @@ export interface Attempt {
   id: string
   studentUid: string
   studentName: string
-  type: 'vocab' | 'reading'
+  type: 'vocab' | 'reading' | 'wordbook'
   refId: string
   refTitle: string
   total: number
@@ -59,6 +59,19 @@ export interface Attempt {
   vocabResults?: VocabResult[]
   readingResults?: ReadingResult[]
   createdAt: Timestamp | null
+}
+
+export interface ReadingRef {
+  id: string
+  title: string
+}
+
+export interface WordLookup {
+  en: string
+  ko: string
+  count: number
+  readings: ReadingRef[]
+  lastSeenAt: Timestamp | null
 }
 
 export function parseWordList(text: string): WordEntry[] {

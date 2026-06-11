@@ -35,7 +35,7 @@ export function VocabDetail() {
         </div>
         <Link
           to={`/vocab/${set.id}/take`}
-          className="rounded-md bg-slate-900 text-white text-sm font-medium px-4 py-2 hover:bg-slate-800"
+          className="rounded-md bg-indigo-600 text-white text-sm font-medium px-4 py-2 hover:bg-indigo-700 transition"
         >
           시험 시작
         </Link>

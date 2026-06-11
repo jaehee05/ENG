@@ -4,5 +4,11 @@
 
 html, body, #root {
   min-height: 100%;
-  background-color: #f8fafc;
+}
+
+body {
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 60%, #f5f3ff 100%);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }

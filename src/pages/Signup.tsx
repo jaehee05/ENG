@@ -46,7 +46,7 @@ export function Signup() {
               required
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
           <div>
@@ -57,7 +57,7 @@ export function Signup() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
           <div>
@@ -69,7 +69,7 @@ export function Signup() {
               minLength={6}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
 
@@ -78,7 +78,7 @@ export function Signup() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full rounded-md bg-slate-900 text-white text-sm font-medium py-2 hover:bg-slate-800 disabled:opacity-60"
+            className="w-full rounded-md bg-indigo-600 text-white text-sm font-medium py-2.5 hover:bg-indigo-700 disabled:opacity-60"
           >
             {submitting ? '가입 중...' : '가입하기'}
           </button>
@@ -86,7 +86,7 @@ export function Signup() {
 
         <p className="mt-4 text-sm text-slate-600 text-center">
           이미 계정이 있으신가요?{' '}
-          <Link to="/login" className="text-slate-900 font-medium hover:underline">
+          <Link to="/login" className="text-indigo-600 font-medium hover:underline">
             로그인
           </Link>
         </p>

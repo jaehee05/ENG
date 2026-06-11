@@ -111,6 +111,27 @@ export async function createVocabAttempt(input: {
   return ref.id
 }
 
+export async function createWordbookAttempt(input: {
+  studentUid: string
+  studentName: string
+  vocabResults: VocabResult[]
+}): Promise<string> {
+  const total = input.vocabResults.length
+  const correct = input.vocabResults.filter((r) => r.correct).length
+  const ref = await addDoc(collection(db, 'attempts'), {
+    studentUid: input.studentUid,
+    studentName: input.studentName,
+    type: 'wordbook',
+    refId: '',
+    refTitle: '내 단어장',
+    total,
+    correct,
+    vocabResults: input.vocabResults,
+    createdAt: serverTimestamp(),
+  })
+  return ref.id
+}
+
 export async function createReadingAttempt(input: {
   studentUid: string
   studentName: string

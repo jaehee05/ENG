@@ -47,7 +47,7 @@ export function ReadingList() {
           <Link
             key={r.id}
             to={`/reading/${r.id}`}
-            className="block rounded-lg border border-slate-200 bg-white p-4 hover:border-slate-400 transition"
+            className="block rounded-lg border border-slate-200 bg-white p-4 hover:border-indigo-300 hover:shadow-md transition"
           >
             <div className="flex items-baseline justify-between gap-3">
               <h2 className="text-base font-semibold text-slate-900 truncate">{r.title}</h2>

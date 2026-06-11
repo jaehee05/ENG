@@ -25,6 +25,13 @@ service cloud.firestore {
       allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow create: if isSignedIn() && request.auth.uid == userId;
       allow update, delete: if isAdmin();
+
+      // Per-student personal wordbook (auto-recorded glossary lookups).
+      match /wordLookups/{lookupId} {
+        allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+        allow create, update: if isSignedIn() && request.auth.uid == userId;
+        allow delete: if isAdmin();
+      }
     }
 
     // Vocab tests and reading content: admin writes, signed-in reads.

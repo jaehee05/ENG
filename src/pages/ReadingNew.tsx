@@ -187,12 +187,7 @@ export function ReadingNew() {
 
         <div className="rounded-md border border-slate-200 bg-slate-50 p-4 space-y-3">
           <div className="flex items-center justify-between gap-3">
-            <div>
-              <h3 className="text-sm font-semibold text-slate-700">단어 풀이</h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                AI 추출 후 필요한 부분은 직접 수정할 수 있습니다.
-              </p>
-            </div>
+            <h3 className="text-sm font-semibold text-slate-700">단어 풀이</h3>
             <button
               type="button"
               onClick={handleExtract}

@@ -17,9 +17,12 @@ export function Layout() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="border-b border-slate-200 bg-white sticky top-0 z-10">
+      <header className="border-b border-slate-200/80 bg-white/70 backdrop-blur-md sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          <Link to="/" className="text-lg font-semibold text-slate-900">
+          <Link
+            to="/"
+            className="text-lg font-bold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent"
+          >
             ENG
           </Link>
           <div className="flex items-center gap-2 sm:gap-3 order-2 sm:order-3">
@@ -47,6 +50,9 @@ export function Layout() {
             </NavLink>
             <NavLink to="/reading" className={linkClass}>
               지문 문제풀이
+            </NavLink>
+            <NavLink to="/wordbook" className={linkClass}>
+              내 단어장
             </NavLink>
           </nav>
         </div>

@@ -84,17 +84,12 @@ export function ReadingDetail() {
           </Link>
           <Link
             to={`/reading/${r.id}/take`}
-            className="flex-1 sm:flex-none text-center rounded-md bg-slate-900 text-white text-sm font-medium px-4 py-2 hover:bg-slate-800"
+            className="flex-1 sm:flex-none text-center rounded-md bg-indigo-600 text-white text-sm font-medium px-4 py-2 hover:bg-indigo-700 transition"
           >
             풀이 시작
           </Link>
         </div>
       </div>
-
-      <p className="text-sm text-slate-500">
-        지문 안 단어를 누르면(또는 마우스를 올리면) 뜻이 표시됩니다.
-        {isAdmin && ' 관리자는 지문과 보기에서 단어들을 드래그해 모아둔 뒤, AI로 뜻을 한 번에 찾아 추가할 수 있습니다.'}
-      </p>
 
       {savedNote && (
         <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{savedNote}</p>

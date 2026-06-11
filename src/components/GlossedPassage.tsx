@@ -19,10 +19,21 @@ interface Props {
   glossary: WordEntry[]
   /** When set, admin can drag-select a word and it is reported here. */
   onSelectWord?: (word: string) => void
+  /** When set, called whenever a student opens a glossed word (en, ko). */
+  onWordLookup?: (en: string, ko: string) => void
+  /** Lowercase set of words the student has previously looked up — get highlighted. */
+  viewedWords?: Set<string>
   className?: string
 }
 
-export function GlossedPassage({ passage, glossary, onSelectWord, className }: Props) {
+export function GlossedPassage({
+  passage,
+  glossary,
+  onSelectWord,
+  onWordLookup,
+  viewedWords,
+  className,
+}: Props) {
   // index of the currently open tooltip ("lineIdx-tokenIdx"), null = none
   const [activeKey, setActiveKey] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -95,13 +106,25 @@ export function GlossedPassage({ passage, glossary, onSelectWord, className }: P
             if (tok.ko === null) return <span key={ti}>{tok.text}</span>
             const key = `${li}-${ti}`
             const open = activeKey === key
+            const lower = tok.text.toLowerCase()
+            const viewed = viewedWords?.has(lower) ?? false
             return (
               <span key={ti} className="relative inline-block">
                 <span
                   data-gloss-word
                   title={tok.ko}
-                  onClick={() => setActiveKey(open ? null : key)}
-                  className="underline decoration-dotted decoration-slate-400 underline-offset-2 cursor-pointer touch-manipulation"
+                  onClick={() => {
+                    const willOpen = !open
+                    setActiveKey(willOpen ? key : null)
+                    if (willOpen && tok.ko && onWordLookup) {
+                      onWordLookup(tok.text, tok.ko)
+                    }
+                  }}
+                  className={
+                    viewed
+                      ? 'bg-yellow-200/70 rounded-sm px-0.5 cursor-pointer touch-manipulation transition-colors hover:bg-yellow-300/70'
+                      : 'underline decoration-dotted decoration-indigo-400 underline-offset-[3px] cursor-pointer touch-manipulation transition-colors hover:bg-indigo-50 rounded-sm'
+                  }
                 >
                   {tok.text}
                 </span>

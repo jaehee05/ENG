@@ -1,10 +1,13 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import { createReadingAttempt, getReading, updateReadingGlossary } from '../lib/firestore'
+import { listMyWordbookKeys, lookupWord } from '../lib/wordbook'
 import { GlossedPassage } from '../components/GlossedPassage'
 import { useGlossQueue, type GlossEntry } from '../components/useGlossQueue'
 import type { Reading } from '../lib/types'
+
+const CHOICE_MARKS = ['①', '②', '③', '④', '⑤']
 
 export function ReadingTake() {
   const { id } = useParams<{ id: string }>()
@@ -13,10 +16,11 @@ export function ReadingTake() {
   const navigate = useNavigate()
   const [r, setR] = useState<Reading | null>(null)
   const [answers, setAnswers] = useState<number[]>([])
-  const [glossaryOpen, setGlossaryOpen] = useState(true)
+  const [glossaryOpen, setGlossaryOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [viewedWords, setViewedWords] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (!id) return
@@ -32,6 +36,32 @@ export function ReadingTake() {
       .catch((e) => setError(e.message ?? '불러오기 실패'))
       .finally(() => setLoading(false))
   }, [id])
+
+  useEffect(() => {
+    if (!user) return
+    listMyWordbookKeys(user.uid).then(setViewedWords).catch(() => {})
+  }, [user])
+
+  const handleWordLookup = useCallback(
+    (en: string, ko: string) => {
+      if (!user || !r) return
+      const lower = en.toLowerCase()
+      setViewedWords((prev) => {
+        if (prev.has(lower)) return prev
+        const next = new Set(prev)
+        next.add(lower)
+        return next
+      })
+      lookupWord({
+        uid: user.uid,
+        en,
+        ko,
+        readingId: r.id,
+        readingTitle: r.title,
+      }).catch(() => {})
+    },
+    [user, r],
+  )
 
   async function handleSave(entries: GlossEntry[]) {
     if (!r || entries.length === 0) return
@@ -86,33 +116,49 @@ export function ReadingTake() {
   if (error && !r) return <p className="text-red-600 text-sm">{error}</p>
   if (!r) return null
 
+  const choicesGlossary = r.choicesGlossary ?? []
+
   return (
     <div className="space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">{r.title}</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          지문 안 밑줄 단어를 누르면(또는 마우스를 올리면) 뜻이 표시됩니다.
-          {isAdmin && ' 관리자는 단어들을 드래그해 모아둔 뒤 AI로 한 번에 뜻을 추가할 수 있습니다.'}
-        </p>
-      </div>
+      <h1 className="text-2xl font-semibold text-slate-900">{r.title}</h1>
 
       <div className="rounded-lg border border-slate-200 bg-white">
         <button
           type="button"
           onClick={() => setGlossaryOpen((v) => !v)}
-          className="w-full flex items-center justify-between px-5 py-3 border-b border-slate-200 text-sm font-semibold text-slate-700"
+          className="w-full flex items-center justify-between px-5 py-3 text-sm font-semibold text-slate-700"
         >
-          단어장 ({r.glossary.length}개)
-          <span className="text-slate-400">{glossaryOpen ? '접기' : '펼치기'}</span>
+          단어장 ({r.glossary.length + choicesGlossary.length}개)
+          <span className="text-slate-400 text-xs">{glossaryOpen ? '접기' : '펼치기'}</span>
         </button>
         {glossaryOpen && (
-          <div className="px-5 py-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
-            {r.glossary.map((g, i) => (
-              <div key={i} className="flex gap-2">
-                <span className="font-medium text-slate-900 min-w-[120px]">{g.en}</span>
-                <span className="text-slate-600">{g.ko}</span>
+          <div className="border-t border-slate-200 px-5 py-4 space-y-4">
+            {r.glossary.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">지문</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
+                  {r.glossary.map((g, i) => (
+                    <div key={i} className="flex gap-2">
+                      <span className="font-medium text-slate-900 min-w-[120px]">{g.en}</span>
+                      <span className="text-slate-600">{g.ko}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            ))}
+            )}
+            {choicesGlossary.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">보기</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
+                  {choicesGlossary.map((g, i) => (
+                    <div key={i} className="flex gap-2">
+                      <span className="font-medium text-slate-900 min-w-[120px]">{g.en}</span>
+                      <span className="text-slate-600">{g.ko}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -122,6 +168,8 @@ export function ReadingTake() {
           passage={r.passage}
           glossary={r.glossary}
           onSelectWord={isAdmin ? (w) => addWord(w, 'glossary') : undefined}
+          onWordLookup={isAdmin ? undefined : handleWordLookup}
+          viewedWords={viewedWords}
         />
       </div>
 
@@ -137,7 +185,7 @@ export function ReadingTake() {
                   key={ci}
                   className={`flex items-start gap-3 rounded border px-3 py-2 cursor-pointer transition ${
                     answers[i] === ci
-                      ? 'border-slate-900 bg-slate-50'
+                      ? 'border-indigo-500 bg-indigo-50/50'
                       : 'border-slate-200 hover:bg-slate-50'
                   }`}
                 >
@@ -150,10 +198,18 @@ export function ReadingTake() {
                       next[i] = ci
                       setAnswers(next)
                     }}
-                    className="mt-1"
+                    className="mt-1 accent-indigo-600"
                   />
-                  <span className="text-sm text-slate-700 w-5">{['①', '②', '③', '④', '⑤'][ci]}</span>
-                  <span className="text-sm text-slate-700 flex-1">{c}</span>
+                  <span className="text-sm text-slate-700 w-5 mt-0.5">{CHOICE_MARKS[ci]}</span>
+                  <span className="text-sm flex-1">
+                    <GlossedPassage
+                      passage={c}
+                      glossary={choicesGlossary}
+                      onWordLookup={isAdmin ? undefined : handleWordLookup}
+                      viewedWords={viewedWords}
+                      className="text-sm leading-6 text-slate-700 break-words whitespace-pre-wrap"
+                    />
+                  </span>
                 </label>
               ))}
             </div>
@@ -166,7 +222,7 @@ export function ReadingTake() {
           <button
             type="submit"
             disabled={submitting}
-            className="rounded-md bg-slate-900 text-white text-sm font-medium px-5 py-2 hover:bg-slate-800 disabled:opacity-60"
+            className="rounded-md bg-indigo-600 text-white text-sm font-medium px-5 py-2 hover:bg-indigo-700 transition disabled:opacity-60"
           >
             {submitting ? '채점 중...' : '제출하기'}
           </button>
