@@ -122,6 +122,9 @@ export function AdminStudents() {
           <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
             <tr>
               <th className="px-4 py-3 text-left font-semibold">이름</th>
+              <th className="px-4 py-3 text-left font-semibold">학교</th>
+              <th className="px-4 py-3 text-left font-semibold">학생 연락처</th>
+              <th className="px-4 py-3 text-left font-semibold">학부모 연락처</th>
               <th className="px-4 py-3 text-left font-semibold">이메일</th>
               <th className="px-4 py-3 text-left font-semibold">비밀번호</th>
               <th className="px-4 py-3 text-left font-semibold">상태</th>
@@ -132,7 +135,7 @@ export function AdminStudents() {
           <tbody className="divide-y divide-slate-100">
             {others.length === 0 && !loading && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
                   아직 가입한 학생이 없습니다.
                 </td>
               </tr>
@@ -141,8 +144,11 @@ export function AdminStudents() {
               const open = revealed.has(a.id)
               return (
                 <tr key={a.id}>
-                  <td className="px-4 py-3 font-medium text-slate-900">{a.displayName}</td>
-                  <td className="px-4 py-3 text-slate-600">{a.email}</td>
+                  <td className="px-4 py-3 font-medium text-slate-900 whitespace-nowrap">{a.displayName}</td>
+                  <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{a.school || '-'}</td>
+                  <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{a.phone || '-'}</td>
+                  <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{a.parentPhone || '-'}</td>
+                  <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{a.email}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <code className="text-xs bg-slate-100 px-2 py-1 rounded font-mono">

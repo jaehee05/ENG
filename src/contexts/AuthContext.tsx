@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
-import { AuthContext } from './authContextValue'
+import { AuthContext, type SignUpInput } from './authContextValue'
 import {
   getAccount,
   signInAccount,
@@ -50,8 +50,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  async function signUp(email: string, password: string, displayName: string) {
-    const acc = await signUpAccount({ email, password, displayName })
+  async function signUp(input: SignUpInput) {
+    const acc = await signUpAccount(input)
     persist(acc)
   }
 

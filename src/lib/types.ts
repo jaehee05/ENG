@@ -10,6 +10,9 @@ export interface UserAccount {
   displayName: string
   role: UserRole
   status: UserStatus
+  school?: string
+  phone?: string
+  parentPhone?: string
   createdAt: Timestamp | null
 }
 

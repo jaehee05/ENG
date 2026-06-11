@@ -27,6 +27,9 @@ function fromSnap(snap: QueryDocumentSnapshot | DocumentSnapshot): UserAccount {
     displayName: d.displayName ?? '',
     role: d.role === 'admin' ? 'admin' : 'student',
     status: (d.status === 'active' || d.status === 'rejected') ? d.status : 'pending',
+    school: d.school,
+    phone: d.phone,
+    parentPhone: d.parentPhone,
     createdAt: (d.createdAt as Timestamp | undefined) ?? null,
   }
 }
@@ -41,6 +44,9 @@ export async function signUpAccount(input: {
   email: string
   password: string
   displayName: string
+  school?: string
+  phone?: string
+  parentPhone?: string
 }): Promise<UserAccount> {
   const email = input.email.trim().toLowerCase()
   const dup = await getDocs(
@@ -54,21 +60,32 @@ export async function signUpAccount(input: {
   const role: 'admin' | 'student' = isFirst ? 'admin' : 'student'
   const status: UserStatus = isFirst ? 'active' : 'pending'
 
+  const displayName = input.displayName.trim()
+  const school = (input.school ?? '').trim()
+  const phone = (input.phone ?? '').trim()
+  const parentPhone = (input.parentPhone ?? '').trim()
+
   const ref = await addDoc(collection(db, 'users'), {
     email,
     password: input.password,
-    displayName: input.displayName.trim(),
+    displayName,
     role,
     status,
+    school,
+    phone,
+    parentPhone,
     createdAt: serverTimestamp(),
   })
   return {
     id: ref.id,
     email,
     password: input.password,
-    displayName: input.displayName.trim(),
+    displayName,
     role,
     status,
+    school,
+    phone,
+    parentPhone,
     createdAt: null,
   }
 }
