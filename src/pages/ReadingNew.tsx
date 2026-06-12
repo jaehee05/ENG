@@ -2,10 +2,25 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import { createReading } from '../lib/firestore'
-import { extractGlossary, wordsToText } from '../lib/api'
-import { parseWordList } from '../lib/types'
+import { extractGlossary, parseReadingText, wordsToText } from '../lib/api'
+import { parseWordList, type ReadingQuestionType } from '../lib/types'
 import { QuestionEditor } from '../components/QuestionEditor'
 import { emptyDraftQuestion, type DraftQuestion } from '../components/draftQuestion'
+
+const ALLOWED_TYPES: ReadingQuestionType[] = [
+  'standard',
+  'cloze',
+  'order',
+  'insert',
+  'summary',
+  'irrelevant',
+  'underline-grammar',
+  'underline-vocab',
+]
+
+function toReadingType(t: string): ReadingQuestionType {
+  return (ALLOWED_TYPES as string[]).includes(t) ? (t as ReadingQuestionType) : 'standard'
+}
 
 function trimDraft(q: DraftQuestion) {
   const out: {
@@ -39,9 +54,52 @@ export function ReadingNew() {
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [extracting, setExtracting] = useState(false)
+  const [rawText, setRawText] = useState('')
+  const [parsing, setParsing] = useState(false)
+  const [parseNotice, setParseNotice] = useState<string | null>(null)
 
   const glossary = useMemo(() => parseWordList(glossaryRaw), [glossaryRaw])
   const choicesGlossary = useMemo(() => parseWordList(choicesGlossaryRaw), [choicesGlossaryRaw])
+
+  async function handleParse() {
+    setError(null)
+    setParseNotice(null)
+    if (!rawText.trim()) {
+      setError('붙여넣은 텍스트가 없습니다.')
+      return
+    }
+    setParsing(true)
+    try {
+      const result = await parseReadingText(rawText)
+      if (result.questions.length === 0) {
+        setError('문항을 찾지 못했습니다. 원문을 다시 확인하세요.')
+        return
+      }
+      if (result.title && !title.trim()) setTitle(result.title)
+      if (result.passage) setPassage(result.passage)
+      const drafts: DraftQuestion[] = result.questions.map((q) => {
+        const choices = q.choices.slice(0, 5)
+        while (choices.length < 5) choices.push('')
+        return {
+          type: toReadingType(q.type),
+          q: q.q,
+          body: q.body,
+          intro: q.intro,
+          summaryBox: q.summaryBox,
+          choices,
+          answer: Math.min(4, Math.max(0, q.answer ?? 0)),
+        }
+      })
+      setQuestions(drafts)
+      setParseNotice(
+        `${drafts.length}개 문항을 자동 입력했습니다. 정답·본문을 확인 후 저장하세요.`,
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '자동 분류에 실패했습니다.')
+    } finally {
+      setParsing(false)
+    }
+  }
 
   async function handleExtract() {
     setError(null)
@@ -103,6 +161,35 @@ export function ReadingNew() {
   return (
     <div className="space-y-6 max-w-3xl">
       <h1 className="text-2xl font-semibold text-slate-900">새 지문</h1>
+
+      <div className="rounded-md border border-brand-200 bg-brand-50/40 p-4 space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-brand-700">원문 붙여넣어 자동 입력</h2>
+            <p className="text-xs text-slate-600 mt-0.5">
+              지문·발문·①~⑤ 선지·정답이 섞인 원문을 통째로 붙여넣으면 AI가 분류해 폼을 채워줍니다.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleParse}
+            disabled={parsing}
+            className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700 disabled:opacity-50 shrink-0"
+          >
+            {parsing ? '분석 중...' : '자동 분류'}
+          </button>
+        </div>
+        <textarea
+          value={rawText}
+          onChange={(e) => setRawText(e.target.value)}
+          rows={8}
+          placeholder={
+            '예) 31. 다음 빈칸에 들어갈 말로 가장 적절한 것은? [3점]\n  Recent studies suggest that ...\n  ① ... ② ... ③ ... ④ ... ⑤ ...\n  정답: ③'
+          }
+          className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+        />
+        {parseNotice && <p className="text-xs text-brand-700">{parseNotice}</p>}
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>

@@ -110,6 +110,46 @@ export function fileToBase64(file: File): Promise<string> {
   })
 }
 
+export interface ParsedReadingQuestion {
+  type: string
+  q: string
+  body: string
+  intro: string
+  summaryBox: string
+  choices: string[]
+  answer: number
+}
+
+export interface ParsedReadingResult {
+  title: string
+  passage: string
+  questions: ParsedReadingQuestion[]
+}
+
+export async function parseReadingText(text: string): Promise<ParsedReadingResult> {
+  const res = await fetch('/api/parse-reading', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ text }),
+  })
+  if (!res.ok) {
+    let message = `요청 실패 (HTTP ${res.status})`
+    try {
+      const body = (await res.json()) as { error?: string }
+      if (body.error) message = body.error
+    } catch {
+      // ignore
+    }
+    throw new Error(message)
+  }
+  const data = (await res.json()) as ParsedReadingResult
+  return {
+    title: data.title ?? '',
+    passage: data.passage ?? '',
+    questions: data.questions ?? [],
+  }
+}
+
 export async function defineWords(input: {
   words: string[]
   passage: string
