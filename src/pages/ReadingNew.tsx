@@ -278,9 +278,10 @@ export function ReadingNew() {
           value={rawText}
           onChange={(e) => setRawText(e.target.value)}
           onPaste={onPaste}
+          onKeyDown={(e) => handleUnderlineHotkey(e, setRawText)}
           rows={8}
           placeholder={
-            '예) 31. 다음 빈칸에 들어갈 말로 가장 적절한 것은? [3점]\n  Recent studies suggest that ...\n  ① ... ② ... ③ ... ④ ... ⑤ ...\n  정답: ③\n\n(이 칸에 캡쳐 이미지를 그대로 붙여넣어도 됩니다)'
+            '예) 31. 다음 빈칸에 들어갈 말로 가장 적절한 것은? [3점]\n  Recent studies suggest that ...\n  ① ... ② ... ③ ... ④ ... ⑤ ...\n  정답: ③\n\n(이 칸에 캡쳐 이미지를 그대로 붙여넣어도 됩니다 · 드래그 후 ⌘U로 밑줄)'
           }
           className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
         />
