@@ -9,9 +9,10 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import { createReading } from '../lib/firestore'
-import { extractGlossary, fileToBase64, parseReadingText, wordsToText } from '../lib/api'
+import { extractGlossary, parseReadingText, wordsToText } from '../lib/api'
 import { parseWordList, type ReadingQuestionType } from '../lib/types'
 import { handleUnderlineHotkey } from '../lib/textareaHotkeys'
+import { resizeImageForUpload } from '../lib/imageResize'
 import { QuestionEditor } from '../components/QuestionEditor'
 import { emptyDraftQuestion, type DraftQuestion } from '../components/draftQuestion'
 
@@ -23,17 +24,8 @@ interface AttachedImage {
   mediaType: string
 }
 
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024
+const MAX_IMAGE_SIZE = 15 * 1024 * 1024
 const MAX_IMAGES = 8
-
-function inferMediaType(file: File): string {
-  if (file.type) return file.type
-  const n = file.name.toLowerCase()
-  if (n.endsWith('.jpg') || n.endsWith('.jpeg')) return 'image/jpeg'
-  if (n.endsWith('.gif')) return 'image/gif'
-  if (n.endsWith('.webp')) return 'image/webp'
-  return 'image/png'
-}
 
 const ALLOWED_TYPES: ReadingQuestionType[] = [
   'standard',
@@ -101,24 +93,23 @@ export function ReadingNew() {
     const picked = accepted.slice(0, room)
     for (const file of picked) {
       if (file.size > MAX_IMAGE_SIZE) {
-        setError(`${file.name}: 5MB를 초과합니다.`)
+        setError(`${file.name}: 15MB를 초과합니다.`)
         continue
       }
       try {
-        const base64 = await fileToBase64(file)
-        const mediaType = inferMediaType(file)
+        const resized = await resizeImageForUpload(file)
         setImages((prev) => [
           ...prev,
           {
             id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
             name: file.name || '캡쳐',
-            previewUrl: `data:${mediaType};base64,${base64}`,
-            base64,
-            mediaType,
+            previewUrl: `data:${resized.mediaType};base64,${resized.base64}`,
+            base64: resized.base64,
+            mediaType: resized.mediaType,
           },
         ])
-      } catch {
-        setError(`${file.name}: 파일을 읽지 못했습니다.`)
+      } catch (err) {
+        setError(`${file.name}: ${err instanceof Error ? err.message : '읽기 실패'}`)
       }
     }
   }
