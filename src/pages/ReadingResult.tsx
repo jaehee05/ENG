@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getAttempt } from '../lib/firestore'
+import { renderUnderlines } from '../lib/renderUnderlines'
 import type { Attempt } from '../lib/types'
 
 export function ReadingResult() {
@@ -51,7 +52,7 @@ export function ReadingResult() {
           >
             <div className="flex items-start justify-between gap-3">
               <p className="text-sm font-semibold text-slate-900 whitespace-pre-wrap">
-                {i + 1}. {r.q}
+                {i + 1}. {renderUnderlines(r.q)}
               </p>
               {r.correct ? (
                 <span className="inline-block rounded bg-brand-100 text-brand-700 text-xs px-2 py-0.5 whitespace-nowrap">
@@ -79,7 +80,7 @@ export function ReadingResult() {
                     }`}
                   >
                     <span className="text-slate-500 w-5">{['①', '②', '③', '④', '⑤'][ci]}</span>
-                    <span className="flex-1 text-slate-700">{c}</span>
+                    <span className="flex-1 text-slate-700">{renderUnderlines(c)}</span>
                     {isAnswer && <span className="text-xs text-brand-700 font-medium">정답</span>}
                     {isUser && !isAnswer && (
                       <span className="text-xs text-red-800 font-medium">선택</span>

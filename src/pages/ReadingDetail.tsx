@@ -6,6 +6,7 @@ import { GlossedPassage } from '../components/GlossedPassage'
 import { GlossaryEditor } from '../components/GlossaryEditor'
 import { MyAttemptsBox } from '../components/MyAttemptsBox'
 import { useGlossQueue, type GlossEntry } from '../components/useGlossQueue'
+import { renderUnderlines } from '../lib/renderUnderlines'
 import type { Attempt, Reading, WordEntry } from '../lib/types'
 
 const CHOICE_MARKS = ['①', '②', '③', '④', '⑤']
@@ -153,7 +154,7 @@ export function ReadingDetail() {
             {r.questions.map((q, qi) => (
               <div key={qi} className="space-y-1">
                 <p className="text-sm font-medium text-slate-800 whitespace-pre-wrap">
-                  {qi + 1}. {q.q}
+                  {qi + 1}. {renderUnderlines(q.q)}
                 </p>
                 <GlossedPassage
                   passage={q.choices.map((c, ci) => `${CHOICE_MARKS[ci]} ${c}`).join('\n')}
