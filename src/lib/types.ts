@@ -19,7 +19,14 @@ export interface UserAccount {
 export interface WordEntry {
   en: string
   ko: string
+  /** Phonetic transcription, e.g. "ǽdvent". No surrounding brackets. */
+  ipa?: string
+  /** Part of speech token: n., v., adj., adv., prep., conj., int. */
+  pos?: string
+  /** English synonyms list. */
+  synonyms?: string[]
   example?: string
+  exampleKo?: string
   definitionEn?: string
 }
 

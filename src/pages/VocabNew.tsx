@@ -10,7 +10,11 @@ brilliant - 훌륭한, 빛나는
 emerge - 나타나다, 부각되다`
 
 interface Extra {
+  ipa?: string
+  pos?: string
+  synonyms?: string[]
   example?: string
+  exampleKo?: string
   definitionEn?: string
 }
 
@@ -58,7 +62,11 @@ export function VocabNew() {
           const key = e.en.toLowerCase()
           const cur = next.get(key) ?? {}
           next.set(key, {
+            ipa: e.ipa || cur.ipa,
+            pos: e.pos || cur.pos,
+            synonyms: e.synonyms?.length ? e.synonyms : cur.synonyms,
             example: e.example || cur.example,
+            exampleKo: e.exampleKo || cur.exampleKo,
             definitionEn: e.definitionEn || cur.definitionEn,
           })
         }
@@ -91,7 +99,14 @@ export function VocabNew() {
         title: title.trim(),
         words: words.map((w) => {
           const out: WordEntry = { en: w.en, ko: w.ko }
+          if (w.ipa?.trim()) out.ipa = w.ipa.trim()
+          if (w.pos?.trim()) out.pos = w.pos.trim()
+          if (w.synonyms && w.synonyms.length > 0) {
+            const cleaned = w.synonyms.map((s) => s.trim()).filter(Boolean)
+            if (cleaned.length > 0) out.synonyms = cleaned
+          }
           if (w.example?.trim()) out.example = w.example.trim()
+          if (w.exampleKo?.trim()) out.exampleKo = w.exampleKo.trim()
           if (w.definitionEn?.trim()) out.definitionEn = w.definitionEn.trim()
           return out
         }),
@@ -178,27 +193,54 @@ export function VocabNew() {
               </button>
             </div>
 
-            <ul className="space-y-3 max-h-[28rem] overflow-y-auto pr-1">
+            <ul className="space-y-3 max-h-[36rem] overflow-y-auto pr-1">
               {words.map((w, i) => (
                 <li
                   key={i}
                   className="rounded-md border border-slate-200 bg-white p-3 space-y-2"
                 >
-                  <div className="flex items-baseline gap-3">
-                    <span className="text-sm font-semibold text-slate-900 min-w-[140px]">
+                  <div className="flex items-baseline gap-3 flex-wrap">
+                    <span className="text-sm font-semibold text-slate-900 min-w-[120px]">
                       {w.en}
                     </span>
                     <span className="text-sm text-slate-600">{w.ko}</span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-start">
                     <label className="sm:col-span-2 text-xs text-slate-500 sm:pt-1.5">
-                      예문
+                      발음
                     </label>
                     <input
                       type="text"
-                      value={w.example ?? ''}
-                      onChange={(e) => patchExtra(w.en, { example: e.target.value })}
-                      placeholder="자연스러운 영어 예문"
+                      value={w.ipa ?? ''}
+                      onChange={(e) => patchExtra(w.en, { ipa: e.target.value })}
+                      placeholder="ǽdvent"
+                      className={`${inputCls} sm:col-span-4`}
+                    />
+                    <label className="sm:col-span-2 text-xs text-slate-500 sm:pt-1.5 sm:text-right sm:pr-2">
+                      품사
+                    </label>
+                    <input
+                      type="text"
+                      value={w.pos ?? ''}
+                      onChange={(e) => patchExtra(w.en, { pos: e.target.value })}
+                      placeholder="n."
+                      className={`${inputCls} sm:col-span-4`}
+                    />
+                    <label className="sm:col-span-2 text-xs text-slate-500 sm:pt-1.5">
+                      유의어
+                    </label>
+                    <input
+                      type="text"
+                      value={(w.synonyms ?? []).join(', ')}
+                      onChange={(e) =>
+                        patchExtra(w.en, {
+                          synonyms: e.target.value
+                            .split(',')
+                            .map((s) => s.trim())
+                            .filter(Boolean),
+                        })
+                      }
+                      placeholder="arrival, appearance, emergence"
                       className={`${inputCls} sm:col-span-10`}
                     />
                     <label className="sm:col-span-2 text-xs text-slate-500 sm:pt-1.5">
@@ -210,7 +252,29 @@ export function VocabNew() {
                       onChange={(e) =>
                         patchExtra(w.en, { definitionEn: e.target.value })
                       }
-                      placeholder="쉬운 영어 정의 (영영 표현)"
+                      placeholder="쉬운 영어 정의"
+                      className={`${inputCls} sm:col-span-10`}
+                    />
+                    <label className="sm:col-span-2 text-xs text-slate-500 sm:pt-1.5">
+                      예문
+                    </label>
+                    <input
+                      type="text"
+                      value={w.example ?? ''}
+                      onChange={(e) => patchExtra(w.en, { example: e.target.value })}
+                      placeholder="자연스러운 영어 예문"
+                      className={`${inputCls} sm:col-span-10`}
+                    />
+                    <label className="sm:col-span-2 text-xs text-slate-500 sm:pt-1.5">
+                      해석
+                    </label>
+                    <input
+                      type="text"
+                      value={w.exampleKo ?? ''}
+                      onChange={(e) =>
+                        patchExtra(w.en, { exampleKo: e.target.value })
+                      }
+                      placeholder="예문의 한국어 번역"
                       className={`${inputCls} sm:col-span-10`}
                     />
                   </div>

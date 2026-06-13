@@ -73,7 +73,11 @@ export async function importReadingsFromPdf(input: {
 export interface EnrichedWord {
   en: string
   ko: string
+  ipa: string
+  pos: string
+  synonyms: string[]
   example: string
+  exampleKo: string
   definitionEn: string
 }
 

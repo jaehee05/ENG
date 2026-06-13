@@ -2,34 +2,23 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import Anthropic from '@anthropic-ai/sdk'
 
 export const config = {
-  maxDuration: 30,
+  maxDuration: 60,
 }
 
 const SYSTEM_PROMPT = `당신은 한국 고등학생을 위한 영어 어휘 학습 자료 작성자입니다.
-주어진 영어 단어 목록 각각에 다음 두 가지를 추가해 JSON으로 반환합니다.
+주어진 영어 단어 목록 각각에 학습용 보강 정보를 채워 submit_enriched 도구를 호출하세요.
 
-1. example: 그 단어가 자연스럽게 쓰인 한 문장의 영어 예문.
-   - 단어를 그대로 또는 자연스러운 활용형으로 포함
-   - 수능 지문 톤(중급, 한 문장 12~22 단어)
-2. definitionEn: 단어의 영영 정의(영어로 설명).
-   - 학습자가 이해할 수 있는 쉬운 영어로
-   - 한국어 뜻과 같은 문맥의 뜻을 정의
-   - 콜린스/롱맨 학습자 사전 스타일 (한 줄, 한 문장)
+각 단어별로 다음을 채웁니다.
 
-원본 en/ko는 그대로 두고 example과 definitionEn만 추가합니다.
+- en, ko: 입력 그대로
+- ipa: 미국식 IPA 발음 표기. 대괄호 없이. 예: "ǽdvent" (advent), "ɪˈmɜːrdʒ" (emerge)
+- pos: 품사 토큰 한 개. n. / v. / adj. / adv. / prep. / conj. / int. 중 하나
+- synonyms: 동의/유의어 2~4개의 영어 단어 배열. 한국어 뜻과 같은 의미군의 동의어. 예: ["arrival", "appearance", "emergence"]. 가능한 단일 단어, 숙어면 가능
+- example: 그 단어가 자연스럽게 쓰인 한 문장의 영어 예문. 수능 지문 톤(중급, 12~22 단어). 단어를 그대로 또는 자연스러운 활용형으로 포함
+- exampleKo: example의 한국어 번역. 자연스러운 한국어 한 문장
+- definitionEn: 영영 정의(영어로 설명). 학습자 사전 스타일, 한 문장. 한국어 뜻과 일치하는 문맥의 의미.
 
-출력은 아래 JSON 형식만, 다른 설명·코드펜스를 붙이지 마세요.
-
-{
-  "words": [
-    {
-      "en": "abandon",
-      "ko": "버리다, 포기하다",
-      "example": "She had to abandon her plan to study abroad due to family issues.",
-      "definitionEn": "to leave a person, thing, or place permanently, especially when you should stay and look after them"
-    }
-  ]
-}`
+ko에 여러 뜻이 쉼표로 묶여 있으면 가장 대표적인 의미 하나에 맞춰 synonyms/definitionEn/example을 작성하세요.`
 
 interface InputWord {
   en: string
@@ -39,7 +28,11 @@ interface InputWord {
 interface EnrichedWord {
   en: string
   ko: string
+  ipa: string
+  pos: string
+  synonyms: string[]
   example: string
+  exampleKo: string
   definitionEn: string
 }
 
@@ -47,27 +40,28 @@ function isStr(x: unknown): x is string {
   return typeof x === 'string'
 }
 
-function parseJsonLoose(text: string): EnrichedWord[] {
-  const trimmed = text.trim()
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/)
-  const body = fenced ? fenced[1] : trimmed
-  const start = body.indexOf('{')
-  const end = body.lastIndexOf('}')
-  if (start < 0 || end < 0) throw new Error('JSON 응답을 찾을 수 없습니다.')
-  const slice = body.slice(start, end + 1)
-  const obj = JSON.parse(slice)
+function normalizeWords(input: unknown): EnrichedWord[] {
+  const obj = (input ?? {}) as { words?: unknown }
   const arr = Array.isArray(obj.words) ? obj.words : []
   const out: EnrichedWord[] = []
   for (const w of arr) {
     if (!w || typeof w !== 'object') continue
-    const en = isStr((w as Record<string, unknown>).en) ? ((w as Record<string, unknown>).en as string).trim() : ''
-    const ko = isStr((w as Record<string, unknown>).ko) ? ((w as Record<string, unknown>).ko as string).trim() : ''
-    const example = isStr((w as Record<string, unknown>).example) ? ((w as Record<string, unknown>).example as string).trim() : ''
-    const definitionEn = isStr((w as Record<string, unknown>).definitionEn)
-      ? ((w as Record<string, unknown>).definitionEn as string).trim()
-      : ''
+    const r = w as Record<string, unknown>
+    const en = isStr(r.en) ? r.en.trim() : ''
     if (!en) continue
-    out.push({ en, ko, example, definitionEn })
+    const synonymsRaw = Array.isArray(r.synonyms) ? r.synonyms : []
+    out.push({
+      en,
+      ko: isStr(r.ko) ? r.ko.trim() : '',
+      ipa: isStr(r.ipa) ? r.ipa.trim() : '',
+      pos: isStr(r.pos) ? r.pos.trim() : '',
+      synonyms: synonymsRaw
+        .map((s) => (isStr(s) ? s.trim() : ''))
+        .filter((s) => s.length > 0),
+      example: isStr(r.example) ? r.example.trim() : '',
+      exampleKo: isStr(r.exampleKo) ? r.exampleKo.trim() : '',
+      definitionEn: isStr(r.definitionEn) ? r.definitionEn.trim() : '',
+    })
   }
   return out
 }
@@ -94,8 +88,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .map((w) => ({ en: w.en.trim(), ko: typeof w.ko === 'string' ? w.ko.trim() : '' }))
 
   const userText = [
-    '다음 단어 목록에 자연스러운 예문과 영영 정의를 추가해주세요.',
-    JSON.stringify({ words: compact }, null, 2),
+    '다음 단어들에 보강 정보를 채워 submit_enriched 도구를 호출하세요.',
+    JSON.stringify({ words: compact }),
   ].join('\n')
 
   const client = new Anthropic({ apiKey })
@@ -103,24 +97,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const msg = await client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
-      system: [
+      max_tokens: 8000,
+      system: SYSTEM_PROMPT,
+      tools: [
         {
-          type: 'text',
-          text: SYSTEM_PROMPT,
-          cache_control: { type: 'ephemeral' },
+          name: 'submit_enriched',
+          description: '단어별 학습 정보를 제출합니다.',
+          input_schema: {
+            type: 'object',
+            properties: {
+              words: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    en: { type: 'string' },
+                    ko: { type: 'string' },
+                    ipa: { type: 'string' },
+                    pos: { type: 'string' },
+                    synonyms: { type: 'array', items: { type: 'string' } },
+                    example: { type: 'string' },
+                    exampleKo: { type: 'string' },
+                    definitionEn: { type: 'string' },
+                  },
+                  required: ['en'],
+                },
+              },
+            },
+            required: ['words'],
+          },
         },
       ],
+      tool_choice: { type: 'tool', name: 'submit_enriched' },
       messages: [{ role: 'user', content: userText }],
     })
 
-    const textBlock = msg.content.find((b) => b.type === 'text')
-    if (!textBlock || textBlock.type !== 'text') {
-      res.status(502).json({ error: 'Claude 응답에 text가 없습니다.' })
+    const toolUse = msg.content.find((b) => b.type === 'tool_use')
+    if (!toolUse || toolUse.type !== 'tool_use') {
+      res.status(502).json({ error: 'Claude 응답에 결과가 없습니다.' })
       return
     }
-    const enriched = parseJsonLoose(textBlock.text)
-    res.status(200).json({ words: enriched })
+    res.status(200).json({ words: normalizeWords(toolUse.input) })
   } catch (err) {
     const message = err instanceof Error ? err.message : '알 수 없는 오류'
     res.status(500).json({ error: message })

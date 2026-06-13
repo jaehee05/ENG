@@ -1,9 +1,36 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import { deleteVocabSet, getVocabSet, listAttemptsForUser } from '../lib/firestore'
 import { MyAttemptsBox } from '../components/MyAttemptsBox'
 import type { Attempt, VocabSet } from '../lib/types'
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function renderExampleWithBoldWord(example: string, head: string): ReactNode {
+  if (!head || !example) return example
+  // Match the headword and obvious inflections (root + up to 4 suffix chars)
+  const re = new RegExp(`\\b(${escapeRegex(head)}\\w{0,4})\\b`, 'gi')
+  const out: ReactNode[] = []
+  let last = 0
+  let key = 0
+  for (const m of example.matchAll(re)) {
+    const start = m.index ?? 0
+    if (start > last)
+      out.push(<Fragment key={key++}>{example.slice(last, start)}</Fragment>)
+    out.push(
+      <strong key={key++} className="font-bold text-slate-900">
+        {m[1]}
+      </strong>,
+    )
+    last = start + m[0].length
+  }
+  if (last < example.length)
+    out.push(<Fragment key={key++}>{example.slice(last)}</Fragment>)
+  return out
+}
 
 export function VocabDetail() {
   const { id } = useParams<{ id: string }>()
@@ -112,26 +139,58 @@ export function VocabDetail() {
         />
       )}
 
-      <ul className="rounded-lg border border-slate-200 bg-white divide-y divide-slate-100">
+      <ul className="space-y-4">
         {set.words.map((w, i) => (
-          <li key={i} className="px-4 py-3 space-y-1.5">
-            <div className="flex items-baseline gap-3 flex-wrap">
-              <span className="text-xs text-slate-400 w-6">{i + 1}.</span>
-              <span className="font-semibold text-slate-900">{w.en}</span>
-              <span className="text-slate-600">{w.ko}</span>
+          <li
+            key={i}
+            className="rounded-lg border border-slate-200 bg-white overflow-hidden"
+          >
+            <div className="px-5 pt-4 pb-2 border-b border-slate-100">
+              <p className="text-xs font-mono text-slate-400 tracking-wider">
+                {String(i + 1).padStart(4, '0')}
+              </p>
             </div>
-            {w.definitionEn && (
-              <p className="pl-9 text-sm text-slate-700">
-                <span className="text-xs text-slate-400 mr-1">[영영]</span>
-                {w.definitionEn}
-              </p>
-            )}
-            {w.example && (
-              <p className="pl-9 text-sm text-slate-700 italic">
-                <span className="text-xs text-slate-400 not-italic mr-1">[예문]</span>
-                {w.example}
-              </p>
-            )}
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 px-5 py-4">
+              <div className="sm:col-span-3">
+                <p className="text-2xl font-bold text-slate-900 leading-tight">{w.en}</p>
+                {w.ipa && (
+                  <p className="text-sm text-slate-500 mt-1">[{w.ipa}]</p>
+                )}
+              </div>
+              <div className="sm:col-span-9 space-y-2">
+                <p className="text-sm leading-relaxed text-slate-800">
+                  {w.pos && (
+                    <span className="font-medium text-slate-700 mr-2">{w.pos}</span>
+                  )}
+                  <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-slate-900 text-white text-[10px] font-bold mr-1.5 align-middle">
+                    1
+                  </span>
+                  <span className="font-semibold text-slate-900">{w.ko}</span>
+                  {w.definitionEn && (
+                    <span className="text-slate-600">
+                      {' '}[{w.definitionEn}]
+                    </span>
+                  )}
+                  {w.synonyms && w.synonyms.length > 0 && (
+                    <span className="text-slate-500">
+                      {' '}= {w.synonyms.join(', ')}
+                    </span>
+                  )}
+                </p>
+                {(w.example || w.exampleKo) && (
+                  <div className="rounded-md bg-slate-100 px-4 py-3 space-y-1">
+                    {w.example && (
+                      <p className="text-sm leading-relaxed text-slate-800">
+                        {renderExampleWithBoldWord(w.example, w.en)}
+                      </p>
+                    )}
+                    {w.exampleKo && (
+                      <p className="text-sm text-slate-600">{w.exampleKo}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
           </li>
         ))}
       </ul>
