@@ -169,7 +169,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const msg = await client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 8000,
+      max_tokens: 16000,
       system: [
         {
           type: 'text',
@@ -218,13 +218,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
 
     const toolUse = msg.content.find((b) => b.type === 'tool_use')
+    const textBlock = msg.content.find((b) => b.type === 'text')
+    const hint =
+      textBlock && textBlock.type === 'text' && textBlock.text.trim()
+        ? textBlock.text.trim().slice(0, 400)
+        : ''
     if (!toolUse || toolUse.type !== 'tool_use') {
-      res.status(502).json({ error: 'Claude 응답에 결과가 없습니다.' })
+      console.error('parse-reading: no tool_use', {
+        stop_reason: msg.stop_reason,
+        hint,
+      })
+      res.status(502).json({
+        error:
+          'Claude 응답에 결과가 없습니다.' +
+          (hint ? ` (모델 메시지: ${hint})` : ` (stop: ${msg.stop_reason ?? 'unknown'})`),
+      })
       return
     }
+    const rawInput = toolUse.input as { questions?: unknown }
+    const rawCount = Array.isArray(rawInput?.questions) ? rawInput.questions.length : 0
     const parsed = normalizeResult(toolUse.input)
     if (parsed.questions.length === 0) {
-      res.status(422).json({ error: '문항을 찾지 못했습니다. 원문을 다시 확인하세요.' })
+      console.error('parse-reading: empty questions', {
+        rawCount,
+        hint,
+        sample: JSON.stringify(rawInput).slice(0, 500),
+      })
+      const reason =
+        rawCount > 0
+          ? `모델이 ${rawCount}개 추출했지만 발문/선지가 비어 있어 모두 제외됨`
+          : '모델이 문항을 추출하지 못함'
+      res.status(422).json({
+        error: `문항을 찾지 못했습니다. (${reason})${hint ? ' - ' + hint : ''}`,
+      })
       return
     }
     res.status(200).json(parsed)
