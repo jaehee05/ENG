@@ -31,6 +31,7 @@ function trimDraft(q: DraftQuestion) {
     body?: string
     intro?: string
     summaryBox?: string
+    points?: number
   } = {
     type: q.type,
     q: q.q.trim(),
@@ -40,6 +41,7 @@ function trimDraft(q: DraftQuestion) {
   if (q.body.trim()) out.body = q.body.trim()
   if (q.intro.trim()) out.intro = q.intro.trim()
   if (q.summaryBox.trim()) out.summaryBox = q.summaryBox.trim()
+  if (q.points && q.points !== 2) out.points = q.points
   return out
 }
 
@@ -88,6 +90,7 @@ export function ReadingNew() {
           summaryBox: q.summaryBox,
           choices,
           answer: Math.min(4, Math.max(0, q.answer ?? 0)),
+          points: q.points && q.points >= 1 && q.points <= 5 ? q.points : undefined,
         }
       })
       setQuestions(drafts)

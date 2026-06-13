@@ -17,15 +17,7 @@ const SYSTEM_PROMPT = `당신은 한국 고등학생 영어 단어 시험 채점
 - userAnswer가 빈 문자열/공백뿐이면 무조건 오답.
 - 한국어가 아닌 답(영어 등)이라도 의미가 맞으면 정답.
 
-출력은 반드시 아래 JSON 형식만, 다른 설명·코드펜스 없이.
-items 배열 길이와 동일한 results 배열을 같은 순서로 반환.
-
-{
-  "results": [
-    { "correct": true },
-    { "correct": false }
-  ]
-}`
+submit_results 도구를 호출해 items 배열과 같은 순서, 같은 길이의 results 배열을 전달하세요.`
 
 interface GradeItem {
   en: string
@@ -37,18 +29,12 @@ interface GradeResult {
   correct: boolean
 }
 
-function parseJsonLoose(text: string): GradeResult[] {
-  const trimmed = text.trim()
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/)
-  const body = fenced ? fenced[1] : trimmed
-  const start = body.indexOf('{')
-  const end = body.lastIndexOf('}')
-  if (start < 0 || end < 0) throw new Error('JSON 응답을 찾을 수 없습니다.')
-  const slice = body.slice(start, end + 1)
-  const obj = JSON.parse(slice)
+function normalize(input: unknown): GradeResult[] {
+  const obj = (input ?? {}) as { results?: unknown }
   const arr = Array.isArray(obj.results) ? obj.results : []
-  return arr.map((r: unknown) => ({
-    correct: typeof r === 'object' && r !== null && (r as { correct?: unknown }).correct === true,
+  return arr.map((r) => ({
+    correct:
+      typeof r === 'object' && r !== null && (r as { correct?: unknown }).correct === true,
   }))
 }
 
@@ -82,8 +68,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         expected: String(it.expected ?? ''),
         userAnswer: String(it.userAnswer ?? ''),
       })),
-      null,
-      0,
     ),
   ].join('\n')
 
@@ -100,15 +84,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           cache_control: { type: 'ephemeral' },
         },
       ],
+      tools: [
+        {
+          name: 'submit_results',
+          description: '각 항목의 채점 결과를 제출합니다.',
+          input_schema: {
+            type: 'object',
+            properties: {
+              results: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    correct: { type: 'boolean' },
+                  },
+                  required: ['correct'],
+                },
+              },
+            },
+            required: ['results'],
+          },
+        },
+      ],
+      tool_choice: { type: 'tool', name: 'submit_results' },
       messages: [{ role: 'user', content: userText }],
     })
 
-    const textBlock = msg.content.find((b) => b.type === 'text')
-    if (!textBlock || textBlock.type !== 'text') {
-      res.status(502).json({ error: 'Claude 응답에 text가 없습니다.' })
+    const toolUse = msg.content.find((b) => b.type === 'tool_use')
+    if (!toolUse || toolUse.type !== 'tool_use') {
+      res.status(502).json({ error: 'Claude 응답에 결과가 없습니다.' })
       return
     }
-    const results = parseJsonLoose(textBlock.text)
+    const results = normalize(toolUse.input)
     if (results.length !== items.length) {
       res.status(502).json({
         error: `결과 개수가 맞지 않습니다. (요청 ${items.length}, 응답 ${results.length})`,

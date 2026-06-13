@@ -18,16 +18,7 @@ const SYSTEM_PROMPT = `당신은 한국 고등학생용 영어 모의고사 교�
 - 동사는 기본형으로 (예: "이끌다, 좌우하다")
 - 숙어는 '~' 자리표시자 사용 가능 (예: "~에 묶이다, ~와 연동되다")
 
-출력은 반드시 아래 JSON 형식만 출력하고, 다른 어떤 설명·코드펜스도 붙이지 마세요.
-
-{
-  "glossary": [
-    { "en": "string", "ko": "string" }
-  ],
-  "choicesGlossary": [
-    { "en": "string", "ko": "string" }
-  ]
-}`
+submit_glossary 도구를 호출해 결과를 제출하세요.`
 
 interface Entry {
   en: string
@@ -39,24 +30,6 @@ interface ExtractResult {
   choicesGlossary: Entry[]
 }
 
-function parseJsonLoose(text: string): ExtractResult {
-  const trimmed = text.trim()
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/)
-  const body = fenced ? fenced[1] : trimmed
-  const start = body.indexOf('{')
-  const end = body.lastIndexOf('}')
-  if (start < 0 || end < 0) throw new Error('JSON 응답을 찾을 수 없습니다.')
-  const slice = body.slice(start, end + 1)
-  const obj = JSON.parse(slice)
-  const glossary: Entry[] = Array.isArray(obj.glossary)
-    ? obj.glossary.filter((e: unknown) => isEntry(e))
-    : []
-  const choicesGlossary: Entry[] = Array.isArray(obj.choicesGlossary)
-    ? obj.choicesGlossary.filter((e: unknown) => isEntry(e))
-    : []
-  return { glossary, choicesGlossary }
-}
-
 function isEntry(e: unknown): e is Entry {
   return (
     typeof e === 'object' &&
@@ -66,6 +39,17 @@ function isEntry(e: unknown): e is Entry {
     (e as Entry).en.trim().length > 0 &&
     (e as Entry).ko.trim().length > 0
   )
+}
+
+function normalize(obj: unknown): ExtractResult {
+  const r = (obj ?? {}) as { glossary?: unknown; choicesGlossary?: unknown }
+  const glossary: Entry[] = Array.isArray(r.glossary)
+    ? r.glossary.filter((e) => isEntry(e))
+    : []
+  const choicesGlossary: Entry[] = Array.isArray(r.choicesGlossary)
+    ? r.choicesGlossary.filter((e) => isEntry(e))
+    : []
+  return { glossary, choicesGlossary }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -111,16 +95,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           cache_control: { type: 'ephemeral' },
         },
       ],
+      tools: [
+        {
+          name: 'submit_glossary',
+          description: '추출한 단어 풀이를 제출합니다.',
+          input_schema: {
+            type: 'object',
+            properties: {
+              glossary: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    en: { type: 'string' },
+                    ko: { type: 'string' },
+                  },
+                  required: ['en', 'ko'],
+                },
+              },
+              choicesGlossary: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    en: { type: 'string' },
+                    ko: { type: 'string' },
+                  },
+                  required: ['en', 'ko'],
+                },
+              },
+            },
+            required: ['glossary', 'choicesGlossary'],
+          },
+        },
+      ],
+      tool_choice: { type: 'tool', name: 'submit_glossary' },
       messages: [{ role: 'user', content: userMessage }],
     })
 
-    const textBlock = msg.content.find((b) => b.type === 'text')
-    if (!textBlock || textBlock.type !== 'text') {
-      res.status(502).json({ error: 'Claude 응답에 text가 없습니다.' })
+    const toolUse = msg.content.find((b) => b.type === 'tool_use')
+    if (!toolUse || toolUse.type !== 'tool_use') {
+      res.status(502).json({ error: 'Claude 응답에 결과가 없습니다.' })
       return
     }
-    const parsed = parseJsonLoose(textBlock.text)
-    res.status(200).json(parsed)
+    res.status(200).json(normalize(toolUse.input))
   } catch (err) {
     const message = err instanceof Error ? err.message : '알 수 없는 오류'
     res.status(500).json({ error: message })

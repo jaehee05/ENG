@@ -8,6 +8,7 @@ export interface DraftQuestion {
   summaryBox: string
   choices: string[]
   answer: number
+  points?: number
 }
 
 export function emptyDraftQuestion(type: ReadingQuestionType = 'standard'): DraftQuestion {

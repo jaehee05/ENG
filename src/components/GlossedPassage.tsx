@@ -29,12 +29,10 @@ interface Props {
   onWordLookup?: (en: string, ko: string) => void
   /** Lowercase set of words the student has previously looked up — get highlighted. */
   viewedWords?: Set<string>
-  /** Enable `①{...}` markup → render the inner text with an underline. */
-  enableUnderlineMarkers?: boolean
   className?: string
 }
 
-const UNDERLINE_RE = /([①②③④⑤])\s*\{([^}]+)\}/g
+const UNDERLINE_RE = /([①②③④⑤])\s*\{([^}]+)\}|\{\{([^}]+)\}\}/g
 
 interface RawSegment {
   text: string
@@ -48,7 +46,11 @@ function splitUnderlines(line: string): RawSegment[] {
   for (const m of line.matchAll(UNDERLINE_RE)) {
     const start = m.index ?? 0
     if (start > last) out.push({ text: line.slice(last, start), underlined: false })
-    out.push({ text: m[2], underlined: true, marker: m[1] })
+    if (m[1]) {
+      out.push({ text: m[2], underlined: true, marker: m[1] })
+    } else {
+      out.push({ text: m[3], underlined: true })
+    }
     last = start + m[0].length
   }
   if (last < line.length) out.push({ text: line.slice(last), underlined: false })
@@ -62,7 +64,6 @@ export function GlossedPassage({
   onSelectWord,
   onWordLookup,
   viewedWords,
-  enableUnderlineMarkers,
   className,
 }: Props) {
   // index of the currently open tooltip ("lineIdx-segIdx-tokenIdx"), null = none
@@ -96,9 +97,7 @@ export function GlossedPassage({
     }
 
     return passage.split('\n').map((lineText) => {
-      const raws = enableUnderlineMarkers
-        ? splitUnderlines(lineText)
-        : [{ text: lineText, underlined: false } as RawSegment]
+      const raws = splitUnderlines(lineText)
       const segments: Segment[] = raws.map((s) => ({
         underlined: s.underlined,
         marker: s.marker,
@@ -106,7 +105,7 @@ export function GlossedPassage({
       }))
       return { segments }
     })
-  }, [passage, glossary, enableUnderlineMarkers])
+  }, [passage, glossary])
 
   // close tooltip when tapping/clicking anywhere outside a glossed word
   useEffect(() => {

@@ -53,6 +53,8 @@ export interface ReadingQuestion {
   summaryBox?: string
   choices: string[]
   answer: number
+  /** Configuration score: 3 for 3점 문항. Absent/2 = default. */
+  points?: number
 }
 
 export const READING_TYPE_LABEL: Record<ReadingQuestionType, string> = {

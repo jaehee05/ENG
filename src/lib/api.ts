@@ -118,6 +118,7 @@ export interface ParsedReadingQuestion {
   summaryBox: string
   choices: string[]
   answer: number
+  points?: number
 }
 
 export interface ParsedReadingResult {
