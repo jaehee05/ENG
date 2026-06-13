@@ -18,6 +18,15 @@ import {
 import { db } from './firebase'
 import type { UserAccount, UserStatus } from './types'
 
+export function validatePassword(pw: string): void {
+  if (!pw || pw.length < 4) {
+    throw new Error('비밀번호는 4자 이상이어야 합니다.')
+  }
+  if (/^\d+$/.test(pw)) {
+    throw new Error('유추하기 쉬운 암호는 사용할 수 없습니다.')
+  }
+}
+
 function fromSnap(snap: QueryDocumentSnapshot | DocumentSnapshot): UserAccount {
   const d = snap.data() ?? {}
   return {
@@ -48,6 +57,7 @@ export async function signUpAccount(input: {
   phone?: string
   parentPhone?: string
 }): Promise<UserAccount> {
+  validatePassword(input.password)
   const email = input.email.trim().toLowerCase()
   const dup = await getDocs(
     query(collection(db, 'users'), where('email', '==', email), limit(1)),
@@ -113,6 +123,7 @@ export async function setAccountStatus(id: string, status: UserStatus): Promise<
 }
 
 export async function setAccountPassword(id: string, password: string): Promise<void> {
+  validatePassword(password)
   await updateDoc(doc(db, 'users', id), { password })
 }
 

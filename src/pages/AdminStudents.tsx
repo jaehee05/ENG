@@ -72,8 +72,12 @@ export function AdminStudents() {
   async function changePassword(id: string) {
     const pw = window.prompt('새 비밀번호를 입력하세요')
     if (!pw) return
-    await setAccountPassword(id, pw)
-    load()
+    try {
+      await setAccountPassword(id, pw)
+      load()
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : '비밀번호 변경에 실패했습니다.')
+    }
   }
 
   async function remove(id: string, name: string) {
