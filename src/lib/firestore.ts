@@ -8,6 +8,7 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  setDoc,
   Timestamp,
   updateDoc,
   where,
@@ -96,6 +97,37 @@ export async function updateReadingContent(
 
 export async function deleteReading(id: string): Promise<void> {
   await deleteDoc(doc(db, 'readings', id))
+}
+
+export async function getReadingOrder(): Promise<string[]> {
+  const snap = await getDoc(doc(db, 'meta', 'readingOrder'))
+  if (!snap.exists()) return []
+  const data = snap.data() as { order?: unknown }
+  return Array.isArray(data.order) ? (data.order.filter((x) => typeof x === 'string') as string[]) : []
+}
+
+export async function setReadingOrder(order: string[]): Promise<void> {
+  await setDoc(doc(db, 'meta', 'readingOrder'), { order, updatedAt: serverTimestamp() })
+}
+
+export function applyReadingOrder<T extends { id: string; createdAt: Timestamp | null }>(
+  items: T[],
+  order: string[],
+): T[] {
+  if (order.length === 0) return items
+  const byId = new Map(items.map((x) => [x.id, x]))
+  const ordered: T[] = []
+  for (const id of order) {
+    const x = byId.get(id)
+    if (x) {
+      ordered.push(x)
+      byId.delete(id)
+    }
+  }
+  const rest = [...byId.values()].sort(
+    (a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0),
+  )
+  return [...ordered, ...rest]
 }
 
 export async function updateReadingGlossaries(
