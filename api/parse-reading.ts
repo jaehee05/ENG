@@ -5,8 +5,12 @@ export const config = {
   maxDuration: 60,
 }
 
-const SYSTEM_PROMPT = `당신은 한국 수능/모의고사 영어 문제 원문 텍스트를 파싱하는 분석가입니다.
-사용자가 책·시험지·인터넷에서 복사해 붙여 넣은 원문(지문 + 발문 + 선지 + 가끔 정답·해설)을 보고 깔끔하게 구조화해서 submit_reading 도구를 호출하세요.
+const SYSTEM_PROMPT = `당신은 한국 수능/모의고사 영어 문제 원문 텍스트 또는 시험지 캡쳐 이미지를 파싱하는 분석가입니다.
+입력에는 본문(지문) + 발문 + 5지선다(①~⑤) + 가끔 정답·해설이 포함되어 있습니다. 깔끔하게 구조화해서 submit_reading 도구를 호출하세요.
+
+가급적 best-effort로 추출하세요. 발문이 잘려 있거나 누락돼도, 본문과 선지가 보이면 발문을 합리적으로 추정하세요(예: 본문에 빈칸이 있으면 "다음 빈칸에 들어갈 말로 가장 적절한 것은?"). 선지가 5개에 모자라면 빈 문자열로 채워서 5개를 맞추세요.
+
+정말 어떤 문항도 안 보이는 경우(예: 입력이 단순 사진/일반 텍스트)에만 submit_reading을 호출하지 말고, 텍스트로 "어떤 부분이 부족한지" 한국어로 설명하세요.
 
 원문에는 다음 노이즈가 섞여 있을 수 있습니다. 모두 제거하세요.
 - 문항 번호 (예: "31.", "[31~32]")
@@ -213,7 +217,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           },
         },
       ],
-      tool_choice: { type: 'tool', name: 'submit_reading' },
+      tool_choice: { type: 'auto' },
       messages: [{ role: 'user', content: userContent }],
     })
 
