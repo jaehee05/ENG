@@ -81,7 +81,9 @@ export interface EnrichedWord {
   definitionEn: string
 }
 
-export async function enrichVocab(words: { en: string; ko: string }[]): Promise<EnrichedWord[]> {
+async function enrichVocabBatch(
+  words: { en: string; ko: string }[],
+): Promise<EnrichedWord[]> {
   const res = await fetch('/api/enrich-vocab', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -99,6 +101,23 @@ export async function enrichVocab(words: { en: string; ko: string }[]): Promise<
   }
   const data = (await res.json()) as { words: EnrichedWord[] }
   return data.words ?? []
+}
+
+const ENRICH_BATCH_SIZE = 25
+
+export async function enrichVocab(
+  words: { en: string; ko: string }[],
+  onProgress?: (done: number, total: number) => void,
+): Promise<EnrichedWord[]> {
+  if (words.length === 0) return []
+  const all: EnrichedWord[] = []
+  for (let i = 0; i < words.length; i += ENRICH_BATCH_SIZE) {
+    const slice = words.slice(i, i + ENRICH_BATCH_SIZE)
+    const enriched = await enrichVocabBatch(slice)
+    all.push(...enriched)
+    onProgress?.(Math.min(i + ENRICH_BATCH_SIZE, words.length), words.length)
+  }
+  return all
 }
 
 export function fileToBase64(file: File): Promise<string> {

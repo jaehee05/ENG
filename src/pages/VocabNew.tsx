@@ -34,6 +34,7 @@ export function VocabNew() {
   const [raw, setRaw] = useState('')
   const [extras, setExtras] = useState<Map<string, Extra>>(new Map())
   const [enriching, setEnriching] = useState(false)
+  const [enrichProgress, setEnrichProgress] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [splitByDay, setSplitByDay] = useState(false)
@@ -66,8 +67,12 @@ export function VocabNew() {
       return
     }
     setEnriching(true)
+    setEnrichProgress(`0 / ${words.length}`)
     try {
-      const enriched = await enrichVocab(words.map((w) => ({ en: w.en, ko: w.ko })))
+      const enriched = await enrichVocab(
+        words.map((w) => ({ en: w.en, ko: w.ko })),
+        (done, total) => setEnrichProgress(`${done} / ${total}`),
+      )
       setExtras((prev) => {
         const next = new Map(prev)
         for (const e of enriched) {
@@ -88,6 +93,7 @@ export function VocabNew() {
       setError(err instanceof Error ? err.message : 'AI 보강에 실패했습니다.')
     } finally {
       setEnriching(false)
+      setEnrichProgress(null)
     }
   }
 
@@ -314,7 +320,9 @@ export function VocabNew() {
                 disabled={enriching}
                 className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700 disabled:opacity-50"
               >
-                {enriching ? '추가 중...' : 'AI로 예문·영영 추가'}
+                {enriching
+                  ? `보강 중... ${enrichProgress ?? ''}`
+                  : 'AI로 예문·영영 추가'}
               </button>
             </div>
 
