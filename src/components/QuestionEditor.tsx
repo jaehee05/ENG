@@ -86,6 +86,7 @@ export function QuestionEditor({ index, question, canRemove, onChange, onRemove 
         <textarea
           value={question.q}
           onChange={(e) => patch({ q: e.target.value })}
+          onKeyDown={(e) => handleUnderlineHotkey(e, (next) => patch({ q: next }))}
           placeholder={READING_TYPE_PROMPT[question.type]}
           rows={2}
           className={inputCls}
@@ -100,6 +101,7 @@ export function QuestionEditor({ index, question, canRemove, onChange, onRemove 
           <textarea
             value={question.intro}
             onChange={(e) => patch({ intro: e.target.value })}
+            onKeyDown={(e) => handleUnderlineHotkey(e, (next) => patch({ intro: next }))}
             rows={3}
             className={inputCls}
           />
@@ -120,7 +122,6 @@ export function QuestionEditor({ index, question, canRemove, onChange, onRemove 
           rows={6}
           className={inputCls}
         />
-        <p className="text-xs text-slate-400 mt-1">⌘U(Ctrl+U)로 선택 부분에 밑줄</p>
       </div>
 
       {needSummary && (
@@ -131,6 +132,9 @@ export function QuestionEditor({ index, question, canRemove, onChange, onRemove 
           <textarea
             value={question.summaryBox}
             onChange={(e) => patch({ summaryBox: e.target.value })}
+            onKeyDown={(e) =>
+              handleUnderlineHotkey(e, (next) => patch({ summaryBox: next }))
+            }
             placeholder="예: ... led to the (A) of less profitable diseases, ... include (B) populations."
             rows={3}
             className={inputCls}
@@ -155,13 +159,14 @@ export function QuestionEditor({ index, question, canRemove, onChange, onRemove 
                 type="text"
                 value={c}
                 onChange={(e) => updateChoice(ci, e.target.value)}
+                onKeyDown={(e) => handleUnderlineHotkey(e, (next) => updateChoice(ci, next))}
                 className="flex-1 rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
             </label>
           ))}
         </div>
         <p className="text-xs text-slate-500 mt-1">
-          정답: {CHOICE_MARKS[question.answer]}
+          정답: {CHOICE_MARKS[question.answer]} · ⌘U(Ctrl+U)로 발문/선지/본문에 밑줄
         </p>
       </div>
     </div>

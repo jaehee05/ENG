@@ -1,43 +1,10 @@
-import { Fragment, useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getReading } from '../lib/firestore'
+import { renderUnderlines as renderWithUnderlines } from '../lib/renderUnderlines'
 import type { Reading, ReadingQuestion } from '../lib/types'
 
 const CHOICE_MARKS = ['①', '②', '③', '④', '⑤']
-
-const UNDERLINE_RE = /([①②③④⑤])\s*\{([^}]+)\}|\{\{([^}]+)\}\}/g
-
-function renderWithUnderlines(text: string): ReactNode {
-  const out: ReactNode[] = []
-  let last = 0
-  let key = 0
-  for (const m of text.matchAll(UNDERLINE_RE)) {
-    const start = m.index ?? 0
-    if (start > last) out.push(<Fragment key={key++}>{text.slice(last, start)}</Fragment>)
-    if (m[1]) {
-      out.push(
-        <Fragment key={key++}>
-          <sup className="text-slate-600 mr-0.5">{m[1]}</sup>
-          <span className="underline decoration-slate-900 decoration-2 underline-offset-[3px]">
-            {m[2]}
-          </span>
-        </Fragment>,
-      )
-    } else {
-      out.push(
-        <span
-          key={key++}
-          className="underline decoration-slate-900 decoration-2 underline-offset-[3px]"
-        >
-          {m[3]}
-        </span>,
-      )
-    }
-    last = start + m[0].length
-  }
-  if (last < text.length) out.push(<Fragment key={key++}>{text.slice(last)}</Fragment>)
-  return out
-}
 
 function GlossaryColumn({ items, label }: { items: { en: string; ko: string }[]; label?: string }) {
   if (items.length === 0) return null
@@ -112,7 +79,7 @@ export function ReadingSheet() {
             return (
               <section key={qi} className={qi > 0 ? 'mt-10 print:break-before-page' : ''}>
                 <p className="text-[12pt] font-semibold mb-2">
-                  {qi + 1}. {q.q}
+                  {qi + 1}. {renderWithUnderlines(q.q)}
                   {q.points && q.points >= 3 && (
                     <span className="ml-2 text-[10pt] font-normal text-slate-600">
                       [{q.points}점]
@@ -123,7 +90,7 @@ export function ReadingSheet() {
                 {q.intro && q.intro.trim() && (
                   <div className="grid grid-cols-3 gap-6 mb-3">
                     <div className="col-span-2 border border-slate-400 p-3 text-[11pt] leading-[1.6] whitespace-pre-wrap">
-                      {q.intro}
+                      {renderWithUnderlines(q.intro)}
                     </div>
                     <div />
                   </div>
@@ -141,7 +108,7 @@ export function ReadingSheet() {
                 {q.summaryBox && q.summaryBox.trim() && (
                   <div className="grid grid-cols-3 gap-6 mt-3">
                     <div className="col-span-2 border border-slate-400 p-3 text-[11pt] leading-[1.6] whitespace-pre-wrap">
-                      {q.summaryBox}
+                      {renderWithUnderlines(q.summaryBox)}
                     </div>
                     <div />
                   </div>
@@ -151,7 +118,7 @@ export function ReadingSheet() {
                   <ol className="col-span-2 space-y-1 text-[11pt] leading-[1.6]">
                     {q.choices.map((c, ci) => (
                       <li key={ci}>
-                        {CHOICE_MARKS[ci]} {c}
+                        {CHOICE_MARKS[ci]} {renderWithUnderlines(c)}
                       </li>
                     ))}
                   </ol>

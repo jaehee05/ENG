@@ -1,4 +1,5 @@
 import { GlossedPassage } from './GlossedPassage'
+import { renderUnderlines } from '../lib/renderUnderlines'
 import type { ReadingQuestion, WordEntry } from '../lib/types'
 
 const CHOICE_MARKS = ['①', '②', '③', '④', '⑤']
@@ -32,7 +33,7 @@ export function QuestionView({
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5 space-y-4">
       <p className="text-sm font-semibold text-slate-900 whitespace-pre-wrap">
-        {index + 1}. {question.q}
+        {index + 1}. {renderUnderlines(question.q)}
         {question.points && question.points >= 3 && (
           <span className="ml-2 inline-block rounded bg-brand-100 text-brand-700 text-[10px] font-semibold px-1.5 py-0.5 align-middle">
             {question.points}점
