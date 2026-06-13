@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import { createVocabAttempt, getVocabSet } from '../lib/firestore'
-import { isCorrectKo } from '../lib/types'
+import { gradeVocabAnswers } from '../lib/grading'
 import type { VocabSet } from '../lib/types'
 
 export function VocabTake() {
@@ -49,16 +49,11 @@ export function VocabTake() {
     if (!set || !profile) return
     setSubmitting(true)
     try {
-      const results = order.map((wordIdx, slotIdx) => {
+      const inputs = order.map((wordIdx, slotIdx) => {
         const w = set.words[wordIdx]
-        const ua = answers[slotIdx] ?? ''
-        return {
-          en: w.en,
-          ko: w.ko,
-          userAnswer: ua,
-          correct: isCorrectKo(ua, w.ko),
-        }
+        return { en: w.en, ko: w.ko, userAnswer: answers[slotIdx] ?? '' }
       })
+      const results = await gradeVocabAnswers(inputs)
       const attemptId = await createVocabAttempt({
         studentUid: profile.id,
         studentName: profile.displayName,

@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import { createWordbookAttempt } from '../lib/firestore'
+import { gradeVocabAnswers } from '../lib/grading'
 import { listMyWordbook } from '../lib/wordbook'
-import { isCorrectKo, type WordEntry } from '../lib/types'
+import type { WordEntry } from '../lib/types'
 
 export function WordbookTake() {
   const { profile } = useAuth()
@@ -37,12 +38,12 @@ export function WordbookTake() {
     if (!profile) return
     setSubmitting(true)
     try {
-      const results = words.map((w, i) => ({
+      const inputs = words.map((w, i) => ({
         en: w.en,
         ko: w.ko,
         userAnswer: answers[i] ?? '',
-        correct: isCorrectKo(answers[i] ?? '', w.ko),
       }))
+      const results = await gradeVocabAnswers(inputs)
       const attemptId = await createWordbookAttempt({
         studentUid: profile.id,
         studentName: profile.displayName,

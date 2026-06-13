@@ -150,6 +150,33 @@ export async function parseReadingText(text: string): Promise<ParsedReadingResul
   }
 }
 
+export interface GradeVocabItem {
+  en: string
+  expected: string
+  userAnswer: string
+}
+
+export async function gradeVocabAI(items: GradeVocabItem[]): Promise<boolean[]> {
+  if (items.length === 0) return []
+  const res = await fetch('/api/grade-vocab', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ items }),
+  })
+  if (!res.ok) {
+    let message = `요청 실패 (HTTP ${res.status})`
+    try {
+      const body = (await res.json()) as { error?: string }
+      if (body.error) message = body.error
+    } catch {
+      // ignore
+    }
+    throw new Error(message)
+  }
+  const data = (await res.json()) as { results: { correct: boolean }[] }
+  return (data.results ?? []).map((r) => Boolean(r.correct))
+}
+
 export async function defineWords(input: {
   words: string[]
   passage: string
