@@ -85,9 +85,10 @@ function normalizeQuestion(raw: unknown): ParsedQuestion | null {
   const type =
     typeof r.type === 'string' && ALLOWED_SET.has(r.type) ? r.type : 'standard'
   const q = typeof r.q === 'string' ? r.q.trim() : ''
-  if (!q) return null
+  const body = typeof r.body === 'string' ? r.body.trim() : ''
   const choicesRaw = Array.isArray(r.choices) ? r.choices : []
   const choices = choicesRaw.map((c) => (typeof c === 'string' ? c.trim() : ''))
+  if (!q && !body && choices.every((c) => !c)) return null
   while (choices.length < 5) choices.push('')
   const answer =
     typeof r.answer === 'number' && r.answer >= 0 && r.answer <= 4 ? Math.trunc(r.answer) : 0
@@ -96,7 +97,7 @@ function normalizeQuestion(raw: unknown): ParsedQuestion | null {
   return {
     type,
     q,
-    body: typeof r.body === 'string' ? r.body.trim() : '',
+    body,
     intro: typeof r.intro === 'string' ? r.intro.trim() : '',
     summaryBox: typeof r.summaryBox === 'string' ? r.summaryBox.trim() : '',
     choices: choices.slice(0, 5),
@@ -178,13 +179,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const msg = await client.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 16000,
-      system: [
-        {
-          type: 'text',
-          text: SYSTEM_PROMPT,
-          cache_control: { type: 'ephemeral' },
-        },
-      ],
+      system: SYSTEM_PROMPT,
       tools: [
         {
           name: 'submit_reading',
@@ -213,7 +208,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     answer: { type: 'integer', minimum: 0, maximum: 4 },
                     points: { type: 'integer', minimum: 1, maximum: 5 },
                   },
-                  required: ['type', 'q', 'choices', 'answer'],
                 },
               },
             },
@@ -247,17 +241,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const rawCount = Array.isArray(rawInput?.questions) ? rawInput.questions.length : 0
     const parsed = normalizeResult(toolUse.input)
     if (parsed.questions.length === 0) {
+      const sample = JSON.stringify(rawInput).slice(0, 600)
       console.error('parse-reading: empty questions', {
         rawCount,
         hint,
-        sample: JSON.stringify(rawInput).slice(0, 500),
+        sample,
+        stop_reason: msg.stop_reason,
       })
       const reason =
         rawCount > 0
-          ? `모델이 ${rawCount}개 추출했지만 발문/선지가 비어 있어 모두 제외됨`
+          ? `모델이 ${rawCount}개 추출했지만 모두 빈 항목`
           : '모델이 문항을 추출하지 못함'
       res.status(422).json({
-        error: `문항을 찾지 못했습니다. (${reason})${hint ? ' - ' + hint : ''}`,
+        error: `문항을 찾지 못했습니다. (${reason})${hint ? ' - 모델 메시지: ' + hint : ''} | 모델 입력: ${sample}`,
       })
       return
     }
