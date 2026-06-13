@@ -121,14 +121,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return
   }
 
-  const { text } = (req.body ?? {}) as { text?: string }
-  if (typeof text !== 'string' || !text.trim()) {
-    res.status(400).json({ error: 'text가 필요합니다.' })
+  const { text, images } = (req.body ?? {}) as { text?: string; images?: string[] }
+  const hasText = typeof text === 'string' && text.trim().length > 0
+  const imageList = Array.isArray(images) ? images.filter((s) => typeof s === 'string' && s) : []
+  if (!hasText && imageList.length === 0) {
+    res.status(400).json({ error: 'text 또는 images가 필요합니다.' })
     return
   }
-  if (text.length > 40000) {
+  if (hasText && (text as string).length > 40000) {
     res.status(400).json({ error: '텍스트가 너무 깁니다. (40000자 이내)' })
     return
+  }
+  if (imageList.length > 8) {
+    res.status(400).json({ error: '이미지는 한 번에 8장까지 첨부할 수 있습니다.' })
+    return
+  }
+
+  const userContent: Anthropic.Messages.ContentBlockParam[] = []
+  for (const raw of imageList) {
+    let data = raw
+    let mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp' = 'image/png'
+    const m = raw.match(/^data:([^;]+);base64,(.+)$/)
+    if (m) {
+      const mt = m[1]
+      data = m[2]
+      if (mt === 'image/jpeg' || mt === 'image/jpg') mediaType = 'image/jpeg'
+      else if (mt === 'image/gif') mediaType = 'image/gif'
+      else if (mt === 'image/webp') mediaType = 'image/webp'
+      else mediaType = 'image/png'
+    }
+    userContent.push({
+      type: 'image',
+      source: { type: 'base64', media_type: mediaType, data },
+    })
+  }
+  if (hasText) {
+    userContent.push({ type: 'text', text: `[원문]\n${(text as string).trim()}` })
+  } else {
+    userContent.push({
+      type: 'text',
+      text: '첨부된 이미지(시험지/캡쳐)에서 문항을 추출해주세요.',
+    })
   }
 
   const client = new Anthropic({ apiKey })
@@ -181,7 +214,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         },
       ],
       tool_choice: { type: 'tool', name: 'submit_reading' },
-      messages: [{ role: 'user', content: `[원문]\n${text.trim()}` }],
+      messages: [{ role: 'user', content: userContent }],
     })
 
     const toolUse = msg.content.find((b) => b.type === 'tool_use')

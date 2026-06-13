@@ -1,11 +1,38 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import {
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ClipboardEvent,
+  type FormEvent,
+} from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import { createReading } from '../lib/firestore'
-import { extractGlossary, parseReadingText, wordsToText } from '../lib/api'
+import { extractGlossary, fileToBase64, parseReadingText, wordsToText } from '../lib/api'
 import { parseWordList, type ReadingQuestionType } from '../lib/types'
 import { QuestionEditor } from '../components/QuestionEditor'
 import { emptyDraftQuestion, type DraftQuestion } from '../components/draftQuestion'
+
+interface AttachedImage {
+  id: string
+  name: string
+  previewUrl: string
+  base64: string
+  mediaType: string
+}
+
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024
+const MAX_IMAGES = 8
+
+function inferMediaType(file: File): string {
+  if (file.type) return file.type
+  const n = file.name.toLowerCase()
+  if (n.endsWith('.jpg') || n.endsWith('.jpeg')) return 'image/jpeg'
+  if (n.endsWith('.gif')) return 'image/gif'
+  if (n.endsWith('.webp')) return 'image/webp'
+  return 'image/png'
+}
 
 const ALLOWED_TYPES: ReadingQuestionType[] = [
   'standard',
@@ -59,6 +86,67 @@ export function ReadingNew() {
   const [rawText, setRawText] = useState('')
   const [parsing, setParsing] = useState(false)
   const [parseNotice, setParseNotice] = useState<string | null>(null)
+  const [images, setImages] = useState<AttachedImage[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  async function addFiles(files: File[]) {
+    const accepted = files.filter((f) => f.type.startsWith('image/') || /\.(png|jpe?g|gif|webp)$/i.test(f.name))
+    if (accepted.length === 0) return
+    const room = MAX_IMAGES - images.length
+    if (room <= 0) {
+      setError(`이미지는 ${MAX_IMAGES}장까지 첨부할 수 있습니다.`)
+      return
+    }
+    const picked = accepted.slice(0, room)
+    for (const file of picked) {
+      if (file.size > MAX_IMAGE_SIZE) {
+        setError(`${file.name}: 5MB를 초과합니다.`)
+        continue
+      }
+      try {
+        const base64 = await fileToBase64(file)
+        const mediaType = inferMediaType(file)
+        setImages((prev) => [
+          ...prev,
+          {
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            name: file.name || '캡쳐',
+            previewUrl: `data:${mediaType};base64,${base64}`,
+            base64,
+            mediaType,
+          },
+        ])
+      } catch {
+        setError(`${file.name}: 파일을 읽지 못했습니다.`)
+      }
+    }
+  }
+
+  function onFilePick(e: ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files ? Array.from(e.target.files) : []
+    void addFiles(files)
+    e.target.value = ''
+  }
+
+  function onPaste(e: ClipboardEvent<HTMLTextAreaElement>) {
+    const items = e.clipboardData?.items
+    if (!items) return
+    const files: File[] = []
+    for (const it of items) {
+      if (it.kind === 'file') {
+        const f = it.getAsFile()
+        if (f && f.type.startsWith('image/')) files.push(f)
+      }
+    }
+    if (files.length > 0) {
+      e.preventDefault()
+      void addFiles(files)
+    }
+  }
+
+  function removeImage(id: string) {
+    setImages((prev) => prev.filter((x) => x.id !== id))
+  }
 
   const glossary = useMemo(() => parseWordList(glossaryRaw), [glossaryRaw])
   const choicesGlossary = useMemo(() => parseWordList(choicesGlossaryRaw), [choicesGlossaryRaw])
@@ -66,13 +154,16 @@ export function ReadingNew() {
   async function handleParse() {
     setError(null)
     setParseNotice(null)
-    if (!rawText.trim()) {
-      setError('붙여넣은 텍스트가 없습니다.')
+    if (!rawText.trim() && images.length === 0) {
+      setError('붙여넣은 텍스트나 첨부 이미지가 없습니다.')
       return
     }
     setParsing(true)
     try {
-      const result = await parseReadingText(rawText)
+      const result = await parseReadingText({
+        text: rawText.trim() ? rawText : undefined,
+        images: images.length > 0 ? images.map((i) => i.previewUrl) : undefined,
+      })
       if (result.questions.length === 0) {
         setError('문항을 찾지 못했습니다. 원문을 다시 확인하세요.')
         return
@@ -168,9 +259,9 @@ export function ReadingNew() {
       <div className="rounded-md border border-brand-200 bg-brand-50/40 p-4 space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-sm font-semibold text-brand-700">원문 붙여넣어 자동 입력</h2>
+            <h2 className="text-sm font-semibold text-brand-700">원문 / 캡쳐로 자동 입력</h2>
             <p className="text-xs text-slate-600 mt-0.5">
-              지문·발문·①~⑤ 선지·정답이 섞인 원문을 통째로 붙여넣으면 AI가 분류해 폼을 채워줍니다.
+              텍스트를 붙여넣거나 시험지·교재 캡쳐 이미지를 첨부하면 AI가 분류해 폼을 채워줍니다.
             </p>
           </div>
           <button
@@ -185,12 +276,63 @@ export function ReadingNew() {
         <textarea
           value={rawText}
           onChange={(e) => setRawText(e.target.value)}
+          onPaste={onPaste}
           rows={8}
           placeholder={
-            '예) 31. 다음 빈칸에 들어갈 말로 가장 적절한 것은? [3점]\n  Recent studies suggest that ...\n  ① ... ② ... ③ ... ④ ... ⑤ ...\n  정답: ③'
+            '예) 31. 다음 빈칸에 들어갈 말로 가장 적절한 것은? [3점]\n  Recent studies suggest that ...\n  ① ... ② ... ③ ... ④ ... ⑤ ...\n  정답: ③\n\n(이 칸에 캡쳐 이미지를 그대로 붙여넣어도 됩니다)'
           }
           className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
         />
+
+        <div className="flex items-center gap-3 flex-wrap">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/gif,image/webp"
+            multiple
+            onChange={onFilePick}
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={images.length >= MAX_IMAGES}
+            className="rounded-md border border-brand-300 bg-white text-brand-700 text-xs font-medium px-3 py-1.5 hover:bg-brand-50 disabled:opacity-50"
+          >
+            + 이미지 첨부
+          </button>
+          {images.length > 0 && (
+            <span className="text-xs text-slate-500">
+              {images.length} / {MAX_IMAGES}장
+            </span>
+          )}
+        </div>
+
+        {images.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {images.map((img) => (
+              <div
+                key={img.id}
+                className="relative rounded-md border border-slate-300 bg-white overflow-hidden"
+              >
+                <img
+                  src={img.previewUrl}
+                  alt={img.name}
+                  className="w-full h-32 object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeImage(img.id)}
+                  className="absolute top-1 right-1 rounded-full bg-slate-900/70 text-white text-xs px-2 py-0.5 hover:bg-slate-900"
+                  aria-label="삭제"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         {parseNotice && <p className="text-xs text-brand-700">{parseNotice}</p>}
       </div>
 

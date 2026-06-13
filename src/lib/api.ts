@@ -127,11 +127,14 @@ export interface ParsedReadingResult {
   questions: ParsedReadingQuestion[]
 }
 
-export async function parseReadingText(text: string): Promise<ParsedReadingResult> {
+export async function parseReadingText(input: {
+  text?: string
+  images?: string[]
+}): Promise<ParsedReadingResult> {
   const res = await fetch('/api/parse-reading', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify(input),
   })
   if (!res.ok) {
     let message = `요청 실패 (HTTP ${res.status})`
