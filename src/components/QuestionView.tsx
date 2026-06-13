@@ -28,6 +28,8 @@ export function QuestionView({
 }: Props) {
   const body = question.body?.trim() ? question.body : fallbackPassage
   const showBody = body && body.trim().length > 0
+  const isUnderlineType =
+    question.type === 'underline-grammar' || question.type === 'underline-vocab'
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5 space-y-4">
@@ -54,6 +56,7 @@ export function QuestionView({
             glossary={passageGlossary}
             viewedWords={viewedWords}
             onWordLookup={onWordLookup}
+            enableUnderlineMarkers={isUnderlineType}
           />
         </div>
       )}

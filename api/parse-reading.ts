@@ -33,6 +33,7 @@ const SYSTEM_PROMPT = `당신은 한국 수능/모의고사 영어 문제 원문
   - body (문자열): 문제별 본문. passage를 따로 채웠다면 비워도 됨.
     - 빈칸은 8개 이상 밑줄(________)로 표기
     - 본문 안에 ①~⑤ 마커가 있는 유형(insert, irrelevant, underline-*)은 마커 유지
+    - underline-grammar / underline-vocab 유형은 밑줄 친 단어/구문을 \`①{...}\` 형식으로 감쌀 것. 예: "He ①{liked} to ②{walking} home." 마커와 중괄호 사이 공백은 넣지 말 것.
   - intro (문자열, 선택): order/insert에서 박스로 주어진 글/문장
   - summaryBox (문자열, 선택): summary에서 박스 안 요약문, (A)·(B) 빈칸 그대로
   - choices (정확히 5개 문자열): ①~⑤ 선지. 마커는 빼고 텍스트만.

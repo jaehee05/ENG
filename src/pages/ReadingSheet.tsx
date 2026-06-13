@@ -1,9 +1,32 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getReading } from '../lib/firestore'
 import type { Reading, ReadingQuestion } from '../lib/types'
 
 const CHOICE_MARKS = ['①', '②', '③', '④', '⑤']
+
+const UNDERLINE_RE = /([①②③④⑤])\s*\{([^}]+)\}/g
+
+function renderWithUnderlines(text: string): ReactNode {
+  const out: ReactNode[] = []
+  let last = 0
+  let key = 0
+  for (const m of text.matchAll(UNDERLINE_RE)) {
+    const start = m.index ?? 0
+    if (start > last) out.push(<Fragment key={key++}>{text.slice(last, start)}</Fragment>)
+    out.push(
+      <Fragment key={key++}>
+        <sup className="text-slate-600 mr-0.5">{m[1]}</sup>
+        <span className="underline decoration-slate-900 decoration-2 underline-offset-[3px]">
+          {m[2]}
+        </span>
+      </Fragment>,
+    )
+    last = start + m[0].length
+  }
+  if (last < text.length) out.push(<Fragment key={key++}>{text.slice(last)}</Fragment>)
+  return out
+}
 
 function GlossaryColumn({ items, label }: { items: { en: string; ko: string }[]; label?: string }) {
   if (items.length === 0) return null
@@ -75,6 +98,8 @@ export function ReadingSheet() {
         <div className="sheet bg-white border border-slate-200 print:border-0 mx-auto min-w-[680px] max-w-[210mm] p-8 print:p-0 font-serif text-slate-900">
           {r.questions.map((q, qi) => {
             const body = bodyFor(q, r.passage)
+            const isUnderline =
+              q.type === 'underline-grammar' || q.type === 'underline-vocab'
             return (
               <section key={qi} className={qi > 0 ? 'mt-10 print:break-before-page' : ''}>
                 <p className="text-[12pt] font-semibold mb-2">
@@ -93,7 +118,7 @@ export function ReadingSheet() {
                 {body && body.trim() && (
                   <div className="grid grid-cols-3 gap-6">
                     <div className="col-span-2 text-[11.5pt] leading-[1.7] whitespace-pre-wrap text-justify">
-                      {body}
+                      {isUnderline ? renderWithUnderlines(body) : body}
                     </div>
                     <GlossaryColumn items={r.glossary} />
                   </div>

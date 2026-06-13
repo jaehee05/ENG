@@ -24,6 +24,7 @@ const SYSTEM_PROMPT = `당신은 한국 수능 영어 모의고사 문제지 분
 - body (문자열): 지문/본문 텍스트.
   - 빈칸 마커는 8개 이상의 밑줄(________)로 표기
   - 본문에 ①~⑤ 마커가 포함된 유형(insert, irrelevant, underline-*)은 ①~⑤를 그대로 포함
+  - underline-grammar / underline-vocab 유형은 밑줄 친 단어/구문을 \`①{...}\` 형식으로 감쌀 것. 예: "He ①{liked} to ②{walking} home." 마커와 중괄호 사이 공백은 넣지 말 것.
 - intro (문자열, 선택): order/insert 유형에서 박스 안에 별도로 주어진 글/문장
 - summaryBox (문자열, 선택): summary 유형에서 박스 안 요약문. (A), (B) 빈칸을 그대로 포함
 - choices (5개 문자열 배열): 5개 선지. 각 선지는 ①~⑤ 마커 없이 텍스트만.
