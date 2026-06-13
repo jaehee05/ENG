@@ -102,7 +102,7 @@ export function ReadingList() {
         <p className="text-slate-500 text-sm">등록된 지문이 없습니다.</p>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div className="space-y-3">
         {items.map((r, i) =>
           reorderMode && isAdmin ? (
             <div
