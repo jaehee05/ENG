@@ -140,59 +140,82 @@ export function VocabDetail() {
       )}
 
       <ul className="space-y-4">
-        {set.words.map((w, i) => (
-          <li
-            key={i}
-            className="rounded-lg border border-slate-200 bg-white overflow-hidden"
-          >
-            <div className="px-5 pt-4 pb-2 border-b border-slate-100">
-              <p className="text-xs font-mono text-slate-400 tracking-wider">
-                {String(i + 1).padStart(4, '0')}
-              </p>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 px-5 py-4">
-              <div className="sm:col-span-3">
-                <p className="text-2xl font-bold text-slate-900 leading-tight">{w.en}</p>
-                {w.ipa && (
-                  <p className="text-sm text-slate-500 mt-1">[{w.ipa}]</p>
-                )}
-              </div>
-              <div className="sm:col-span-9 space-y-2">
-                <p className="text-sm leading-relaxed text-slate-800">
-                  {w.pos && (
-                    <span className="font-medium text-slate-700 mr-2">{w.pos}</span>
-                  )}
-                  <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-slate-900 text-white text-[10px] font-bold mr-1.5 align-middle">
-                    1
-                  </span>
-                  <span className="font-semibold text-slate-900">{w.ko}</span>
-                  {w.definitionEn && (
-                    <span className="text-slate-600">
-                      {' '}[{w.definitionEn}]
-                    </span>
-                  )}
-                  {w.synonyms && w.synonyms.length > 0 && (
-                    <span className="text-slate-500">
-                      {' '}= {w.synonyms.join(', ')}
-                    </span>
-                  )}
+        {set.words.map((w, i) => {
+          const senses =
+            w.senses && w.senses.length > 0
+              ? w.senses
+              : [
+                  {
+                    pos: w.pos,
+                    ko: w.ko,
+                    definitionEn: w.definitionEn,
+                    synonyms: w.synonyms,
+                    examples:
+                      w.example || w.exampleKo
+                        ? [{ en: w.example ?? '', ko: w.exampleKo }]
+                        : [],
+                  },
+                ]
+          return (
+            <li
+              key={i}
+              className="rounded-lg border border-slate-200 bg-white overflow-hidden"
+            >
+              <div className="px-5 pt-4 pb-2 border-b border-slate-100">
+                <p className="text-xs font-mono text-slate-400 tracking-wider">
+                  {String(i + 1).padStart(4, '0')}
                 </p>
-                {(w.example || w.exampleKo) && (
-                  <div className="rounded-md bg-slate-100 px-4 py-3 space-y-1">
-                    {w.example && (
-                      <p className="text-sm leading-relaxed text-slate-800">
-                        {renderExampleWithBoldWord(w.example, w.en)}
-                      </p>
-                    )}
-                    {w.exampleKo && (
-                      <p className="text-sm text-slate-600">{w.exampleKo}</p>
-                    )}
-                  </div>
-                )}
               </div>
-            </div>
-          </li>
-        ))}
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 px-5 py-4">
+                <div className="sm:col-span-3">
+                  <p className="text-2xl font-bold text-slate-900 leading-tight">{w.en}</p>
+                  {w.ipa && (
+                    <p className="text-sm text-slate-500 mt-1">[{w.ipa}]</p>
+                  )}
+                </div>
+                <div className="sm:col-span-9 space-y-3">
+                  {senses.map((s, si) => (
+                    <div key={si} className="space-y-1.5">
+                      <p className="text-sm leading-relaxed text-slate-800">
+                        {s.pos && (
+                          <span className="font-medium text-slate-700 mr-2">{s.pos}</span>
+                        )}
+                        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-slate-900 text-white text-[10px] font-bold mr-1.5 align-middle">
+                          {si + 1}
+                        </span>
+                        <span className="font-semibold text-slate-900">{s.ko}</span>
+                        {s.definitionEn && (
+                          <span className="text-slate-600"> [{s.definitionEn}]</span>
+                        )}
+                        {s.synonyms && s.synonyms.length > 0 && (
+                          <span className="text-slate-500">
+                            {' '}= {s.synonyms.join(', ')}
+                          </span>
+                        )}
+                      </p>
+                      {s.examples && s.examples.length > 0 && (
+                        <div className="rounded-md bg-slate-100 px-4 py-3 space-y-2">
+                          {s.examples.map((ex, ei) => (
+                            <div key={ei} className="space-y-0.5">
+                              {ex.en && (
+                                <p className="text-sm leading-relaxed text-slate-800">
+                                  {renderExampleWithBoldWord(ex.en, w.en)}
+                                </p>
+                              )}
+                              {ex.ko && (
+                                <p className="text-sm text-slate-600">{ex.ko}</p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </li>
+          )
+        })}
       </ul>
     </div>
   )

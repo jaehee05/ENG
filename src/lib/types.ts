@@ -16,6 +16,19 @@ export interface UserAccount {
   createdAt: Timestamp | null
 }
 
+export interface VocabExample {
+  en: string
+  ko?: string
+}
+
+export interface VocabSense {
+  pos?: string
+  ko: string
+  definitionEn?: string
+  synonyms?: string[]
+  examples?: VocabExample[]
+}
+
 export interface WordEntry {
   en: string
   ko: string
@@ -28,6 +41,8 @@ export interface WordEntry {
   example?: string
   exampleKo?: string
   definitionEn?: string
+  /** Multi-sense detail; if present, used for display instead of flat fields. */
+  senses?: VocabSense[]
 }
 
 export interface VocabSet {

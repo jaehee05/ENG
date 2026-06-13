@@ -2,12 +2,19 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import { createVocabSet } from '../lib/firestore'
-import { parseWordList, type WordEntry } from '../lib/types'
+import { parseWordList, type VocabSense, type WordEntry } from '../lib/types'
 import { enrichVocab } from '../lib/api'
+import { looksLikeTextbookVocab, parseTextbookVocab } from '../lib/parseTextbookVocab'
 
 const PLACEHOLDER = `abandon - 버리다, 포기하다
 brilliant - 훌륭한, 빛나는
-emerge - 나타나다, 부각되다`
+emerge - 나타나다, 부각되다
+
+또는 교재 형식 그대로 붙여넣어도 됩니다:
+0001 advent [ǽdvent]
+n. ❶ 도래, 출현 [The arrival of a notable person or thing] = arrival, appearance
+- Since the advent of jet aircraft, travel has been sped-up.
+- 제트기의 출현 이후, 여행이 가속화되었다.`
 
 interface Extra {
   ipa?: string
@@ -16,6 +23,7 @@ interface Extra {
   example?: string
   exampleKo?: string
   definitionEn?: string
+  senses?: VocabSense[]
 }
 
 export function VocabNew() {
@@ -29,13 +37,14 @@ export function VocabNew() {
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
+  const isTextbook = useMemo(() => looksLikeTextbookVocab(raw), [raw])
   const words: WordEntry[] = useMemo(() => {
-    const parsed = parseWordList(raw)
+    const parsed = isTextbook ? parseTextbookVocab(raw) : parseWordList(raw)
     return parsed.map((p) => {
       const extra = extras.get(p.en.toLowerCase())
       return extra ? { ...p, ...extra } : p
     })
-  }, [raw, extras])
+  }, [raw, extras, isTextbook])
 
   function patchExtra(en: string, p: Extra) {
     setExtras((prev) => {
@@ -108,6 +117,7 @@ export function VocabNew() {
           if (w.example?.trim()) out.example = w.example.trim()
           if (w.exampleKo?.trim()) out.exampleKo = w.exampleKo.trim()
           if (w.definitionEn?.trim()) out.definitionEn = w.definitionEn.trim()
+          if (w.senses && w.senses.length > 0) out.senses = w.senses
           return out
         }),
         maxAttempts,
@@ -171,7 +181,14 @@ export function VocabNew() {
             rows={10}
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
-          <p className="text-xs text-slate-500 mt-1">인식된 단어: {words.length}개</p>
+          <p className="text-xs text-slate-500 mt-1">
+            인식된 단어: {words.length}개
+            {isTextbook && (
+              <span className="ml-2 inline-block rounded bg-brand-100 text-brand-700 text-[10px] font-semibold px-1.5 py-0.5 align-middle">
+                교재 형식 인식됨
+              </span>
+            )}
+          </p>
         </div>
 
         {words.length > 0 && (
