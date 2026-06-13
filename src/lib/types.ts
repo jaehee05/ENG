@@ -27,6 +27,8 @@ export interface VocabSet {
   id: string
   title: string
   words: WordEntry[]
+  /** Per-student attempt cap. Undefined = unlimited. */
+  maxAttempts?: number
   createdBy: string
   createdByName: string
   createdAt: Timestamp | null

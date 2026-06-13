@@ -73,14 +73,37 @@ export function VocabDetail() {
               {deleting ? '삭제 중...' : '삭제'}
             </button>
           )}
-          <Link
-            to={`/vocab/${set.id}/take`}
-            className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700 transition"
-          >
-            시험 시작
-          </Link>
+          {(() => {
+            const blocked =
+              !isAdmin && set.maxAttempts ? myAttempts.length >= set.maxAttempts : false
+            if (blocked) {
+              return (
+                <span
+                  className="rounded-md bg-slate-200 text-slate-500 text-sm font-medium px-4 py-2 cursor-not-allowed"
+                  title="응시 횟수를 모두 사용했습니다."
+                >
+                  응시 횟수 초과
+                </span>
+              )
+            }
+            return (
+              <Link
+                to={`/vocab/${set.id}/take`}
+                className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700 transition"
+              >
+                시험 시작
+              </Link>
+            )
+          })()}
         </div>
       </div>
+
+      {set.maxAttempts && (
+        <p className="text-xs text-slate-500">
+          응시 제한: {myAttempts.length} / {set.maxAttempts}회
+          {isAdmin && <span className="ml-1 text-brand-700">(관리자는 무관)</span>}
+        </p>
+      )}
 
       {myAttempts.length > 0 && (
         <MyAttemptsBox

@@ -40,13 +40,21 @@ export async function getVocabSet(id: string): Promise<VocabSet | null> {
 export async function createVocabSet(input: {
   title: string
   words: WordEntry[]
+  maxAttempts?: number
   createdBy: string
   createdByName: string
 }): Promise<string> {
-  const ref = await addDoc(collection(db, 'vocabSets'), {
-    ...input,
+  const payload: Record<string, unknown> = {
+    title: input.title,
+    words: input.words,
+    createdBy: input.createdBy,
+    createdByName: input.createdByName,
     createdAt: serverTimestamp(),
-  })
+  }
+  if (input.maxAttempts && input.maxAttempts > 0) {
+    payload.maxAttempts = Math.trunc(input.maxAttempts)
+  }
+  const ref = await addDoc(collection(db, 'vocabSets'), payload)
   return ref.id
 }
 

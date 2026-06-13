@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
-import { createVocabAttempt, getVocabSet } from '../lib/firestore'
+import {
+  createVocabAttempt,
+  getVocabSet,
+  listAttemptsForUser,
+} from '../lib/firestore'
 import { gradeVocabAnswers } from '../lib/grading'
 import type { VocabSet } from '../lib/types'
 
@@ -9,7 +13,9 @@ export function VocabTake() {
   const { id } = useParams<{ id: string }>()
   const { profile } = useAuth()
   const navigate = useNavigate()
+  const isAdmin = profile?.role === 'admin'
   const [set, setSet] = useState<VocabSet | null>(null)
+  const [usedAttempts, setUsedAttempts] = useState(0)
   const [order, setOrder] = useState<number[]>([])
   const [answers, setAnswers] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
@@ -18,14 +24,15 @@ export function VocabTake() {
   const [showHints, setShowHints] = useState(true)
 
   useEffect(() => {
-    if (!id) return
-    getVocabSet(id)
-      .then((s) => {
+    if (!id || !profile) return
+    Promise.all([getVocabSet(id), listAttemptsForUser(profile.id)])
+      .then(([s, atts]) => {
         if (!s) {
           setError('시험지를 찾을 수 없습니다.')
           return
         }
         setSet(s)
+        setUsedAttempts(atts.filter((a) => a.type === 'vocab' && a.refId === id).length)
         const idx = s.words.map((_, i) => i)
         for (let i = idx.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1))
@@ -36,7 +43,10 @@ export function VocabTake() {
       })
       .catch((e) => setError(e.message ?? '불러오기 실패'))
       .finally(() => setLoading(false))
-  }, [id])
+  }, [id, profile])
+
+  const blocked =
+    !!set?.maxAttempts && !isAdmin && usedAttempts >= (set.maxAttempts ?? 0)
 
   const answered = useMemo(() => answers.filter((a) => a.trim()).length, [answers])
   const hasHints = useMemo(
@@ -71,6 +81,24 @@ export function VocabTake() {
   if (loading) return <p className="text-slate-500 text-sm">불러오는 중...</p>
   if (error) return <p className="text-red-600 text-sm">{error}</p>
   if (!set) return null
+
+  if (blocked) {
+    return (
+      <div className="space-y-4 max-w-2xl">
+        <h1 className="text-2xl font-semibold text-slate-900">{set.title}</h1>
+        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          이 시험지의 응시 횟수 제한({set.maxAttempts}회)을 모두 사용했습니다.
+          현재 응시: {usedAttempts}회.
+        </div>
+        <Link
+          to={`/vocab/${set.id}`}
+          className="inline-block rounded-md border border-slate-300 text-slate-700 text-sm font-medium px-4 py-2 hover:bg-slate-100"
+        >
+          시험지 상세로 돌아가기
+        </Link>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6 max-w-3xl">

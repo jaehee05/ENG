@@ -18,6 +18,7 @@ export function VocabNew() {
   const { profile } = useAuth()
   const navigate = useNavigate()
   const [title, setTitle] = useState('')
+  const [maxAttemptsRaw, setMaxAttemptsRaw] = useState('')
   const [raw, setRaw] = useState('')
   const [extras, setExtras] = useState<Map<string, Extra>>(new Map())
   const [enriching, setEnriching] = useState(false)
@@ -76,6 +77,14 @@ export function VocabNew() {
     if (!profile) return
     if (!title.trim()) return setError('제목을 입력하세요.')
     if (words.length === 0) return setError('단어를 1개 이상 입력하세요.')
+    let maxAttempts: number | undefined
+    if (maxAttemptsRaw.trim()) {
+      const n = Number.parseInt(maxAttemptsRaw, 10)
+      if (!Number.isFinite(n) || n <= 0) {
+        return setError('응시 횟수 제한은 양의 정수여야 합니다.')
+      }
+      maxAttempts = n
+    }
     setSubmitting(true)
     try {
       const id = await createVocabSet({
@@ -86,6 +95,7 @@ export function VocabNew() {
           if (w.definitionEn?.trim()) out.definitionEn = w.definitionEn.trim()
           return out
         }),
+        maxAttempts,
         createdBy: profile.id,
         createdByName: profile.displayName,
       })
@@ -112,6 +122,21 @@ export function VocabNew() {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="예: 수능 어휘 Day 1"
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          />
+        </div>
+
+        <div className="max-w-xs">
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            응시 횟수 제한{' '}
+            <span className="font-normal text-slate-500">(비워두면 무제한)</span>
+          </label>
+          <input
+            type="number"
+            min={1}
+            value={maxAttemptsRaw}
+            onChange={(e) => setMaxAttemptsRaw(e.target.value)}
+            placeholder="예: 3"
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
         </div>
