@@ -102,7 +102,29 @@ export function VocabNew() {
     if (w.example?.trim()) out.example = w.example.trim()
     if (w.exampleKo?.trim()) out.exampleKo = w.exampleKo.trim()
     if (w.definitionEn?.trim()) out.definitionEn = w.definitionEn.trim()
-    if (w.senses && w.senses.length > 0) out.senses = w.senses
+    if (w.senses && w.senses.length > 0) {
+      const senses: VocabSense[] = []
+      for (const s of w.senses) {
+        const cs: VocabSense = { ko: s.ko?.trim() ?? '' }
+        if (s.pos?.trim()) cs.pos = s.pos.trim()
+        if (s.definitionEn?.trim()) cs.definitionEn = s.definitionEn.trim()
+        if (s.synonyms && s.synonyms.length > 0) {
+          const syns = s.synonyms.map((x) => x.trim()).filter(Boolean)
+          if (syns.length > 0) cs.synonyms = syns
+        }
+        if (s.examples && s.examples.length > 0) {
+          const exs = []
+          for (const ex of s.examples) {
+            const cex: { en: string; ko?: string } = { en: ex.en?.trim() ?? '' }
+            if (ex.ko?.trim()) cex.ko = ex.ko.trim()
+            if (cex.en || cex.ko) exs.push(cex)
+          }
+          if (exs.length > 0) cs.examples = exs
+        }
+        if (cs.ko) senses.push(cs)
+      }
+      if (senses.length > 0) out.senses = senses
+    }
     return out
   }
 
