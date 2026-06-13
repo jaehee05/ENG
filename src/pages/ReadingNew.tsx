@@ -11,6 +11,7 @@ import { useAuth } from '../contexts/useAuth'
 import { createReading } from '../lib/firestore'
 import { extractGlossary, fileToBase64, parseReadingText, wordsToText } from '../lib/api'
 import { parseWordList, type ReadingQuestionType } from '../lib/types'
+import { handleUnderlineHotkey } from '../lib/textareaHotkeys'
 import { QuestionEditor } from '../components/QuestionEditor'
 import { emptyDraftQuestion, type DraftQuestion } from '../components/draftQuestion'
 
@@ -358,9 +359,13 @@ export function ReadingNew() {
           <textarea
             value={passage}
             onChange={(e) => setPassage(e.target.value)}
+            onKeyDown={(e) => handleUnderlineHotkey(e, setPassage)}
             rows={10}
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
+          <p className="text-xs text-slate-400 mt-1">
+            본문에서 단어/구를 드래그한 뒤 ⌘U(Ctrl+U)로 밑줄 표시
+          </p>
         </div>
 
         <div className="space-y-3">

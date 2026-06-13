@@ -3,6 +3,7 @@ import {
   READING_TYPE_PROMPT,
   type ReadingQuestionType,
 } from '../lib/types'
+import { handleUnderlineHotkey } from '../lib/textareaHotkeys'
 import type { DraftQuestion } from './draftQuestion'
 
 const CHOICE_MARKS = ['①', '②', '③', '④', '⑤']
@@ -115,9 +116,11 @@ export function QuestionEditor({ index, question, canRemove, onChange, onRemove 
         <textarea
           value={question.body}
           onChange={(e) => patch({ body: e.target.value })}
+          onKeyDown={(e) => handleUnderlineHotkey(e, (next) => patch({ body: next }))}
           rows={6}
           className={inputCls}
         />
+        <p className="text-xs text-slate-400 mt-1">⌘U(Ctrl+U)로 선택 부분에 밑줄</p>
       </div>
 
       {needSummary && (

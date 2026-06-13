@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { deleteReading, getReading, updateReadingContent } from '../lib/firestore'
 import type { Reading, ReadingQuestion } from '../lib/types'
+import { handleUnderlineHotkey } from '../lib/textareaHotkeys'
 import { QuestionEditor } from '../components/QuestionEditor'
 import { emptyDraftQuestion, type DraftQuestion } from '../components/draftQuestion'
 
@@ -165,9 +166,13 @@ export function ReadingEdit() {
           <textarea
             value={passage}
             onChange={(e) => setPassage(e.target.value)}
+            onKeyDown={(e) => handleUnderlineHotkey(e, setPassage)}
             rows={12}
             className={inputCls}
           />
+          <p className="text-xs text-slate-400 mt-1">
+            드래그 후 ⌘U(Ctrl+U)로 선택 부분에 밑줄
+          </p>
         </div>
 
         <div className="space-y-3">
