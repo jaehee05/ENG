@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import {
   createVocabAttempt,
@@ -11,6 +11,7 @@ import type { VocabSet } from '../lib/types'
 
 export function VocabTake() {
   const { id } = useParams<{ id: string }>()
+  const [search] = useSearchParams()
   const { profile } = useAuth()
   const navigate = useNavigate()
   const isAdmin = profile?.role === 'admin'
@@ -23,6 +24,9 @@ export function VocabTake() {
   const [error, setError] = useState<string | null>(null)
   const [showHints, setShowHints] = useState(true)
 
+  const fromRaw = Number.parseInt(search.get('from') ?? '', 10)
+  const toRaw = Number.parseInt(search.get('to') ?? '', 10)
+
   useEffect(() => {
     if (!id || !profile) return
     Promise.all([getVocabSet(id), listAttemptsForUser(profile.id)])
@@ -33,17 +37,23 @@ export function VocabTake() {
         }
         setSet(s)
         setUsedAttempts(atts.filter((a) => a.type === 'vocab' && a.refId === id).length)
-        const idx = s.words.map((_, i) => i)
+        const total = s.words.length
+        const start =
+          Number.isFinite(fromRaw) && fromRaw >= 1 && fromRaw <= total ? fromRaw : 1
+        const endCandidate =
+          Number.isFinite(toRaw) && toRaw >= start && toRaw <= total ? toRaw : total
+        const idx: number[] = []
+        for (let i = start - 1; i <= endCandidate - 1; i++) idx.push(i)
         for (let i = idx.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1))
           ;[idx[i], idx[j]] = [idx[j], idx[i]]
         }
         setOrder(idx)
-        setAnswers(new Array(s.words.length).fill(''))
+        setAnswers(new Array(idx.length).fill(''))
       })
       .catch((e) => setError(e.message ?? '불러오기 실패'))
       .finally(() => setLoading(false))
-  }, [id, profile])
+  }, [id, profile, fromRaw, toRaw])
 
   const blocked =
     !!set?.maxAttempts && !isAdmin && usedAttempts >= (set.maxAttempts ?? 0)
@@ -106,7 +116,13 @@ export function VocabTake() {
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">{set.title}</h1>
           <p className="text-sm text-slate-500 mt-1">
-            영단어의 뜻을 한국어로 입력하세요. 총 {set.words.length}문항
+            영단어의 뜻을 한국어로 입력하세요. 총 {order.length}문항
+            {order.length !== set.words.length && (
+              <span className="ml-2 text-brand-700">
+                (범위: {(order.length > 0 ? Math.min(...order) : 0) + 1}~
+                {(order.length > 0 ? Math.max(...order) : 0) + 1}번)
+              </span>
+            )}
           </p>
         </div>
         {hasHints && (
@@ -171,7 +187,7 @@ export function VocabTake() {
 
         <div className="sticky bottom-0 bg-white/90 backdrop-blur-sm rounded-b-lg py-3 px-4 border-t border-slate-200 flex items-center justify-between">
           <p className="text-sm text-slate-600">
-            작성 {answered} / {set.words.length}
+            작성 {answered} / {order.length}
           </p>
           <button
             type="submit"

@@ -5,6 +5,70 @@ import { deleteVocabSet, getVocabSet, listAttemptsForUser } from '../lib/firesto
 import { MyAttemptsBox } from '../components/MyAttemptsBox'
 import type { Attempt, VocabSet } from '../lib/types'
 
+function RangeStartBox({
+  total,
+  blocked,
+  href,
+}: {
+  total: number
+  blocked: boolean
+  href: (from: number, to: number) => string
+}) {
+  const [from, setFrom] = useState(1)
+  const [to, setTo] = useState(total)
+
+  // clamp
+  const clampedFrom = Math.min(Math.max(1, from), total)
+  const clampedTo = Math.min(Math.max(clampedFrom, to), total)
+  const count = clampedTo - clampedFrom + 1
+
+  return (
+    <div className="rounded-lg border border-brand-200 bg-brand-50/40 p-4 flex flex-col sm:flex-row sm:items-end gap-3">
+      <div className="flex-1 flex items-end gap-2 flex-wrap">
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1">시작 번호</label>
+          <input
+            type="number"
+            min={1}
+            max={total}
+            value={from}
+            onChange={(e) => setFrom(Number.parseInt(e.target.value, 10) || 1)}
+            className="w-24 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          />
+        </div>
+        <span className="pb-2 text-slate-400">~</span>
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1">끝 번호</label>
+          <input
+            type="number"
+            min={1}
+            max={total}
+            value={to}
+            onChange={(e) => setTo(Number.parseInt(e.target.value, 10) || total)}
+            className="w-24 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          />
+        </div>
+        <p className="pb-2.5 text-xs text-slate-500">총 {total}단어 중 {count}개</p>
+      </div>
+      {blocked ? (
+        <span
+          className="rounded-md bg-slate-200 text-slate-500 text-sm font-medium px-5 py-2.5 cursor-not-allowed text-center"
+          title="응시 횟수를 모두 사용했습니다."
+        >
+          응시 횟수 초과
+        </span>
+      ) : (
+        <Link
+          to={href(clampedFrom, clampedTo)}
+          className="rounded-md bg-brand-600 text-white text-sm font-semibold px-5 py-2.5 hover:bg-brand-700 transition text-center"
+        >
+          시험 시작 ({count}개)
+        </Link>
+      )}
+    </div>
+  )
+}
+
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
@@ -89,41 +153,25 @@ export function VocabDetail() {
             {set.words.length}단어 · {set.createdByName}
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          {isAdmin && (
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={deleting}
-              className="rounded-md border border-red-200 text-red-600 text-sm font-medium px-4 py-2 hover:bg-red-50 disabled:opacity-50"
-            >
-              {deleting ? '삭제 중...' : '삭제'}
-            </button>
-          )}
-          {(() => {
-            const blocked =
-              !isAdmin && set.maxAttempts ? myAttempts.length >= set.maxAttempts : false
-            if (blocked) {
-              return (
-                <span
-                  className="rounded-md bg-slate-200 text-slate-500 text-sm font-medium px-4 py-2 cursor-not-allowed"
-                  title="응시 횟수를 모두 사용했습니다."
-                >
-                  응시 횟수 초과
-                </span>
-              )
-            }
-            return (
-              <Link
-                to={`/vocab/${set.id}/take`}
-                className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700 transition"
-              >
-                시험 시작
-              </Link>
-            )
-          })()}
-        </div>
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={deleting}
+            className="rounded-md border border-red-200 text-red-600 text-sm font-medium px-4 py-2 hover:bg-red-50 disabled:opacity-50"
+          >
+            {deleting ? '삭제 중...' : '삭제'}
+          </button>
+        )}
       </div>
+
+      <RangeStartBox
+        total={set.words.length}
+        blocked={
+          !isAdmin && set.maxAttempts ? myAttempts.length >= set.maxAttempts : false
+        }
+        href={(from, to) => `/vocab/${set.id}/take?from=${from}&to=${to}`}
+      />
 
       {set.maxAttempts && (
         <p className="text-xs text-slate-500">
