@@ -123,6 +123,22 @@ export interface ReadingRef {
   title: string
 }
 
+export type AssignmentType = 'vocab' | 'reading'
+
+export interface Assignment {
+  id: string
+  studentUid: string
+  studentName: string
+  assignedBy: string
+  assignedByName: string
+  type: AssignmentType
+  refId: string
+  refTitle: string
+  note?: string
+  dueAt: Timestamp | null
+  createdAt: Timestamp | null
+}
+
 export interface WordLookup {
   en: string
   ko: string

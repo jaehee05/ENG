@@ -14,6 +14,8 @@ import {
 } from 'firebase/firestore'
 import { db } from './firebase'
 import type {
+  Assignment,
+  AssignmentType,
   Attempt,
   Reading,
   ReadingResult,
@@ -186,6 +188,45 @@ export async function listAttemptsForUser(uid: string): Promise<Attempt[]> {
     ),
   )
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Attempt, 'id'>) }))
+}
+
+export async function createAssignment(input: {
+  studentUid: string
+  studentName: string
+  assignedBy: string
+  assignedByName: string
+  type: AssignmentType
+  refId: string
+  refTitle: string
+  note?: string
+  dueAt?: Date | null
+}): Promise<string> {
+  const payload: Record<string, unknown> = {
+    studentUid: input.studentUid,
+    studentName: input.studentName,
+    assignedBy: input.assignedBy,
+    assignedByName: input.assignedByName,
+    type: input.type,
+    refId: input.refId,
+    refTitle: input.refTitle,
+    createdAt: serverTimestamp(),
+    dueAt: input.dueAt ? Timestamp.fromDate(input.dueAt) : null,
+  }
+  if (input.note && input.note.trim()) payload.note = input.note.trim()
+  const ref = await addDoc(collection(db, 'assignments'), payload)
+  return ref.id
+}
+
+export async function listAssignmentsForStudent(uid: string): Promise<Assignment[]> {
+  const snap = await getDocs(
+    query(collection(db, 'assignments'), where('studentUid', '==', uid)),
+  )
+  const items = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Assignment, 'id'>) }))
+  return items.sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0))
+}
+
+export async function deleteAssignment(id: string): Promise<void> {
+  await deleteDoc(doc(db, 'assignments', id))
 }
 
 export function formatDate(ts: Timestamp | null | undefined): string {

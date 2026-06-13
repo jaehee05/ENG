@@ -32,7 +32,6 @@ export function AdminStudents() {
   const [accounts, setAccounts] = useState<UserAccount[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [revealed, setRevealed] = useState<Set<string>>(new Set())
 
   async function load() {
     setLoading(true)
@@ -83,15 +82,6 @@ export function AdminStudents() {
     load()
   }
 
-  function toggleReveal(id: string) {
-    setRevealed((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
   const others = accounts.filter((a) => a.id !== profile?.id)
   const me = accounts.find((a) => a.id === profile?.id)
   const pending = others.filter((a) => a.status === 'pending').length
@@ -127,7 +117,6 @@ export function AdminStudents() {
               <th className="px-4 py-3 text-left font-semibold">학생 연락처</th>
               <th className="px-4 py-3 text-left font-semibold">학부모 연락처</th>
               <th className="px-4 py-3 text-left font-semibold">이메일</th>
-              <th className="px-4 py-3 text-left font-semibold">비밀번호</th>
               <th className="px-4 py-3 text-left font-semibold">상태</th>
               <th className="px-4 py-3 text-left font-semibold">가입일</th>
               <th className="px-4 py-3 text-left font-semibold">관리</th>
@@ -136,13 +125,12 @@ export function AdminStudents() {
           <tbody className="divide-y divide-slate-100">
             {others.length === 0 && !loading && (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
                   아직 가입한 학생이 없습니다.
                 </td>
               </tr>
             )}
             {others.map((a) => {
-              const open = revealed.has(a.id)
               return (
                 <tr key={a.id}>
                   <td className="px-4 py-3 font-medium text-slate-900 whitespace-nowrap">
@@ -154,19 +142,6 @@ export function AdminStudents() {
                   <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{a.phone || '-'}</td>
                   <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{a.parentPhone || '-'}</td>
                   <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{a.email}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <code className="text-xs bg-slate-100 px-2 py-1 rounded font-mono">
-                        {open ? a.password ?? '' : '••••••'}
-                      </code>
-                      <button
-                        onClick={() => toggleReveal(a.id)}
-                        className="text-xs text-slate-500 hover:text-slate-900"
-                      >
-                        {open ? '숨기기' : '보기'}
-                      </button>
-                    </div>
-                  </td>
                   <td className="px-4 py-3">
                     <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLASS[a.status]}`}>
                       {STATUS_LABEL[a.status]}

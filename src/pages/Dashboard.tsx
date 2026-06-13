@@ -1,5 +1,12 @@
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
+import {
+  formatDate,
+  listAssignmentsForStudent,
+  listAttemptsForUser,
+} from '../lib/firestore'
+import type { Assignment, AssignmentType } from '../lib/types'
 
 const cards = [
   {
@@ -32,8 +39,53 @@ const cards = [
   },
 ]
 
+function assignmentPath(a: Assignment): string {
+  return a.type === 'vocab' ? `/vocab/${a.refId}` : `/reading/${a.refId}`
+}
+
+function isOverdue(a: Assignment): boolean {
+  if (!a.dueAt) return false
+  return a.dueAt.toMillis() < Date.now()
+}
+
 export function Dashboard() {
   const { profile } = useAuth()
+  const [assignments, setAssignments] = useState<Assignment[]>([])
+  const [completedKeys, setCompletedKeys] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    if (!profile) return
+    Promise.all([
+      listAssignmentsForStudent(profile.id),
+      listAttemptsForUser(profile.id),
+    ])
+      .then(([asn, atts]) => {
+        setAssignments(asn)
+        const keys = new Set<string>()
+        for (const a of atts) {
+          if (a.refId && (a.type === 'vocab' || a.type === 'reading')) {
+            keys.add(`${a.type}:${a.refId}`)
+          }
+        }
+        setCompletedKeys(keys)
+      })
+      .catch(() => {
+        // dashboard 보조 정보. 실패해도 카드는 보여야 함
+      })
+  }, [profile])
+
+  const open = useMemo(
+    () =>
+      assignments
+        .filter((a) => !completedKeys.has(`${a.type as AssignmentType}:${a.refId}`))
+        .sort((a, b) => {
+          const ad = a.dueAt?.toMillis() ?? Infinity
+          const bd = b.dueAt?.toMillis() ?? Infinity
+          return ad - bd
+        }),
+    [assignments, completedKeys],
+  )
+
   const greeting = (() => {
     const h = new Date().getHours()
     if (h < 6) return '늦었어요'
@@ -54,6 +106,49 @@ export function Dashboard() {
           {profile?.displayName}님,<br className="sm:hidden" /> 오늘도 한 걸음 더.
         </h1>
       </section>
+
+      {open.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-base font-semibold text-slate-900">내 과제</h2>
+            <span className="text-xs text-slate-500">미완료 {open.length}건</span>
+          </div>
+          <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white overflow-hidden">
+            {open.map((a) => {
+              const overdue = isOverdue(a)
+              return (
+                <li key={a.id}>
+                  <Link
+                    to={assignmentPath(a)}
+                    className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="inline-block rounded bg-brand-50 text-brand-700 text-xs font-medium px-2 py-0.5">
+                          {a.type === 'vocab' ? '단어 시험지' : '지문'}
+                        </span>
+                        <span className="text-sm font-semibold text-slate-900 truncate">
+                          {a.refTitle}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500 mt-1">
+                        {a.dueAt && (
+                          <span className={overdue ? 'text-red-600 font-medium' : ''}>
+                            마감: {formatDate(a.dueAt)}
+                            {overdue && ' (지남)'}
+                          </span>
+                        )}
+                        {a.note && <span className="text-slate-600">· {a.note}</span>}
+                      </div>
+                    </div>
+                    <span className="text-slate-300 text-xl shrink-0">→</span>
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+      )}
 
       <section>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

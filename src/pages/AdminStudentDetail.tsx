@@ -1,9 +1,25 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { useAuth } from '../contexts/useAuth'
 import { getAccount } from '../lib/account'
-import { listAttemptsForUser } from '../lib/firestore'
+import {
+  createAssignment,
+  deleteAssignment,
+  listAssignmentsForStudent,
+  listAttemptsForUser,
+  listReadings,
+  listVocabSets,
+} from '../lib/firestore'
 import { listMyWordbook } from '../lib/wordbook'
-import type { Attempt, UserAccount, WordLookup } from '../lib/types'
+import type {
+  Assignment,
+  AssignmentType,
+  Attempt,
+  Reading,
+  UserAccount,
+  VocabSet,
+  WordLookup,
+} from '../lib/types'
 
 function fmtDate(ts: { toDate: () => Date } | null | undefined): string {
   if (!ts) return ''
@@ -32,18 +48,41 @@ type TypeFilter = 'all' | Attempt['type']
 
 export function AdminStudentDetail() {
   const { id } = useParams<{ id: string }>()
+  const { profile } = useAuth()
   const [account, setAccount] = useState<UserAccount | null>(null)
   const [attempts, setAttempts] = useState<Attempt[]>([])
   const [wordbook, setWordbook] = useState<WordLookup[]>([])
+  const [vocabSets, setVocabSets] = useState<VocabSet[]>([])
+  const [readings, setReadings] = useState<Reading[]>([])
+  const [assignments, setAssignments] = useState<Assignment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
 
+  const [assignType, setAssignType] = useState<AssignmentType>('reading')
+  const [assignRefId, setAssignRefId] = useState('')
+  const [assignDue, setAssignDue] = useState('')
+  const [assignNote, setAssignNote] = useState('')
+  const [assigning, setAssigning] = useState(false)
+  const [assignError, setAssignError] = useState<string | null>(null)
+
+  async function reloadAssignments() {
+    if (!id) return
+    setAssignments(await listAssignmentsForStudent(id))
+  }
+
   useEffect(() => {
     if (!id) return
     let cancelled = false
-    Promise.all([getAccount(id), listAttemptsForUser(id), listMyWordbook(id)])
-      .then(([acc, atts, wb]) => {
+    Promise.all([
+      getAccount(id),
+      listAttemptsForUser(id),
+      listMyWordbook(id),
+      listVocabSets(),
+      listReadings(),
+      listAssignmentsForStudent(id),
+    ])
+      .then(([acc, atts, wb, vs, rd, asn]) => {
         if (cancelled) return
         if (!acc) {
           setError('학생을 찾을 수 없습니다.')
@@ -52,6 +91,9 @@ export function AdminStudentDetail() {
         setAccount(acc)
         setAttempts(atts)
         setWordbook(wb)
+        setVocabSets(vs)
+        setReadings(rd)
+        setAssignments(asn)
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : '불러오기에 실패했습니다.')
@@ -91,6 +133,84 @@ export function AdminStudentDetail() {
     () => (typeFilter === 'all' ? attempts : attempts.filter((a) => a.type === typeFilter)),
     [attempts, typeFilter],
   )
+
+  const progress = useMemo(() => {
+    const vocabDone = new Set(
+      attempts.filter((a) => a.type === 'vocab' && a.refId).map((a) => a.refId),
+    )
+    const readingDone = new Set(
+      attempts.filter((a) => a.type === 'reading' && a.refId).map((a) => a.refId),
+    )
+    return {
+      vocabDone: vocabDone.size,
+      vocabTotal: vocabSets.length,
+      readingDone: readingDone.size,
+      readingTotal: readings.length,
+    }
+  }, [attempts, vocabSets, readings])
+
+  const completedRefIds = useMemo(() => {
+    const map: Record<AssignmentType, Set<string>> = {
+      vocab: new Set(
+        attempts.filter((a) => a.type === 'vocab' && a.refId).map((a) => a.refId),
+      ),
+      reading: new Set(
+        attempts.filter((a) => a.type === 'reading' && a.refId).map((a) => a.refId),
+      ),
+    }
+    return map
+  }, [attempts])
+
+  const assignOptions = assignType === 'vocab' ? vocabSets : readings
+
+  async function handleAssign(e: React.FormEvent) {
+    e.preventDefault()
+    setAssignError(null)
+    if (!id || !account || !profile) return
+    if (!assignRefId) {
+      setAssignError('과제로 부여할 항목을 선택하세요.')
+      return
+    }
+    const source = assignType === 'vocab' ? vocabSets : readings
+    const target = source.find((s) => s.id === assignRefId)
+    if (!target) {
+      setAssignError('선택한 항목을 찾을 수 없습니다.')
+      return
+    }
+    const dueDate = assignDue ? new Date(assignDue) : null
+    if (dueDate && Number.isNaN(dueDate.getTime())) {
+      setAssignError('마감일이 올바르지 않습니다.')
+      return
+    }
+    setAssigning(true)
+    try {
+      await createAssignment({
+        studentUid: id,
+        studentName: account.displayName,
+        assignedBy: profile.id,
+        assignedByName: profile.displayName,
+        type: assignType,
+        refId: assignRefId,
+        refTitle: target.title,
+        note: assignNote,
+        dueAt: dueDate,
+      })
+      setAssignRefId('')
+      setAssignDue('')
+      setAssignNote('')
+      await reloadAssignments()
+    } catch (err) {
+      setAssignError(err instanceof Error ? err.message : '과제 부여에 실패했습니다.')
+    } finally {
+      setAssigning(false)
+    }
+  }
+
+  async function handleDeleteAssignment(asn: Assignment) {
+    if (!window.confirm(`"${asn.refTitle}" 과제를 삭제하시겠습니까?`)) return
+    await deleteAssignment(asn.id)
+    await reloadAssignments()
+  }
 
   if (loading) return <p className="text-slate-500 text-sm">불러오는 중...</p>
   if (error) return <p className="text-red-600 text-sm">{error}</p>
@@ -150,6 +270,146 @@ export function AdminStudentDetail() {
           sub={`총 ${attempts.filter((a) => a.type === 'reading').length}회`}
         />
       </div>
+
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold text-slate-900">학습 진행도</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <ProgressCard
+            label="단어 시험지"
+            done={progress.vocabDone}
+            total={progress.vocabTotal}
+          />
+          <ProgressCard
+            label="지문 문제풀이"
+            done={progress.readingDone}
+            total={progress.readingTotal}
+          />
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold text-slate-900">과제</h2>
+          <span className="text-xs text-slate-500">총 {assignments.length}건</span>
+        </div>
+
+        <form
+          onSubmit={handleAssign}
+          className="rounded-lg border border-brand-200 bg-brand-50/40 p-4 space-y-3"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">유형</label>
+              <select
+                value={assignType}
+                onChange={(e) => {
+                  setAssignType(e.target.value as AssignmentType)
+                  setAssignRefId('')
+                }}
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                <option value="reading">지문 문제풀이</option>
+                <option value="vocab">단어 시험지</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                {assignType === 'vocab' ? '단어 시험지' : '지문'} 선택
+              </label>
+              <select
+                value={assignRefId}
+                onChange={(e) => setAssignRefId(e.target.value)}
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                <option value="">— 선택 —</option>
+                {assignOptions.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                마감일 <span className="text-slate-400 font-normal">(선택)</span>
+              </label>
+              <input
+                type="date"
+                value={assignDue}
+                onChange={(e) => setAssignDue(e.target.value)}
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                메모 <span className="text-slate-400 font-normal">(선택)</span>
+              </label>
+              <input
+                type="text"
+                value={assignNote}
+                onChange={(e) => setAssignNote(e.target.value)}
+                placeholder="예: 시간 재고 풀어보기"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
+          </div>
+          {assignError && <p className="text-sm text-red-600">{assignError}</p>}
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={assigning}
+              className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700 disabled:opacity-50"
+            >
+              {assigning ? '부여 중...' : '과제 부여'}
+            </button>
+          </div>
+        </form>
+
+        {assignments.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
+            아직 부여한 과제가 없습니다.
+          </div>
+        ) : (
+          <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
+            {assignments.map((a) => {
+              const done = completedRefIds[a.type].has(a.refId)
+              return (
+                <li key={a.id} className="px-4 py-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span
+                        className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${
+                          done ? 'bg-brand-100 text-brand-700' : 'bg-slate-100 text-slate-600'
+                        }`}
+                      >
+                        {done ? '완료' : '미완료'}
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        {a.type === 'vocab' ? '단어 시험지' : '지문'}
+                      </span>
+                      <span className="text-sm font-semibold text-slate-900 truncate">
+                        {a.refTitle}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500 mt-1">
+                      {a.dueAt && <span>마감: {fmtDate(a.dueAt)}</span>}
+                      <span>부여: {fmtDate(a.createdAt)}</span>
+                      {a.note && <span className="text-slate-600">· {a.note}</span>}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteAssignment(a)}
+                    className="text-xs text-slate-400 hover:text-red-600 shrink-0"
+                  >
+                    삭제
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </section>
 
       <section className="space-y-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
@@ -269,6 +529,28 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
       <p className="text-xs text-slate-500">{label}</p>
       <p className="text-2xl font-semibold text-slate-900 mt-1">{value}</p>
       {sub && <p className="text-xs text-slate-400 mt-1">{sub}</p>}
+    </div>
+  )
+}
+
+function ProgressCard({ label, done, total }: { label: string; done: number; total: number }) {
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-2">
+      <div className="flex items-baseline justify-between">
+        <p className="text-xs text-slate-500">{label}</p>
+        <p className="text-xs text-slate-500">{pct}%</p>
+      </div>
+      <p className="text-2xl font-semibold text-slate-900">
+        {done}
+        <span className="text-base text-slate-400 font-medium"> / {total}</span>
+      </p>
+      <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+        <div
+          className="h-full bg-brand-500"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
     </div>
   )
 }
