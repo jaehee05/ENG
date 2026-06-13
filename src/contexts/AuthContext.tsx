@@ -9,6 +9,26 @@ import type { UserAccount } from '../lib/types'
 
 const STORAGE_KEY = 'eng_account_id'
 
+function getStoredId(): string | null {
+  if (typeof window === 'undefined') return null
+  return localStorage.getItem(STORAGE_KEY) ?? sessionStorage.getItem(STORAGE_KEY)
+}
+
+function writeStoredId(id: string, persistent: boolean) {
+  if (persistent) {
+    localStorage.setItem(STORAGE_KEY, id)
+    sessionStorage.removeItem(STORAGE_KEY)
+  } else {
+    sessionStorage.setItem(STORAGE_KEY, id)
+    localStorage.removeItem(STORAGE_KEY)
+  }
+}
+
+function clearStoredId() {
+  localStorage.removeItem(STORAGE_KEY)
+  sessionStorage.removeItem(STORAGE_KEY)
+}
+
 function stripPassword(a: UserAccount): UserAccount {
   const { password: _omit, ...rest } = a
   void _omit
@@ -18,18 +38,18 @@ function stripPassword(a: UserAccount): UserAccount {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserAccount | null>(null)
   const [loading, setLoading] = useState<boolean>(
-    () => typeof window !== 'undefined' && !!localStorage.getItem(STORAGE_KEY),
+    () => typeof window !== 'undefined' && !!getStoredId(),
   )
 
   useEffect(() => {
-    const id = localStorage.getItem(STORAGE_KEY)
+    const id = getStoredId()
     if (!id) return
     let cancelled = false
     getAccount(id)
       .then((acc) => {
         if (cancelled) return
         if (acc) setProfile(stripPassword(acc))
-        else localStorage.removeItem(STORAGE_KEY)
+        else clearStoredId()
       })
       .catch(() => {})
       .finally(() => {
@@ -40,24 +60,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  function persist(acc: UserAccount | null) {
+  function persist(acc: UserAccount | null, keepSignedIn = true) {
     if (acc) {
-      localStorage.setItem(STORAGE_KEY, acc.id)
+      writeStoredId(acc.id, keepSignedIn)
       setProfile(stripPassword(acc))
     } else {
-      localStorage.removeItem(STORAGE_KEY)
+      clearStoredId()
       setProfile(null)
     }
   }
 
   async function signUp(input: SignUpInput) {
     const acc = await signUpAccount(input)
-    persist(acc)
+    persist(acc, true)
   }
 
-  async function signIn(email: string, password: string) {
+  async function signIn(email: string, password: string, keepSignedIn = true) {
     const acc = await signInAccount(email, password)
-    persist(acc)
+    persist(acc, keepSignedIn)
   }
 
   async function logOut() {

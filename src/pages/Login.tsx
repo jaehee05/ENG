@@ -7,6 +7,7 @@ export function Login() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [keepSignedIn, setKeepSignedIn] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -15,7 +16,7 @@ export function Login() {
     setError(null)
     setSubmitting(true)
     try {
-      await signIn(email, password)
+      await signIn(email, password, keepSignedIn)
       navigate('/')
     } catch (err) {
       setError(err instanceof Error ? err.message : '로그인에 실패했습니다.')
@@ -52,6 +53,16 @@ export function Login() {
               className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
           </div>
+
+          <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={keepSignedIn}
+              onChange={(e) => setKeepSignedIn(e.target.checked)}
+              className="accent-brand-600"
+            />
+            로그인 유지
+          </label>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 

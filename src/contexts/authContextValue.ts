@@ -14,7 +14,7 @@ export interface AuthContextValue {
   profile: UserAccount | null
   loading: boolean
   signUp: (input: SignUpInput) => Promise<void>
-  signIn: (email: string, password: string) => Promise<void>
+  signIn: (email: string, password: string, keepSignedIn?: boolean) => Promise<void>
   logOut: () => Promise<void>
   refreshProfile: () => Promise<void>
 }
