@@ -36,6 +36,9 @@ export function VocabNew() {
   const [enriching, setEnriching] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [splitByDay, setSplitByDay] = useState(false)
+  const [perDayRaw, setPerDayRaw] = useState('30')
+  const [splitProgress, setSplitProgress] = useState<string | null>(null)
 
   const isTextbook = useMemo(() => looksLikeTextbookVocab(raw), [raw])
   const words: WordEntry[] = useMemo(() => {
@@ -88,9 +91,25 @@ export function VocabNew() {
     }
   }
 
+  function cleanWord(w: WordEntry): WordEntry {
+    const out: WordEntry = { en: w.en, ko: w.ko }
+    if (w.ipa?.trim()) out.ipa = w.ipa.trim()
+    if (w.pos?.trim()) out.pos = w.pos.trim()
+    if (w.synonyms && w.synonyms.length > 0) {
+      const cleaned = w.synonyms.map((s) => s.trim()).filter(Boolean)
+      if (cleaned.length > 0) out.synonyms = cleaned
+    }
+    if (w.example?.trim()) out.example = w.example.trim()
+    if (w.exampleKo?.trim()) out.exampleKo = w.exampleKo.trim()
+    if (w.definitionEn?.trim()) out.definitionEn = w.definitionEn.trim()
+    if (w.senses && w.senses.length > 0) out.senses = w.senses
+    return out
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
+    setSplitProgress(null)
     if (!profile) return
     if (!title.trim()) return setError('제목을 입력하세요.')
     if (words.length === 0) return setError('단어를 1개 이상 입력하세요.')
@@ -102,24 +121,45 @@ export function VocabNew() {
       }
       maxAttempts = n
     }
+
+    if (splitByDay) {
+      const perDay = Number.parseInt(perDayRaw, 10)
+      if (!Number.isFinite(perDay) || perDay <= 0) {
+        return setError('DAY당 단어 수는 양의 정수여야 합니다.')
+      }
+      const total = Math.ceil(words.length / perDay)
+      const cleaned = words.map(cleanWord)
+      const base = title.trim()
+      setSubmitting(true)
+      try {
+        let lastId: string | null = null
+        for (let i = 0; i < total; i++) {
+          const slice = cleaned.slice(i * perDay, (i + 1) * perDay)
+          setSplitProgress(`${i + 1}/${total} DAY 저장 중...`)
+          lastId = await createVocabSet({
+            title: `${base} DAY ${i + 1}`,
+            words: slice,
+            maxAttempts,
+            createdBy: profile.id,
+            createdByName: profile.displayName,
+          })
+        }
+        setSplitProgress(null)
+        if (lastId) navigate('/vocab')
+      } catch (err) {
+        setError(err instanceof Error ? err.message : '저장에 실패했습니다.')
+        setSplitProgress(null)
+      } finally {
+        setSubmitting(false)
+      }
+      return
+    }
+
     setSubmitting(true)
     try {
       const id = await createVocabSet({
         title: title.trim(),
-        words: words.map((w) => {
-          const out: WordEntry = { en: w.en, ko: w.ko }
-          if (w.ipa?.trim()) out.ipa = w.ipa.trim()
-          if (w.pos?.trim()) out.pos = w.pos.trim()
-          if (w.synonyms && w.synonyms.length > 0) {
-            const cleaned = w.synonyms.map((s) => s.trim()).filter(Boolean)
-            if (cleaned.length > 0) out.synonyms = cleaned
-          }
-          if (w.example?.trim()) out.example = w.example.trim()
-          if (w.exampleKo?.trim()) out.exampleKo = w.exampleKo.trim()
-          if (w.definitionEn?.trim()) out.definitionEn = w.definitionEn.trim()
-          if (w.senses && w.senses.length > 0) out.senses = w.senses
-          return out
-        }),
+        words: words.map(cleanWord),
         maxAttempts,
         createdBy: profile.id,
         createdByName: profile.displayName,
@@ -151,19 +191,65 @@ export function VocabNew() {
           />
         </div>
 
-        <div className="max-w-xs">
-          <label className="block text-sm font-medium text-slate-700 mb-1">
-            응시 횟수 제한{' '}
-            <span className="font-normal text-slate-500">(비워두면 무제한)</span>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              응시 횟수 제한{' '}
+              <span className="font-normal text-slate-500">(비워두면 무제한)</span>
+            </label>
+            <input
+              type="number"
+              min={1}
+              value={maxAttemptsRaw}
+              onChange={(e) => setMaxAttemptsRaw(e.target.value)}
+              placeholder="예: 3"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </div>
+        </div>
+
+        <div className="rounded-md border border-brand-200 bg-brand-50/40 p-4 space-y-2">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={splitByDay}
+              onChange={(e) => setSplitByDay(e.target.checked)}
+              className="accent-brand-600"
+            />
+            <span className="text-sm font-medium text-slate-700">
+              DAY 단위로 분할 저장
+            </span>
+            <span className="text-xs text-slate-500">
+              한 번에 여러 개의 시험지를 만듭니다.
+            </span>
           </label>
-          <input
-            type="number"
-            min={1}
-            value={maxAttemptsRaw}
-            onChange={(e) => setMaxAttemptsRaw(e.target.value)}
-            placeholder="예: 3"
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-          />
+          {splitByDay && (
+            <div className="flex items-end gap-3 flex-wrap pl-6">
+              <div>
+                <label className="block text-xs text-slate-600 mb-1">
+                  DAY당 단어 수
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  value={perDayRaw}
+                  onChange={(e) => setPerDayRaw(e.target.value)}
+                  className="w-28 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+              {(() => {
+                const per = Number.parseInt(perDayRaw, 10)
+                if (!Number.isFinite(per) || per <= 0 || words.length === 0) return null
+                const total = Math.ceil(words.length / per)
+                return (
+                  <p className="pb-2.5 text-xs text-slate-600">
+                    총 {words.length}단어 → <strong>{total}개 DAY</strong>로 분할 (제목: "
+                    {title.trim() || '제목'} DAY 1" ~ "{title.trim() || '제목'} DAY {total}")
+                  </p>
+                )
+              })()}
+            </div>
+          )}
         </div>
 
         <div>
@@ -302,6 +388,7 @@ export function VocabNew() {
         )}
 
         {error && <p className="text-sm text-red-600">{error}</p>}
+        {splitProgress && <p className="text-sm text-brand-700">{splitProgress}</p>}
 
         <div className="flex gap-2">
           <button
@@ -309,7 +396,11 @@ export function VocabNew() {
             disabled={submitting}
             className="rounded-md bg-brand-600 text-white text-sm font-medium px-5 py-2 hover:bg-brand-700 transition disabled:opacity-60"
           >
-            {submitting ? '저장 중...' : '저장'}
+            {submitting
+              ? '저장 중...'
+              : splitByDay
+                ? 'DAY 분할 저장'
+                : '저장'}
           </button>
           <button
             type="button"
