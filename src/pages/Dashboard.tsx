@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import {
@@ -8,32 +8,79 @@ import {
 } from '../lib/firestore'
 import type { Assignment, AssignmentType } from '../lib/types'
 
-const cards = [
+const iconCls = 'h-6 w-6'
+const iconProps = {
+  fill: 'none' as const,
+  viewBox: '0 0 24 24',
+  strokeWidth: 1.8,
+  stroke: 'currentColor',
+  strokeLinecap: 'round' as const,
+  strokeLinejoin: 'round' as const,
+}
+
+const VocabIcon = (
+  <svg className={iconCls} {...iconProps}>
+    <path d="M9 5h6a2 2 0 0 1 2 2v12l-5-2-5 2V7a2 2 0 0 1 2-2Z" />
+    <path d="M9 9h6M9 12h4" />
+  </svg>
+)
+
+const ReadingIcon = (
+  <svg className={iconCls} {...iconProps}>
+    <path d="M3 5.5A1.5 1.5 0 0 1 4.5 4H10a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H4.5A1.5 1.5 0 0 1 3 16.5v-11Z" />
+    <path d="M21 5.5A1.5 1.5 0 0 0 19.5 4H14a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h5.5a1.5 1.5 0 0 0 1.5-1.5v-11Z" />
+  </svg>
+)
+
+const WordbookIcon = (
+  <svg className={iconCls} {...iconProps}>
+    <path d="M6 4h11a2 2 0 0 1 2 2v14l-3-2-3 2-3-2-3 2V6a2 2 0 0 1 2-2Z" />
+    <path d="M9 9h7" />
+  </svg>
+)
+
+const HistoryIcon = (
+  <svg className={iconCls} {...iconProps}>
+    <path d="M3 12a9 9 0 1 0 3.4-7.04" />
+    <path d="M3 4v5h5" />
+    <path d="M12 8v4l3 2" />
+  </svg>
+)
+
+interface Card {
+  to: string
+  title: string
+  icon: ReactNode
+  gradient: string
+  ring: string
+}
+
+const cards: Card[] = [
   {
     to: '/vocab',
     title: '단어 시험지',
-    initial: '단',
+    icon: VocabIcon,
     gradient: 'from-brand-500 to-brand-500',
     ring: 'group-hover:ring-brand-200',
   },
   {
     to: '/reading',
     title: '지문 문제풀이',
-    initial: '지',
+    icon: ReadingIcon,
     gradient: 'from-brand-500 to-brand-700',
     ring: 'group-hover:ring-brand-200',
   },
   {
     to: '/wordbook',
     title: '내 단어장',
-    initial: '내',
+    icon: WordbookIcon,
     gradient: 'from-brand-500 to-brand-500',
     ring: 'group-hover:ring-brand-200',
   },
   {
     to: '/history',
     title: '내 기록',
-    initial: '기',
+    icon: HistoryIcon,
     gradient: 'from-brand-500 to-brand-700',
     ring: 'group-hover:ring-brand-200',
   },
@@ -159,9 +206,9 @@ export function Dashboard() {
               className="group relative block rounded-2xl border border-slate-200 bg-white p-6 shadow-soft hover:shadow-lift hover:-translate-y-0.5 transition-all"
             >
               <div
-                className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br ${c.gradient} text-white font-bold text-lg shadow-md ring-4 ring-white ${c.ring}`}
+                className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br ${c.gradient} text-white shadow-md ring-4 ring-white ${c.ring}`}
               >
-                {c.initial}
+                {c.icon}
               </div>
               <h2 className="mt-5 text-lg font-semibold text-slate-900">{c.title}</h2>
               <span className="absolute bottom-6 right-6 text-slate-300 group-hover:text-slate-900 transition text-xl">
