@@ -20,12 +20,7 @@ export function ReadingList() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">지문 문제풀이</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            모의고사 지문에 단어 뜻을 함께 제공해 어휘·독해 약점을 가립니다.
-          </p>
-        </div>
+        <h1 className="text-2xl font-semibold text-slate-900">지문 문제풀이</h1>
         {profile?.role === 'admin' && (
           <div className="flex gap-2 flex-wrap">
             <Link

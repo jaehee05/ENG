@@ -25,6 +25,7 @@ import { Pending } from './pages/Pending'
 import { Rejected } from './pages/Rejected'
 import { AdminStudents } from './pages/AdminStudents'
 import { AdminStudentDetail } from './pages/AdminStudentDetail'
+import { MyHistory } from './pages/MyHistory'
 
 function App() {
   return (
@@ -54,6 +55,8 @@ function App() {
               <Route path="/wordbook" element={<Wordbook />} />
               <Route path="/wordbook/take" element={<WordbookTake />} />
               <Route path="/wordbook/result/:attemptId" element={<WordbookResult />} />
+
+              <Route path="/history" element={<MyHistory />} />
             </Route>
           </Route>
 

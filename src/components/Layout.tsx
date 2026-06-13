@@ -7,6 +7,7 @@ const navItems = [
   { to: '/vocab', label: '단어 시험지' },
   { to: '/reading', label: '지문 문제풀이' },
   { to: '/wordbook', label: '내 단어장' },
+  { to: '/history', label: '내 기록' },
 ]
 
 export function Layout() {

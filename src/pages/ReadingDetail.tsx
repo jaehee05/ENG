@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { getReading, updateReadingGlossaries } from '../lib/firestore'
+import { getReading, listAttemptsForUser, updateReadingGlossaries } from '../lib/firestore'
 import { useAuth } from '../contexts/useAuth'
 import { GlossedPassage } from '../components/GlossedPassage'
 import { GlossaryEditor } from '../components/GlossaryEditor'
+import { MyAttemptsBox } from '../components/MyAttemptsBox'
 import { useGlossQueue, type GlossEntry } from '../components/useGlossQueue'
-import type { Reading, WordEntry } from '../lib/types'
+import type { Attempt, Reading, WordEntry } from '../lib/types'
 
 const CHOICE_MARKS = ['①', '②', '③', '④', '⑤']
 
@@ -24,20 +25,29 @@ export function ReadingDetail() {
   const { profile } = useAuth()
   const isAdmin = profile?.role === 'admin'
   const [r, setR] = useState<Reading | null>(null)
+  const [attempts, setAttempts] = useState<Attempt[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [savedNote, setSavedNote] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!id) return
-    getReading(id)
-      .then((x) => {
+    if (!id || !profile) return
+    Promise.all([getReading(id), listAttemptsForUser(profile.id)])
+      .then(([x, atts]) => {
         if (!x) setError('지문을 찾을 수 없습니다.')
-        else setR(x)
+        else {
+          setR(x)
+          setAttempts(atts)
+        }
       })
       .catch((e) => setError(e.message ?? '불러오기 실패'))
       .finally(() => setLoading(false))
-  }, [id])
+  }, [id, profile])
+
+  const myAttempts = useMemo(
+    () => attempts.filter((a) => a.type === 'reading' && a.refId === id),
+    [attempts, id],
+  )
 
   async function handleSave(entries: GlossEntry[]) {
     if (!r) return
@@ -114,6 +124,13 @@ export function ReadingDetail() {
 
       {savedNote && (
         <p className="rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-700">{savedNote}</p>
+      )}
+
+      {myAttempts.length > 0 && (
+        <MyAttemptsBox
+          attempts={myAttempts}
+          buildResultPath={(a) => `/reading/${r.id}/result/${a.id}`}
+        />
       )}
 
       <div>

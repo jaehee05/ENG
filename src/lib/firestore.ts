@@ -47,6 +47,10 @@ export async function createVocabSet(input: {
   return ref.id
 }
 
+export async function deleteVocabSet(id: string): Promise<void> {
+  await deleteDoc(doc(db, 'vocabSets', id))
+}
+
 export async function listReadings(): Promise<Reading[]> {
   const snap = await getDocs(query(collection(db, 'readings'), orderBy('createdAt', 'desc')))
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Reading, 'id'>) }))

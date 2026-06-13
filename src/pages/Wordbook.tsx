@@ -32,9 +32,9 @@ export function Wordbook() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">내 단어장</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            지문에서 누른 단어가 자동으로 모입니다. 총 {words.length}개
-          </p>
+          {!loading && words.length > 0 && (
+            <p className="text-xs text-slate-500 mt-1">총 {words.length}개</p>
+          )}
         </div>
         <Link
           to="/wordbook/take"
