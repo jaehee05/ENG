@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import {
+  Fragment,
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import {
@@ -7,7 +14,58 @@ import {
   listAttemptsForUser,
 } from '../lib/firestore'
 import { gradeVocabAnswers } from '../lib/grading'
-import type { VocabSet } from '../lib/types'
+import type { VocabSet, WordEntry } from '../lib/types'
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function renderExampleWithBoldWord(example: string, head: string): ReactNode {
+  if (!head || !example) return example
+  const re = new RegExp(`\\b(${escapeRegex(head)}\\w{0,4})\\b`, 'gi')
+  const out: ReactNode[] = []
+  let last = 0
+  let key = 0
+  for (const m of example.matchAll(re)) {
+    const start = m.index ?? 0
+    if (start > last)
+      out.push(<Fragment key={key++}>{example.slice(last, start)}</Fragment>)
+    out.push(
+      <strong key={key++} className="font-bold text-slate-900">
+        {m[1]}
+      </strong>,
+    )
+    last = start + m[0].length
+  }
+  if (last < example.length)
+    out.push(<Fragment key={key++}>{example.slice(last)}</Fragment>)
+  return out
+}
+
+interface Hints {
+  pos?: string
+  definitionEn?: string
+  synonyms?: string[]
+  example?: string
+}
+
+function firstSenseHints(w: WordEntry): Hints {
+  const first = w.senses?.[0]
+  if (first) {
+    return {
+      pos: first.pos ?? w.pos,
+      definitionEn: first.definitionEn ?? w.definitionEn,
+      synonyms: first.synonyms?.length ? first.synonyms : w.synonyms,
+      example: first.examples?.[0]?.en ?? w.example,
+    }
+  }
+  return {
+    pos: w.pos,
+    definitionEn: w.definitionEn,
+    synonyms: w.synonyms,
+    example: w.example,
+  }
+}
 
 export function VocabTake() {
   const { id } = useParams<{ id: string }>()
@@ -36,7 +94,9 @@ export function VocabTake() {
           return
         }
         setSet(s)
-        setUsedAttempts(atts.filter((a) => a.type === 'vocab' && a.refId === id).length)
+        setUsedAttempts(
+          atts.filter((a) => a.type === 'vocab' && a.refId === id).length,
+        )
         const total = s.words.length
         const start =
           Number.isFinite(fromRaw) && fromRaw >= 1 && fromRaw <= total ? fromRaw : 1
@@ -59,8 +119,18 @@ export function VocabTake() {
     !!set?.maxAttempts && !isAdmin && usedAttempts >= (set.maxAttempts ?? 0)
 
   const answered = useMemo(() => answers.filter((a) => a.trim()).length, [answers])
-  const hasHints = useMemo(
-    () => set?.words.some((w) => w.example || w.definitionEn) ?? false,
+  const hasAnyHint = useMemo(
+    () =>
+      set?.words.some(
+        (w) =>
+          w.example ||
+          w.definitionEn ||
+          (w.synonyms && w.synonyms.length > 0) ||
+          (w.senses?.[0] &&
+            (w.senses[0].definitionEn ||
+              (w.senses[0].synonyms && w.senses[0].synonyms.length > 0) ||
+              w.senses[0].examples?.[0]?.en)),
+      ) ?? false,
     [set],
   )
 
@@ -125,7 +195,7 @@ export function VocabTake() {
             )}
           </p>
         </div>
-        {hasHints && (
+        {hasAnyHint && (
           <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
             <input
               type="checkbox"
@@ -138,48 +208,79 @@ export function VocabTake() {
         )}
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-2">
-        <ul className="rounded-lg border border-slate-200 bg-white divide-y divide-slate-100">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <ul className="space-y-4">
           {order.map((wordIdx, slotIdx) => {
             const w = set.words[wordIdx]
-            const showHintRow = showHints && (w.example || w.definitionEn)
+            const hints = firstSenseHints(w)
             return (
-              <li key={slotIdx} className="px-4 py-3 space-y-1.5">
-                <div className="grid grid-cols-12 items-center gap-2">
-                  <div className="col-span-1 text-sm text-slate-500">{slotIdx + 1}</div>
-                  <div className="col-span-5 text-sm font-medium text-slate-900 break-words">
-                    {w.en}
+              <li
+                key={slotIdx}
+                className="rounded-lg border border-slate-200 bg-white overflow-hidden"
+              >
+                <div className="px-5 pt-4 pb-2 border-b border-slate-100">
+                  <p className="text-xs font-mono text-slate-400 tracking-wider">
+                    {String(slotIdx + 1).padStart(4, '0')}
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 px-5 py-4">
+                  <div className="sm:col-span-3">
+                    <p className="text-2xl font-bold text-slate-900 leading-tight">
+                      {w.en}
+                    </p>
+                    {w.ipa && (
+                      <p className="text-sm text-slate-500 mt-1">[{w.ipa}]</p>
+                    )}
                   </div>
-                  <div className="col-span-6">
-                    <input
-                      type="text"
-                      value={answers[slotIdx] ?? ''}
-                      onChange={(e) => {
-                        const next = [...answers]
-                        next[slotIdx] = e.target.value
-                        setAnswers(next)
-                      }}
-                      placeholder="한국어 뜻"
-                      className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                    />
+                  <div className="sm:col-span-9 space-y-2">
+                    <div className="flex items-baseline gap-2 flex-wrap">
+                      {hints.pos && (
+                        <span className="text-sm font-medium text-slate-700">
+                          {hints.pos}
+                        </span>
+                      )}
+                      <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-slate-900 text-white text-[10px] font-bold align-middle">
+                        1
+                      </span>
+                      <input
+                        type="text"
+                        value={answers[slotIdx] ?? ''}
+                        onChange={(e) => {
+                          const next = [...answers]
+                          next[slotIdx] = e.target.value
+                          setAnswers(next)
+                        }}
+                        placeholder="한국어 뜻"
+                        className="flex-1 min-w-[160px] rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                      />
+                    </div>
+                    {showHints && (
+                      <>
+                        {(hints.definitionEn ||
+                          (hints.synonyms && hints.synonyms.length > 0)) && (
+                          <p className="text-sm text-slate-600 leading-relaxed">
+                            {hints.definitionEn && (
+                              <span>[{hints.definitionEn}]</span>
+                            )}
+                            {hints.synonyms && hints.synonyms.length > 0 && (
+                              <span className="text-slate-500">
+                                {hints.definitionEn ? ' ' : ''}={' '}
+                                {hints.synonyms.join(', ')}
+                              </span>
+                            )}
+                          </p>
+                        )}
+                        {hints.example && (
+                          <div className="rounded-md bg-slate-100 px-4 py-3">
+                            <p className="text-sm leading-relaxed text-slate-800">
+                              {renderExampleWithBoldWord(hints.example, w.en)}
+                            </p>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                 </div>
-                {showHintRow && (
-                  <div className="pl-[calc(8.333%+8px)] space-y-0.5">
-                    {w.definitionEn && (
-                      <p className="text-xs text-slate-600">
-                        <span className="text-slate-400 mr-1">[영영]</span>
-                        {w.definitionEn}
-                      </p>
-                    )}
-                    {w.example && (
-                      <p className="text-xs text-slate-600 italic">
-                        <span className="text-slate-400 mr-1 not-italic">[예문]</span>
-                        {w.example}
-                      </p>
-                    )}
-                  </div>
-                )}
               </li>
             )
           })}
