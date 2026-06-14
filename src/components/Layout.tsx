@@ -47,9 +47,14 @@ export function Layout() {
                 </NavLink>
               ))}
               {profile?.role === 'admin' && (
-                <NavLink to="/admin/students" className={navClass}>
-                  학생 관리
-                </NavLink>
+                <>
+                  <NavLink to="/admin/students" className={navClass}>
+                    학생 관리
+                  </NavLink>
+                  <NavLink to="/admin/notify" className={navClass}>
+                    알림톡
+                  </NavLink>
+                </>
               )}
             </nav>
 
@@ -110,17 +115,30 @@ export function Layout() {
                 </NavLink>
               ))}
               {profile?.role === 'admin' && (
-                <NavLink
-                  to="/admin/students"
-                  onClick={() => setOpen(false)}
-                  className={({ isActive }) =>
-                    `block px-3 py-2.5 rounded-lg text-sm font-medium ${
-                      isActive ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'
-                    }`
-                  }
-                >
-                  학생 관리
-                </NavLink>
+                <>
+                  <NavLink
+                    to="/admin/students"
+                    onClick={() => setOpen(false)}
+                    className={({ isActive }) =>
+                      `block px-3 py-2.5 rounded-lg text-sm font-medium ${
+                        isActive ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'
+                      }`
+                    }
+                  >
+                    학생 관리
+                  </NavLink>
+                  <NavLink
+                    to="/admin/notify"
+                    onClick={() => setOpen(false)}
+                    className={({ isActive }) =>
+                      `block px-3 py-2.5 rounded-lg text-sm font-medium ${
+                        isActive ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'
+                      }`
+                    }
+                  >
+                    알림톡
+                  </NavLink>
+                </>
               )}
               <div className="mt-3 pt-3 border-t border-slate-200/60 flex items-center justify-between">
                 <span className="text-sm text-slate-600">

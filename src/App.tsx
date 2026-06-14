@@ -25,6 +25,7 @@ import { Pending } from './pages/Pending'
 import { Rejected } from './pages/Rejected'
 import { AdminStudents } from './pages/AdminStudents'
 import { AdminStudentDetail } from './pages/AdminStudentDetail'
+import { AdminNotify } from './pages/AdminNotify'
 import { MyHistory } from './pages/MyHistory'
 
 function App() {
@@ -68,6 +69,7 @@ function App() {
               <Route path="/reading/:id/edit" element={<ReadingEdit />} />
               <Route path="/admin/students" element={<AdminStudents />} />
               <Route path="/admin/students/:id" element={<AdminStudentDetail />} />
+              <Route path="/admin/notify" element={<AdminNotify />} />
             </Route>
           </Route>
 
