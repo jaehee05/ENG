@@ -127,25 +127,25 @@ export function ReadingSheet() {
                   </div>
                 )}
 
+                {q.image && (
+                  <div className="grid grid-cols-3 gap-6 mb-3">
+                    <div className="col-span-2">
+                      <img
+                        src={q.image}
+                        alt="도표"
+                        className="w-full max-h-[14cm] object-contain border border-slate-300"
+                      />
+                    </div>
+                    <div />
+                  </div>
+                )}
+
                 {body && body.trim() && (
                   <div className="grid grid-cols-3 gap-6">
                     <div className="col-span-2 text-[11.5pt] leading-[1.85] whitespace-pre-wrap text-justify font-myeongjo text-slate-900">
                       {renderWithUnderlines(body)}
                     </div>
                     <GlossaryColumn items={r.glossary} label="지문 단어" />
-                  </div>
-                )}
-
-                {q.image && (
-                  <div className="grid grid-cols-3 gap-6 mt-3">
-                    <div className="col-span-2 flex justify-center">
-                      <img
-                        src={q.image}
-                        alt="도표"
-                        className="max-w-full max-h-[14cm] border border-slate-300"
-                      />
-                    </div>
-                    <div />
                   </div>
                 )}
 

@@ -53,6 +53,14 @@ export function QuestionView({
         </div>
       )}
 
+      {question.image && (
+        <img
+          src={question.image}
+          alt="도표"
+          className="w-full max-h-[600px] object-contain rounded border border-slate-200"
+        />
+      )}
+
       {showBody && (
         <div className={question.intro ? '' : ''}>
           <GlossedPassage
@@ -60,16 +68,6 @@ export function QuestionView({
             glossary={passageGlossary}
             viewedWords={viewedWords}
             onWordLookup={onWordLookup}
-          />
-        </div>
-      )}
-
-      {question.image && (
-        <div className="flex justify-center">
-          <img
-            src={question.image}
-            alt="도표"
-            className="max-w-full max-h-[480px] rounded border border-slate-200"
           />
         </div>
       )}
