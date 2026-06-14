@@ -52,6 +52,22 @@ export function VocabSheet() {
       .finally(() => setLoading(false))
   }, [id])
 
+  function handlePrint() {
+    if (!set) return
+    const original = document.title
+    const stamp = (() => {
+      const d = new Date()
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    })()
+    document.title = `${set.title} 시험지 ${stamp}`
+    setTimeout(() => {
+      window.print()
+      setTimeout(() => {
+        document.title = original
+      }, 500)
+    }, 50)
+  }
+
   function toggle(key: 'hints' | 'answers', on: boolean) {
     const next = new URLSearchParams(search)
     if (key === 'hints') {
@@ -102,11 +118,14 @@ export function VocabSheet() {
             정답표 (답안 표시)
           </label>
           <button
-            onClick={() => window.print()}
+            onClick={handlePrint}
             className="rounded-md bg-slate-900 text-white text-sm font-medium px-3 py-1.5 hover:bg-slate-800"
           >
-            인쇄 / PDF 저장
+            PDF로 저장
           </button>
+          <p className="text-[11px] text-slate-500 max-w-[140px] sm:max-w-none">
+            인쇄 대화창에서 "PDF로 저장" 또는 "Save as PDF" 선택
+          </p>
         </div>
       </div>
 
@@ -194,14 +213,25 @@ export function VocabSheet() {
             size: A4;
             margin: 14mm;
           }
-          body { background: white !important; }
+          html, body {
+            background: white !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
           .no-print { display: none !important; }
           header, nav { display: none !important; }
           main, main > div {
             padding: 0 !important;
             max-width: none !important;
           }
-          li { page-break-inside: avoid; }
+          ul > li {
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+          .sheet {
+            box-shadow: none !important;
+            border: 0 !important;
+          }
         }
       `}</style>
     </div>

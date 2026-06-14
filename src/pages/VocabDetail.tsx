@@ -19,13 +19,27 @@ function StartBox({
   testLimit: number | null
   buildHref: (mode: 'practice' | 'test') => string
 }) {
-  const testBlocked = testLimit !== null && testUsed >= testLimit
+  const remaining = testLimit !== null ? Math.max(0, testLimit - testUsed) : null
+  const testBlocked = remaining !== null && remaining === 0
 
   return (
-    <div className="rounded-lg border border-brand-200 bg-brand-50/40 p-4 flex items-center justify-between gap-3 flex-wrap">
-      <p className="text-sm text-slate-600">
-        전체 {total}단어 · 연습은 무제한, 시험은 횟수 제한.
-      </p>
+    <div className="rounded-lg border border-brand-200 bg-brand-50/40 p-4 space-y-3">
+      <div className="flex items-baseline justify-between gap-3 flex-wrap">
+        <p className="text-sm text-slate-600">
+          전체 {total}단어 · 연습은 무제한
+        </p>
+        {testLimit !== null && (
+          <p className="text-sm">
+            <span className="text-slate-500">시험 응시:</span>{' '}
+            <strong className="text-slate-900">{testUsed}회 사용</strong>
+            {' · '}
+            <strong className={remaining === 0 ? 'text-red-600' : 'text-brand-700'}>
+              {remaining}회 남음
+            </strong>
+            <span className="text-slate-500"> / 총 {testLimit}회</span>
+          </p>
+        )}
+      </div>
       <div className="flex gap-2 flex-wrap">
         <Link
           to={buildHref('practice')}
@@ -38,7 +52,7 @@ function StartBox({
             className="rounded-md bg-slate-200 text-slate-500 text-sm font-medium px-5 py-2.5 cursor-not-allowed"
             title="응시 횟수를 모두 사용했습니다."
           >
-            응시 횟수 초과 ({testUsed}/{testLimit}회)
+            응시 횟수 초과
           </span>
         ) : (
           <Link
@@ -46,10 +60,8 @@ function StartBox({
             className="rounded-md bg-brand-600 text-white text-sm font-semibold px-5 py-2.5 hover:bg-brand-700 transition"
           >
             시험 보기
-            {testLimit !== null && (
-              <span className="ml-1 font-normal">
-                ({testUsed}/{testLimit}회)
-              </span>
+            {remaining !== null && (
+              <span className="ml-1 font-normal">(남은 {remaining}회)</span>
             )}
           </Link>
         )}
