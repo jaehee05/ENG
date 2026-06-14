@@ -105,33 +105,6 @@ function StartBox({
   )
 }
 
-function escapeRegex(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
-function renderExampleWithBoldWord(example: string, head: string): ReactNode {
-  if (!head || !example) return example
-  // Match the headword and obvious inflections (root + up to 4 suffix chars)
-  const re = new RegExp(`\\b(${escapeRegex(head)}\\w{0,4})\\b`, 'gi')
-  const out: ReactNode[] = []
-  let last = 0
-  let key = 0
-  for (const m of example.matchAll(re)) {
-    const start = m.index ?? 0
-    if (start > last)
-      out.push(<Fragment key={key++}>{example.slice(last, start)}</Fragment>)
-    out.push(
-      <strong key={key++} className="font-bold text-slate-900">
-        {m[1]}
-      </strong>,
-    )
-    last = start + m[0].length
-  }
-  if (last < example.length)
-    out.push(<Fragment key={key++}>{example.slice(last)}</Fragment>)
-  return out
-}
-
 export function VocabDetail() {
   const { id } = useParams<{ id: string }>()
   const { profile } = useAuth()
