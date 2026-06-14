@@ -22,7 +22,14 @@ export function ReadingList() {
   useEffect(() => {
     Promise.all([listReadings(), getReadingOrder()])
       .then(([readings, order]) => {
-        setItems(applyReadingOrder(readings, order))
+        if (order.length > 0) {
+          setItems(applyReadingOrder(readings, order))
+        } else {
+          const sorted = [...readings].sort((a, b) =>
+            a.title.localeCompare(b.title, 'ko'),
+          )
+          setItems(sorted)
+        }
       })
       .catch((e) => setError(e instanceof Error ? e.message : '목록을 불러오지 못했습니다.'))
       .finally(() => setLoading(false))

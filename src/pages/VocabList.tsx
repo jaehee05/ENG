@@ -14,7 +14,12 @@ export function VocabList() {
 
   useEffect(() => {
     listVocabSets()
-      .then(setSets)
+      .then((all) => {
+        const sorted = [...all].sort((a, b) =>
+          a.title.localeCompare(b.title, 'ko'),
+        )
+        setSets(sorted)
+      })
       .catch((e) => setError(e.message ?? '목록을 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
   }, [])

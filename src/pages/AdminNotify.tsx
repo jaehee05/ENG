@@ -1,12 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import { listAccounts } from '../lib/account'
 import {
-  getPpurioSettings,
   listAssignmentsForStudent,
   listAttemptsForUser,
-  setPpurioSettings,
-  type PpurioSettings,
 } from '../lib/firestore'
+import {
+  fetchPpurioSettings,
+  getAdminSecret,
+  savePpurioSettings,
+  sendBatchAlimtalk,
+  setAdminSecret,
+  type PpurioSettingsView,
+  type SendResultItem,
+} from '../lib/ppurioApi'
 import type { Assignment, UserAccount } from '../lib/types'
 
 interface StudentBundle {
@@ -65,34 +71,70 @@ export function AdminNotify() {
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [hideCompleted, setHideCompleted] = useState(false)
 
-  const [creds, setCreds] = useState<PpurioSettings>({
-    account: '',
-    apiKey: '',
-    senderProfile: '',
-    footer: '',
-  })
+  const [adminSecret, setAdminSecretState] = useState(() => getAdminSecret())
+  const [ppurioAccount, setPpurioAccount] = useState('')
+  const [senderProfile, setSenderProfile] = useState('')
+  const [apiKey, setApiKey] = useState('')
+  const [apiKeyMasked, setApiKeyMasked] = useState('')
+  const [hasApiKey, setHasApiKey] = useState(false)
+  const [footerLine, setFooterLine] = useState('')
   const [credsLoaded, setCredsLoaded] = useState(false)
+  const [credsLoading, setCredsLoading] = useState(false)
   const [credsSaving, setCredsSaving] = useState(false)
   const [credsNotice, setCredsNotice] = useState<string | null>(null)
   const [showApiKey, setShowApiKey] = useState(false)
   const [credsOpen, setCredsOpen] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [sendResults, setSendResults] = useState<SendResultItem[] | null>(null)
+
+  function applyView(v: PpurioSettingsView) {
+    setPpurioAccount(v.ppurioAccount)
+    setSenderProfile(v.senderProfile)
+    setApiKeyMasked(v.apiKeyMasked)
+    setHasApiKey(v.hasApiKey)
+    setFooterLine(v.footer)
+  }
+
+  async function loadCreds() {
+    if (!adminSecret) return
+    setCredsLoading(true)
+    setCredsNotice(null)
+    try {
+      const v = await fetchPpurioSettings()
+      applyView(v)
+      setCredsLoaded(true)
+    } catch (e) {
+      setCredsNotice(e instanceof Error ? e.message : '불러오기 실패')
+    } finally {
+      setCredsLoading(false)
+    }
+  }
 
   useEffect(() => {
-    getPpurioSettings()
-      .then((s) => {
-        if (s) {
-          setCreds(s)
-          setCredsLoaded(true)
-        }
-      })
-      .catch(() => {})
+    if (adminSecret) {
+      void loadCreds()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  function persistSecret(v: string) {
+    setAdminSecret(v)
+    setAdminSecretState(v)
+  }
 
   async function saveCreds() {
     setCredsNotice(null)
     setCredsSaving(true)
     try {
-      await setPpurioSettings(creds)
+      await savePpurioSettings({
+        ppurioAccount,
+        senderProfile,
+        apiKey: apiKey || undefined,
+        footer: footerLine,
+      })
+      setApiKey('')
+      const v = await fetchPpurioSettings()
+      applyView(v)
       setCredsLoaded(true)
       setCredsNotice('저장되었습니다.')
       setTimeout(() => setCredsNotice((cur) => (cur === '저장되었습니다.' ? null : cur)), 2000)
@@ -165,6 +207,53 @@ export function AdminNotify() {
     }
   }
 
+  async function handleSend() {
+    if (!adminSecret) {
+      setCredsNotice('관리자 비밀키를 먼저 입력하세요.')
+      return
+    }
+    if (!templateCode.trim()) {
+      setCredsNotice('템플릿 코드를 입력하세요.')
+      return
+    }
+    const targets = visible.filter((b) => (b.account.phone ?? '').trim())
+    if (targets.length === 0) {
+      setCredsNotice('연락처가 있는 학생이 없습니다.')
+      return
+    }
+    if (
+      !window.confirm(
+        `${targets.length}명에게 알림톡을 발송합니다. 계속하시겠습니까?`,
+      )
+    )
+      return
+    setSending(true)
+    setSendResults(null)
+    try {
+      const recipients = targets.map((b) => ({
+        label: b.account.displayName,
+        phone: b.account.phone ?? '',
+        name: b.account.displayName,
+        changeWord: {
+          이름: b.account.displayName,
+          '1': statusValue(b),
+          '2': notice,
+        },
+      }))
+      const out = await sendBatchAlimtalk({
+        templateCode: templateCode.trim(),
+        messageType: msgType === '강조표기형' ? 'AT' : msgType === '이미지형' ? 'AI' : 'AT',
+        recipients,
+      })
+      setSendResults(out.results)
+      setCredsNotice(`발송 완료: 성공 ${out.sent} / 실패 ${out.failed}`)
+    } catch (e) {
+      setCredsNotice(e instanceof Error ? e.message : '발송 실패')
+    } finally {
+      setSending(false)
+    }
+  }
+
   function downloadCsv() {
     const rows = [['발송유형', '템플릿코드', '수신번호', '이름', '1', '2']]
     for (const b of visible) {
@@ -217,13 +306,39 @@ export function AdminNotify() {
           <span className="text-sm font-semibold text-slate-700">
             뿌리오 발신 설정
             <span className="ml-2 text-xs font-normal text-slate-500">
-              {credsLoaded ? '저장됨' : '미설정'}
+              {credsLoaded ? '서버 동기화됨' : adminSecret ? '미동기화' : '관리자 비밀키 필요'}
             </span>
           </span>
           <span className="text-slate-400 text-sm">{credsOpen ? '−' : '+'}</span>
         </button>
         {credsOpen && (
           <div className="space-y-3 pt-2 border-t border-slate-100">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                관리자 비밀키 (ADMIN_SECRET){' '}
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  value={adminSecret}
+                  onChange={(e) => persistSecret(e.target.value)}
+                  placeholder="Cloud Functions ADMIN_SECRET 값"
+                  className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+                <button
+                  type="button"
+                  onClick={loadCreds}
+                  disabled={!adminSecret || credsLoading}
+                  className="rounded-md border border-slate-300 text-slate-700 text-sm font-medium px-3 py-2 hover:bg-slate-100 disabled:opacity-50"
+                >
+                  {credsLoading ? '확인 중...' : '서버 설정 불러오기'}
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">
+                Cloud Functions의 <code>ADMIN_SECRET</code> env 값과 동일해야 합니다. 이 브라우저에만 저장됩니다.
+              </p>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">
@@ -231,22 +346,31 @@ export function AdminNotify() {
                 </label>
                 <input
                   type="text"
-                  value={creds.account}
-                  onChange={(e) => setCreds({ ...creds, account: e.target.value })}
+                  value={ppurioAccount}
+                  onChange={(e) => setPpurioAccount(e.target.value)}
                   placeholder="뿌리오 로그인 아이디"
                   className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">
-                  API Key
+                  API Key{' '}
+                  {hasApiKey && (
+                    <span className="text-slate-400 font-normal">
+                      (현재 저장된: {apiKeyMasked || '···'})
+                    </span>
+                  )}
                 </label>
                 <div className="relative">
                   <input
                     type={showApiKey ? 'text' : 'password'}
-                    value={creds.apiKey}
-                    onChange={(e) => setCreds({ ...creds, apiKey: e.target.value })}
-                    placeholder="뿌리오 발급 API Key"
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    placeholder={
+                      hasApiKey
+                        ? '변경하려면 새 키 입력 (비우면 유지)'
+                        : '뿌리오 발급 API Key'
+                    }
                     className="w-full rounded-md border border-slate-300 px-3 py-2 pr-16 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
                   <button
@@ -264,8 +388,8 @@ export function AdminNotify() {
                 </label>
                 <input
                   type="text"
-                  value={creds.senderProfile}
-                  onChange={(e) => setCreds({ ...creds, senderProfile: e.target.value })}
+                  value={senderProfile}
+                  onChange={(e) => setSenderProfile(e.target.value)}
                   placeholder="예: @kjhedu"
                   className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
@@ -277,8 +401,8 @@ export function AdminNotify() {
                 </label>
                 <input
                   type="text"
-                  value={creds.footer}
-                  onChange={(e) => setCreds({ ...creds, footer: e.target.value })}
+                  value={footerLine}
+                  onChange={(e) => setFooterLine(e.target.value)}
                   placeholder="예: 수신거부: 0808-xxx-xxxx"
                   className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
@@ -288,17 +412,17 @@ export function AdminNotify() {
               <button
                 type="button"
                 onClick={saveCreds}
-                disabled={credsSaving}
+                disabled={credsSaving || !adminSecret}
                 className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700 disabled:opacity-50"
               >
-                {credsSaving ? '저장 중...' : '저장'}
+                {credsSaving ? '저장 중...' : '서버에 저장'}
               </button>
               {credsNotice && <span className="text-xs text-brand-700">{credsNotice}</span>}
             </div>
             <p className="text-[11px] text-slate-500 leading-relaxed">
-              자격증명은 Firestore <code>settings/ppurio</code>에 저장됩니다. 현재 보안 규칙이
-              공개라 누구나 읽을 수 있으니, 운영 시 규칙을 잠그고 서버에서만 접근하도록 바꿔야
-              합니다. 또한 뿌리오 IP 화이트리스트를 사용하는 경우 별도 발송 프록시가 필요합니다.
+              자격증명은 Firestore <code>settings/ppurio</code>에 저장되며, Firestore rules로
+              클라이언트 접근이 차단됩니다. Cloud Functions(Admin SDK)에서만 접근 가능. 뿌리오 IP
+              화이트리스트는 컨설팅 레포의 vm-proxy를 그대로 재사용합니다.
             </p>
           </div>
         )}
@@ -368,16 +492,47 @@ export function AdminNotify() {
             />
             미완료 과제가 있는 학생만 보기
           </label>
-          <button
-            type="button"
-            onClick={downloadCsv}
-            disabled={visible.length === 0}
-            className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700 disabled:opacity-50"
-          >
-            CSV 다운로드 ({visible.length}명)
-          </button>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={downloadCsv}
+              disabled={visible.length === 0}
+              className="rounded-md border border-slate-300 text-slate-700 text-sm font-medium px-4 py-2 hover:bg-slate-100 disabled:opacity-50"
+            >
+              CSV 다운로드 ({visible.length}명)
+            </button>
+            <button
+              type="button"
+              onClick={handleSend}
+              disabled={visible.length === 0 || sending}
+              className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700 disabled:opacity-50"
+            >
+              {sending ? '발송 중...' : `즉시 발송 (${visible.length}명)`}
+            </button>
+          </div>
         </div>
       </div>
+
+      {sendResults && (
+        <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <p className="text-sm font-semibold text-slate-700 mb-2">발송 결과</p>
+          <ul className="divide-y divide-slate-100 text-sm">
+            {sendResults.map((r, i) => (
+              <li key={i} className="py-1.5 flex items-center justify-between gap-3">
+                <span className="text-slate-700">
+                  {r.label || r.phone}{' '}
+                  <span className="text-xs text-slate-400">{r.phone}</span>
+                </span>
+                {r.ok ? (
+                  <span className="text-xs text-brand-700 font-medium">성공</span>
+                ) : (
+                  <span className="text-xs text-red-600">{r.error || '실패'}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {loading && <p className="text-slate-500 text-sm">불러오는 중...</p>}
       {error && <p className="text-red-600 text-sm">{error}</p>}

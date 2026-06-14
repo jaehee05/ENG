@@ -10,6 +10,10 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // settings/* 는 클라이언트 접근 차단. Cloud Functions(Admin SDK)만 접근.
+    match /settings/{doc=**} {
+      allow read, write: if false;
+    }
     match /{document=**} {
       allow read, write: if true;
     }
