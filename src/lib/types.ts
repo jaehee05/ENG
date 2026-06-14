@@ -56,6 +56,17 @@ export interface VocabSet {
   createdAt: Timestamp | null
 }
 
+export interface VocabSeries {
+  id: string
+  title: string
+  lastDayNumber: number
+  maxAttempts?: number
+  createdBy: string
+  createdByName: string
+  createdAt: Timestamp | null
+  updatedAt: Timestamp | null
+}
+
 export type ReadingQuestionType =
   | 'standard'
   | 'cloze'

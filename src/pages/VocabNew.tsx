@@ -1,8 +1,18 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
-import { createVocabSet } from '../lib/firestore'
-import { parseWordList, type VocabSense, type WordEntry } from '../lib/types'
+import {
+  bumpVocabSeries,
+  createVocabSeries,
+  createVocabSet,
+  listVocabSeries,
+} from '../lib/firestore'
+import {
+  parseWordList,
+  type VocabSense,
+  type VocabSeries,
+  type WordEntry,
+} from '../lib/types'
 import { enrichVocab } from '../lib/api'
 import { looksLikeTextbookVocab, parseTextbookVocab } from '../lib/parseTextbookVocab'
 
@@ -40,6 +50,29 @@ export function VocabNew() {
   const [splitByDay, setSplitByDay] = useState(false)
   const [perDayRaw, setPerDayRaw] = useState('30')
   const [splitProgress, setSplitProgress] = useState<string | null>(null)
+  const [seriesList, setSeriesList] = useState<VocabSeries[]>([])
+  const [seriesMode, setSeriesMode] = useState<string>('new') // 'new' or series.id
+
+  useEffect(() => {
+    listVocabSeries()
+      .then(setSeriesList)
+      .catch(() => {})
+  }, [])
+
+  const selectedSeries: VocabSeries | null = useMemo(() => {
+    if (seriesMode === 'new') return null
+    return seriesList.find((s) => s.id === seriesMode) ?? null
+  }, [seriesMode, seriesList])
+
+  useEffect(() => {
+    if (selectedSeries) {
+      setTitle(selectedSeries.title)
+      setSplitByDay(true)
+      if (selectedSeries.maxAttempts) {
+        setMaxAttemptsRaw(String(selectedSeries.maxAttempts))
+      }
+    }
+  }, [selectedSeries])
 
   const isTextbook = useMemo(() => looksLikeTextbookVocab(raw), [raw])
   const words: WordEntry[] = useMemo(() => {
@@ -158,20 +191,32 @@ export function VocabNew() {
       const total = Math.ceil(words.length / perDay)
       const cleaned = words.map(cleanWord)
       const base = title.trim()
+      const startDay = selectedSeries ? selectedSeries.lastDayNumber + 1 : 1
       setSubmitting(true)
       try {
+        let seriesId = selectedSeries?.id
+        if (!seriesId) {
+          seriesId = await createVocabSeries({
+            title: base,
+            maxAttempts,
+            createdBy: profile.id,
+            createdByName: profile.displayName,
+          })
+        }
         let lastId: string | null = null
         for (let i = 0; i < total; i++) {
+          const dayNumber = startDay + i
           const slice = cleaned.slice(i * perDay, (i + 1) * perDay)
-          setSplitProgress(`${i + 1}/${total} DAY 저장 중...`)
+          setSplitProgress(`${i + 1}/${total} DAY ${dayNumber} 저장 중...`)
           lastId = await createVocabSet({
-            title: `${base} DAY ${i + 1}`,
+            title: `${base} DAY ${dayNumber}`,
             words: slice,
             maxAttempts,
             createdBy: profile.id,
             createdByName: profile.displayName,
           })
         }
+        await bumpVocabSeries(seriesId, startDay + total - 1)
         setSplitProgress(null)
         if (lastId) navigate('/vocab')
       } catch (err) {
@@ -208,6 +253,32 @@ export function VocabNew() {
       <h1 className="text-2xl font-semibold text-slate-900">새 단어 시험지</h1>
 
       <form onSubmit={handleSubmit} className="space-y-5">
+        {seriesList.length > 0 && (
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              단어장 시리즈
+            </label>
+            <select
+              value={seriesMode}
+              onChange={(e) => setSeriesMode(e.target.value)}
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              <option value="new">— 새 시리즈로 시작 —</option>
+              {seriesList.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.title} (DAY {s.lastDayNumber}까지 생성됨)
+                </option>
+              ))}
+            </select>
+            {selectedSeries && (
+              <p className="text-xs text-brand-700 mt-1">
+                "{selectedSeries.title}" 시리즈에 이어 붙이기 — 이번 저장은 DAY{' '}
+                {selectedSeries.lastDayNumber + 1}부터 시작합니다.
+              </p>
+            )}
+          </div>
+        )}
+
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">제목</label>
           <input
@@ -215,7 +286,8 @@ export function VocabNew() {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="예: 수능 어휘 Day 1"
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            disabled={!!selectedSeries}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-slate-100 disabled:text-slate-500"
           />
         </div>
 
@@ -269,10 +341,13 @@ export function VocabNew() {
                 const per = Number.parseInt(perDayRaw, 10)
                 if (!Number.isFinite(per) || per <= 0 || words.length === 0) return null
                 const total = Math.ceil(words.length / per)
+                const start = selectedSeries ? selectedSeries.lastDayNumber + 1 : 1
+                const end = start + total - 1
+                const base = title.trim() || '제목'
                 return (
                   <p className="pb-2.5 text-xs text-slate-600">
                     총 {words.length}단어 → <strong>{total}개 DAY</strong>로 분할 (제목: "
-                    {title.trim() || '제목'} DAY 1" ~ "{title.trim() || '제목'} DAY {total}")
+                    {base} DAY {start}" ~ "{base} DAY {end}")
                   </p>
                 )
               })()}

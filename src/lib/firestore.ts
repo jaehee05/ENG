@@ -21,6 +21,7 @@ import type {
   Reading,
   ReadingResult,
   VocabResult,
+  VocabSeries,
   VocabSet,
   WordEntry,
   ReadingQuestion,
@@ -60,6 +61,54 @@ export async function createVocabSet(input: {
 
 export async function deleteVocabSet(id: string): Promise<void> {
   await deleteDoc(doc(db, 'vocabSets', id))
+}
+
+export async function listVocabSeries(): Promise<VocabSeries[]> {
+  const snap = await getDocs(
+    query(collection(db, 'vocabSeries'), orderBy('createdAt', 'desc')),
+  )
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<VocabSeries, 'id'>) }))
+}
+
+export async function getVocabSeries(id: string): Promise<VocabSeries | null> {
+  const snap = await getDoc(doc(db, 'vocabSeries', id))
+  if (!snap.exists()) return null
+  return { id: snap.id, ...(snap.data() as Omit<VocabSeries, 'id'>) }
+}
+
+export async function createVocabSeries(input: {
+  title: string
+  maxAttempts?: number
+  createdBy: string
+  createdByName: string
+}): Promise<string> {
+  const payload: Record<string, unknown> = {
+    title: input.title,
+    lastDayNumber: 0,
+    createdBy: input.createdBy,
+    createdByName: input.createdByName,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  }
+  if (input.maxAttempts && input.maxAttempts > 0) {
+    payload.maxAttempts = Math.trunc(input.maxAttempts)
+  }
+  const ref = await addDoc(collection(db, 'vocabSeries'), payload)
+  return ref.id
+}
+
+export async function bumpVocabSeries(
+  id: string,
+  newLastDay: number,
+): Promise<void> {
+  await updateDoc(doc(db, 'vocabSeries', id), {
+    lastDayNumber: newLastDay,
+    updatedAt: serverTimestamp(),
+  })
+}
+
+export async function deleteVocabSeries(id: string): Promise<void> {
+  await deleteDoc(doc(db, 'vocabSeries', id))
 }
 
 export async function listReadings(): Promise<Reading[]> {
