@@ -167,7 +167,7 @@ export function GlossedPassage({
                     }}
                     className={
                       viewed
-                        ? 'bg-brand-100 rounded-sm px-0.5 cursor-pointer touch-manipulation transition-colors hover:bg-brand-200'
+                        ? 'bg-brand-100 rounded-sm cursor-pointer touch-manipulation transition-colors hover:bg-brand-200'
                         : 'underline decoration-dotted decoration-brand-500 underline-offset-[3px] cursor-pointer touch-manipulation transition-colors hover:bg-brand-50 rounded-sm'
                     }
                   >
