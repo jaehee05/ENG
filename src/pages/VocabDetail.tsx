@@ -1,81 +1,106 @@
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import { deleteVocabSet, getVocabSet, listAttemptsForUser } from '../lib/firestore'
 import { MyAttemptsBox } from '../components/MyAttemptsBox'
+import { highlightHead } from '../lib/highlightWord'
 import type { Attempt, VocabSet } from '../lib/types'
 
-function RangeStartBox({
+const renderExampleWithBoldWord = highlightHead
+
+function StartBox({
   total,
-  testBlocked,
-  href,
+  testUsed,
+  testLimit,
+  buildHref,
 }: {
   total: number
-  testBlocked: boolean
-  href: (from: number, to: number, mode: 'practice' | 'test') => string
+  testUsed: number
+  testLimit: number | null
+  buildHref: (params: {
+    mode: 'practice' | 'test'
+    from?: number
+    to?: number
+  }) => string
 }) {
   const [from, setFrom] = useState(1)
   const [to, setTo] = useState(total)
 
-  // clamp
   const clampedFrom = Math.min(Math.max(1, from), total)
   const clampedTo = Math.min(Math.max(clampedFrom, to), total)
-  const count = clampedTo - clampedFrom + 1
+  const practiceCount = clampedTo - clampedFrom + 1
+
+  const testBlocked = testLimit !== null && testUsed >= testLimit
 
   return (
-    <div className="rounded-lg border border-brand-200 bg-brand-50/40 p-4 space-y-3">
-      <div className="flex items-end gap-2 flex-wrap">
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">시작 번호</label>
-          <input
-            type="number"
-            min={1}
-            max={total}
-            value={from}
-            onChange={(e) => setFrom(Number.parseInt(e.target.value, 10) || 1)}
-            className="w-24 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-          />
+    <div className="space-y-3">
+      <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
+        <p className="text-sm font-semibold text-slate-700">연습하기 (무제한)</p>
+        <div className="flex items-end gap-2 flex-wrap">
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">
+              시작 번호
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={total}
+              value={from}
+              onChange={(e) => setFrom(Number.parseInt(e.target.value, 10) || 1)}
+              className="w-24 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </div>
+          <span className="pb-2 text-slate-400">~</span>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">
+              끝 번호
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={total}
+              value={to}
+              onChange={(e) => setTo(Number.parseInt(e.target.value, 10) || total)}
+              className="w-24 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </div>
+          <Link
+            to={buildHref({ mode: 'practice', from: clampedFrom, to: clampedTo })}
+            className="rounded-md border border-brand-600 text-brand-700 text-sm font-semibold px-5 py-2.5 hover:bg-brand-50 transition"
+          >
+            연습 시작 ({practiceCount}개)
+          </Link>
         </div>
-        <span className="pb-2 text-slate-400">~</span>
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">끝 번호</label>
-          <input
-            type="number"
-            min={1}
-            max={total}
-            value={to}
-            onChange={(e) => setTo(Number.parseInt(e.target.value, 10) || total)}
-            className="w-24 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-          />
-        </div>
-        <p className="pb-2.5 text-xs text-slate-500">총 {total}단어 중 {count}개</p>
       </div>
-      <div className="flex gap-2 flex-wrap">
-        <Link
-          to={href(clampedFrom, clampedTo, 'practice')}
-          className="rounded-md border border-brand-600 text-brand-700 text-sm font-semibold px-5 py-2.5 hover:bg-brand-100 transition text-center"
-        >
-          연습하기 ({count}개)
-        </Link>
+
+      <div className="rounded-lg border border-brand-200 bg-brand-50/40 p-4 flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <p className="text-sm font-semibold text-slate-700">시험 보기 ({total}개 전체)</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            전 범위로 한 번에 응시합니다.
+          </p>
+        </div>
         {testBlocked ? (
           <span
             className="rounded-md bg-slate-200 text-slate-500 text-sm font-medium px-5 py-2.5 cursor-not-allowed text-center"
             title="응시 횟수를 모두 사용했습니다."
           >
-            응시 횟수 초과
+            응시 횟수 초과 ({testUsed}/{testLimit}회)
           </span>
         ) : (
           <Link
-            to={href(clampedFrom, clampedTo, 'test')}
-            className="rounded-md bg-brand-600 text-white text-sm font-semibold px-5 py-2.5 hover:bg-brand-700 transition text-center"
+            to={buildHref({ mode: 'test' })}
+            className="rounded-md bg-brand-600 text-white text-sm font-semibold px-5 py-2.5 hover:bg-brand-700 transition"
           >
-            시험 보기 ({count}개)
+            시험 보기
+            {testLimit !== null && (
+              <span className="ml-1 font-normal">
+                ({testUsed}/{testLimit}회)
+              </span>
+            )}
           </Link>
         )}
       </div>
-      <p className="text-xs text-slate-500">
-        연습은 횟수 제한 없이 무제한, 시험은 횟수에 포함됩니다.
-      </p>
     </div>
   )
 }
@@ -176,16 +201,17 @@ export function VocabDetail() {
         )}
       </div>
 
-      <RangeStartBox
+      <StartBox
         total={set.words.length}
-        testBlocked={
-          !isAdmin && set.maxAttempts
-            ? myAttempts.filter((a) => !a.practice).length >= set.maxAttempts
-            : false
-        }
-        href={(from, to, mode) =>
-          `/vocab/${set.id}/take?from=${from}&to=${to}&mode=${mode}`
-        }
+        testUsed={myAttempts.filter((a) => !a.practice).length}
+        testLimit={isAdmin ? null : (set.maxAttempts ?? null)}
+        buildHref={({ mode, from, to }) => {
+          const params = new URLSearchParams()
+          params.set('mode', mode)
+          if (from !== undefined) params.set('from', String(from))
+          if (to !== undefined) params.set('to', String(to))
+          return `/vocab/${set.id}/take?${params.toString()}`
+        }}
       />
 
       <div className="flex justify-end">
@@ -196,14 +222,6 @@ export function VocabDetail() {
           시험지로 보기 / 인쇄
         </Link>
       </div>
-
-      {set.maxAttempts && (
-        <p className="text-xs text-slate-500">
-          시험 응시 제한: {myAttempts.filter((a) => !a.practice).length} /{' '}
-          {set.maxAttempts}회
-          {isAdmin && <span className="ml-1 text-brand-700">(관리자는 무관)</span>}
-        </p>
-      )}
 
       {myAttempts.length > 0 && (
         <MyAttemptsBox

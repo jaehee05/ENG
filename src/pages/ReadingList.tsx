@@ -160,7 +160,7 @@ export function ReadingList() {
           ) : (
             <Link
               key={r.id}
-              to={`/reading/${r.id}`}
+              to={isAdmin ? `/reading/${r.id}` : `/reading/${r.id}/take`}
               className="block rounded-lg border border-slate-200 bg-white p-4 hover:border-brand-300 hover:shadow-md transition"
             >
               <div className="flex items-baseline justify-between gap-3">
