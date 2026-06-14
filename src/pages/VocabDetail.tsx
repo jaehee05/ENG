@@ -7,12 +7,12 @@ import type { Attempt, VocabSet } from '../lib/types'
 
 function RangeStartBox({
   total,
-  blocked,
+  testBlocked,
   href,
 }: {
   total: number
-  blocked: boolean
-  href: (from: number, to: number) => string
+  testBlocked: boolean
+  href: (from: number, to: number, mode: 'practice' | 'test') => string
 }) {
   const [from, setFrom] = useState(1)
   const [to, setTo] = useState(total)
@@ -23,8 +23,8 @@ function RangeStartBox({
   const count = clampedTo - clampedFrom + 1
 
   return (
-    <div className="rounded-lg border border-brand-200 bg-brand-50/40 p-4 flex flex-col sm:flex-row sm:items-end gap-3">
-      <div className="flex-1 flex items-end gap-2 flex-wrap">
+    <div className="rounded-lg border border-brand-200 bg-brand-50/40 p-4 space-y-3">
+      <div className="flex items-end gap-2 flex-wrap">
         <div>
           <label className="block text-xs font-medium text-slate-600 mb-1">시작 번호</label>
           <input
@@ -50,21 +50,32 @@ function RangeStartBox({
         </div>
         <p className="pb-2.5 text-xs text-slate-500">총 {total}단어 중 {count}개</p>
       </div>
-      {blocked ? (
-        <span
-          className="rounded-md bg-slate-200 text-slate-500 text-sm font-medium px-5 py-2.5 cursor-not-allowed text-center"
-          title="응시 횟수를 모두 사용했습니다."
-        >
-          응시 횟수 초과
-        </span>
-      ) : (
+      <div className="flex gap-2 flex-wrap">
         <Link
-          to={href(clampedFrom, clampedTo)}
-          className="rounded-md bg-brand-600 text-white text-sm font-semibold px-5 py-2.5 hover:bg-brand-700 transition text-center"
+          to={href(clampedFrom, clampedTo, 'practice')}
+          className="rounded-md border border-brand-600 text-brand-700 text-sm font-semibold px-5 py-2.5 hover:bg-brand-100 transition text-center"
         >
-          시험 시작 ({count}개)
+          연습하기 ({count}개)
         </Link>
-      )}
+        {testBlocked ? (
+          <span
+            className="rounded-md bg-slate-200 text-slate-500 text-sm font-medium px-5 py-2.5 cursor-not-allowed text-center"
+            title="응시 횟수를 모두 사용했습니다."
+          >
+            응시 횟수 초과
+          </span>
+        ) : (
+          <Link
+            to={href(clampedFrom, clampedTo, 'test')}
+            className="rounded-md bg-brand-600 text-white text-sm font-semibold px-5 py-2.5 hover:bg-brand-700 transition text-center"
+          >
+            시험 보기 ({count}개)
+          </Link>
+        )}
+      </div>
+      <p className="text-xs text-slate-500">
+        연습은 횟수 제한 없이 무제한, 시험은 횟수에 포함됩니다.
+      </p>
     </div>
   )
 }
@@ -167,15 +178,29 @@ export function VocabDetail() {
 
       <RangeStartBox
         total={set.words.length}
-        blocked={
-          !isAdmin && set.maxAttempts ? myAttempts.length >= set.maxAttempts : false
+        testBlocked={
+          !isAdmin && set.maxAttempts
+            ? myAttempts.filter((a) => !a.practice).length >= set.maxAttempts
+            : false
         }
-        href={(from, to) => `/vocab/${set.id}/take?from=${from}&to=${to}`}
+        href={(from, to, mode) =>
+          `/vocab/${set.id}/take?from=${from}&to=${to}&mode=${mode}`
+        }
       />
+
+      <div className="flex justify-end">
+        <Link
+          to={`/vocab/${set.id}/sheet`}
+          className="text-sm text-slate-500 hover:text-slate-900 underline"
+        >
+          시험지로 보기 / 인쇄
+        </Link>
+      </div>
 
       {set.maxAttempts && (
         <p className="text-xs text-slate-500">
-          응시 제한: {myAttempts.length} / {set.maxAttempts}회
+          시험 응시 제한: {myAttempts.filter((a) => !a.practice).length} /{' '}
+          {set.maxAttempts}회
           {isAdmin && <span className="ml-1 text-brand-700">(관리자는 무관)</span>}
         </p>
       )}

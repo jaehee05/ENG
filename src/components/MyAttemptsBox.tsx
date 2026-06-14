@@ -58,6 +58,11 @@ export function MyAttemptsBox({ attempts, buildResultPath }: Props) {
                 <div className="flex items-center gap-3 min-w-0">
                   <span className="text-xs text-slate-400 w-10">{sorted.length - i}회차</span>
                   <span className="text-slate-500 text-xs">{fmtDate(a.createdAt)}</span>
+                  {a.practice && (
+                    <span className="text-[10px] text-slate-500 bg-slate-100 rounded px-1.5 py-0.5">
+                      연습
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <span className="text-slate-700">

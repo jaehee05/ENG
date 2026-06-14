@@ -226,10 +226,11 @@ export async function createVocabAttempt(input: {
   refId: string
   refTitle: string
   vocabResults: VocabResult[]
+  practice?: boolean
 }): Promise<string> {
   const total = input.vocabResults.length
   const correct = input.vocabResults.filter((r) => r.correct).length
-  const ref = await addDoc(collection(db, 'attempts'), {
+  const payload: Record<string, unknown> = {
     studentUid: input.studentUid,
     studentName: input.studentName,
     type: 'vocab',
@@ -239,7 +240,9 @@ export async function createVocabAttempt(input: {
     correct,
     vocabResults: input.vocabResults,
     createdAt: serverTimestamp(),
-  })
+  }
+  if (input.practice) payload.practice = true
+  const ref = await addDoc(collection(db, 'attempts'), payload)
   return ref.id
 }
 

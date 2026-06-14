@@ -84,6 +84,7 @@ export function VocabTake() {
 
   const fromRaw = Number.parseInt(search.get('from') ?? '', 10)
   const toRaw = Number.parseInt(search.get('to') ?? '', 10)
+  const isPractice = search.get('mode') === 'practice'
 
   useEffect(() => {
     if (!id || !profile) return
@@ -95,7 +96,8 @@ export function VocabTake() {
         }
         setSet(s)
         setUsedAttempts(
-          atts.filter((a) => a.type === 'vocab' && a.refId === id).length,
+          atts.filter((a) => a.type === 'vocab' && a.refId === id && !a.practice)
+            .length,
         )
         const total = s.words.length
         const start =
@@ -116,7 +118,10 @@ export function VocabTake() {
   }, [id, profile, fromRaw, toRaw])
 
   const blocked =
-    !!set?.maxAttempts && !isAdmin && usedAttempts >= (set.maxAttempts ?? 0)
+    !isPractice &&
+    !!set?.maxAttempts &&
+    !isAdmin &&
+    usedAttempts >= (set.maxAttempts ?? 0)
 
   const answered = useMemo(() => answers.filter((a) => a.trim()).length, [answers])
   const hasAnyHint = useMemo(
@@ -150,6 +155,7 @@ export function VocabTake() {
         refId: set.id,
         refTitle: set.title,
         vocabResults: results,
+        practice: isPractice,
       })
       navigate(`/vocab/${set.id}/result/${attemptId}`)
     } catch (err) {
@@ -184,13 +190,29 @@ export function VocabTake() {
     <div className="space-y-6 max-w-3xl">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">{set.title}</h1>
+          <h1 className="text-2xl font-semibold text-slate-900">
+            {set.title}
+            <span
+              className={`ml-2 inline-block rounded-full px-2 py-0.5 text-xs font-semibold align-middle ${
+                isPractice
+                  ? 'bg-slate-100 text-slate-600'
+                  : 'bg-brand-100 text-brand-700'
+              }`}
+            >
+              {isPractice ? '연습' : '시험'}
+            </span>
+          </h1>
           <p className="text-sm text-slate-500 mt-1">
             영단어의 뜻을 한국어로 입력하세요. 총 {order.length}문항
             {order.length !== set.words.length && (
               <span className="ml-2 text-brand-700">
                 (범위: {(order.length > 0 ? Math.min(...order) : 0) + 1}~
                 {(order.length > 0 ? Math.max(...order) : 0) + 1}번)
+              </span>
+            )}
+            {isPractice && (
+              <span className="ml-2 text-slate-500">
+                · 연습 응시는 횟수에 포함되지 않습니다.
               </span>
             )}
           </p>
@@ -295,7 +317,11 @@ export function VocabTake() {
             disabled={submitting}
             className="rounded-md bg-brand-600 text-white text-sm font-medium px-5 py-2 hover:bg-brand-700 transition disabled:opacity-60"
           >
-            {submitting ? '채점 중...' : '제출하기'}
+            {submitting
+              ? '채점 중...'
+              : isPractice
+                ? '연습 제출'
+                : '제출하기'}
           </button>
         </div>
       </form>

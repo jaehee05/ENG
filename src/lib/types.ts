@@ -156,6 +156,8 @@ export interface Attempt {
   refTitle: string
   total: number
   correct: number
+  /** True when this attempt is a 연습(practice) run — excluded from maxAttempts limit. */
+  practice?: boolean
   vocabResults?: VocabResult[]
   readingResults?: ReadingResult[]
   createdAt: Timestamp | null

@@ -9,6 +9,7 @@ import { VocabList } from './pages/VocabList'
 import { VocabNew } from './pages/VocabNew'
 import { VocabDetail } from './pages/VocabDetail'
 import { VocabTake } from './pages/VocabTake'
+import { VocabSheet } from './pages/VocabSheet'
 import { VocabResult } from './pages/VocabResult'
 import { ReadingList } from './pages/ReadingList'
 import { ReadingNew } from './pages/ReadingNew'
@@ -48,6 +49,7 @@ function App() {
               <Route path="/vocab" element={<VocabList />} />
               <Route path="/vocab/:id" element={<VocabDetail />} />
               <Route path="/vocab/:id/take" element={<VocabTake />} />
+              <Route path="/vocab/:id/sheet" element={<VocabSheet />} />
               <Route path="/vocab/:id/result/:attemptId" element={<VocabResult />} />
 
               <Route path="/reading" element={<ReadingList />} />
