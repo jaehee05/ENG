@@ -26,6 +26,12 @@ export function CorpusDetail() {
   const [editingIdx, setEditingIdx] = useState<number | null>(null)
   const [editEn, setEditEn] = useState('')
   const [editKo, setEditKo] = useState('')
+  const [editIpa, setEditIpa] = useState('')
+  const [editPos, setEditPos] = useState('')
+  const [editSynonymsRaw, setEditSynonymsRaw] = useState('')
+  const [editDefinitionEn, setEditDefinitionEn] = useState('')
+  const [editExample, setEditExample] = useState('')
+  const [editExampleKo, setEditExampleKo] = useState('')
 
   useEffect(() => {
     if (!id) return
@@ -126,15 +132,30 @@ export function CorpusDetail() {
     if (!series) return
     const w = series.words?.[i]
     if (!w) return
+    const first = w.senses?.[0]
     setEditingIdx(i)
     setEditEn(w.en)
-    setEditKo(w.ko)
+    setEditKo(first?.ko ?? w.ko)
+    setEditIpa(w.ipa ?? '')
+    setEditPos(first?.pos ?? w.pos ?? '')
+    const syns = first?.synonyms?.length ? first.synonyms : w.synonyms
+    setEditSynonymsRaw(syns ? syns.join(', ') : '')
+    setEditDefinitionEn(first?.definitionEn ?? w.definitionEn ?? '')
+    const ex0 = first?.examples?.[0]
+    setEditExample(ex0?.en ?? w.example ?? '')
+    setEditExampleKo(ex0?.ko ?? w.exampleKo ?? '')
   }
 
   function cancelEdit() {
     setEditingIdx(null)
     setEditEn('')
     setEditKo('')
+    setEditIpa('')
+    setEditPos('')
+    setEditSynonymsRaw('')
+    setEditDefinitionEn('')
+    setEditExample('')
+    setEditExampleKo('')
   }
 
   async function saveEdit(i: number) {
@@ -145,8 +166,44 @@ export function CorpusDetail() {
       setNotice('영단어와 한국어 뜻을 모두 입력하세요.')
       return
     }
+    const ipa = editIpa.trim()
+    const pos = editPos.trim()
+    const synonyms = editSynonymsRaw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+    const definitionEn = editDefinitionEn.trim()
+    const example = editExample.trim()
+    const exampleKo = editExampleKo.trim()
+
     const updated = [...(series.words ?? [])]
-    updated[i] = { ...updated[i], en: newEn, ko: newKo }
+    const prev = updated[i]
+    const next: WordEntry = { en: newEn, ko: newKo }
+    if (ipa) next.ipa = ipa
+    if (pos) next.pos = pos
+    if (synonyms.length > 0) next.synonyms = synonyms
+    if (definitionEn) next.definitionEn = definitionEn
+    if (example) next.example = example
+    if (exampleKo) next.exampleKo = exampleKo
+
+    if (prev.senses && prev.senses.length > 0) {
+      const senses = prev.senses.map((s, idx) => {
+        if (idx !== 0) return s
+        const examples =
+          example || exampleKo
+            ? [{ en: example, ...(exampleKo ? { ko: exampleKo } : {}) }]
+            : []
+        const sense: typeof s = { ko: newKo }
+        if (pos) sense.pos = pos
+        if (definitionEn) sense.definitionEn = definitionEn
+        if (synonyms.length > 0) sense.synonyms = synonyms
+        if (examples.length > 0) sense.examples = examples
+        return sense
+      })
+      next.senses = senses
+    }
+
+    updated[i] = next
     try {
       await updateVocabSeries(series.id, { words: updated })
       const refreshed = await getVocabSeries(series.id)
@@ -324,45 +381,123 @@ export function CorpusDetail() {
                     }`}
                   >
                     {editing ? (
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs text-slate-400 w-12">
+                      <div className="rounded-md border border-brand-200 bg-brand-50/30 p-3 space-y-2">
+                        <p className="text-xs text-slate-500">
                           {String(i + 1).padStart(4, '0')}
-                        </span>
-                        <input
-                          type="text"
-                          value={editEn}
-                          onChange={(e) => setEditEn(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') saveEdit(i)
-                            if (e.key === 'Escape') cancelEdit()
-                          }}
-                          autoFocus
-                          className="rounded border border-slate-300 px-2 py-1 text-sm w-40 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                        />
-                        <input
-                          type="text"
-                          value={editKo}
-                          onChange={(e) => setEditKo(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') saveEdit(i)
-                            if (e.key === 'Escape') cancelEdit()
-                          }}
-                          className="rounded border border-slate-300 px-2 py-1 text-sm flex-1 min-w-[160px] focus:outline-none focus:ring-2 focus:ring-brand-500"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => saveEdit(i)}
-                          className="text-xs text-white bg-brand-600 hover:bg-brand-700 rounded px-2 py-1"
-                        >
-                          저장
-                        </button>
-                        <button
-                          type="button"
-                          onClick={cancelEdit}
-                          className="text-xs text-slate-500 hover:text-slate-900 px-2 py-1"
-                        >
-                          취소
-                        </button>
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                          <div className="sm:col-span-3">
+                            <label className="block text-[10px] text-slate-500 mb-0.5">
+                              영단어
+                            </label>
+                            <input
+                              type="text"
+                              value={editEn}
+                              onChange={(e) => setEditEn(e.target.value)}
+                              autoFocus
+                              className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                            />
+                          </div>
+                          <div className="sm:col-span-3">
+                            <label className="block text-[10px] text-slate-500 mb-0.5">
+                              발음 (IPA)
+                            </label>
+                            <input
+                              type="text"
+                              value={editIpa}
+                              onChange={(e) => setEditIpa(e.target.value)}
+                              placeholder="ǽdvent"
+                              className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                            />
+                          </div>
+                          <div className="sm:col-span-2">
+                            <label className="block text-[10px] text-slate-500 mb-0.5">
+                              품사
+                            </label>
+                            <input
+                              type="text"
+                              value={editPos}
+                              onChange={(e) => setEditPos(e.target.value)}
+                              placeholder="n."
+                              className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                            />
+                          </div>
+                          <div className="sm:col-span-4">
+                            <label className="block text-[10px] text-slate-500 mb-0.5">
+                              한국어 뜻
+                            </label>
+                            <input
+                              type="text"
+                              value={editKo}
+                              onChange={(e) => setEditKo(e.target.value)}
+                              className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                            />
+                          </div>
+                          <div className="sm:col-span-6">
+                            <label className="block text-[10px] text-slate-500 mb-0.5">
+                              유의어 (쉼표로 구분)
+                            </label>
+                            <input
+                              type="text"
+                              value={editSynonymsRaw}
+                              onChange={(e) => setEditSynonymsRaw(e.target.value)}
+                              placeholder="arrival, appearance, emergence"
+                              className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                            />
+                          </div>
+                          <div className="sm:col-span-6">
+                            <label className="block text-[10px] text-slate-500 mb-0.5">
+                              영영 정의
+                            </label>
+                            <input
+                              type="text"
+                              value={editDefinitionEn}
+                              onChange={(e) => setEditDefinitionEn(e.target.value)}
+                              placeholder="The arrival of a notable person or thing"
+                              className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                            />
+                          </div>
+                          <div className="sm:col-span-6">
+                            <label className="block text-[10px] text-slate-500 mb-0.5">
+                              영어 예문
+                            </label>
+                            <input
+                              type="text"
+                              value={editExample}
+                              onChange={(e) => setEditExample(e.target.value)}
+                              placeholder="Since the advent of jet aircraft, travel has been sped-up."
+                              className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                            />
+                          </div>
+                          <div className="sm:col-span-6">
+                            <label className="block text-[10px] text-slate-500 mb-0.5">
+                              예문 한국어 번역
+                            </label>
+                            <input
+                              type="text"
+                              value={editExampleKo}
+                              onChange={(e) => setEditExampleKo(e.target.value)}
+                              placeholder="제트기의 출현 이후, 여행이 가속화되었다."
+                              className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex justify-end gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={cancelEdit}
+                            className="text-xs text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded border border-slate-300"
+                          >
+                            취소
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => saveEdit(i)}
+                            className="text-xs text-white bg-brand-600 hover:bg-brand-700 rounded px-3 py-1.5"
+                          >
+                            저장
+                          </button>
+                        </div>
                       </div>
                     ) : (
                       <div className="flex items-baseline gap-3">
