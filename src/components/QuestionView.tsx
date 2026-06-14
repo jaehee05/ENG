@@ -64,6 +64,16 @@ export function QuestionView({
         </div>
       )}
 
+      {question.image && (
+        <div className="flex justify-center">
+          <img
+            src={question.image}
+            alt="도표"
+            className="max-w-full max-h-[480px] rounded border border-slate-200"
+          />
+        </div>
+      )}
+
       {question.summaryBox && question.summaryBox.trim() && (
         <div className="rounded-lg border border-slate-300 bg-slate-50 p-4">
           <GlossedPassage

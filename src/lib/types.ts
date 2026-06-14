@@ -96,6 +96,8 @@ export interface ReadingQuestion {
   answer: number
   /** Configuration score: 3 for 3점 문항. Absent/2 = default. */
   points?: number
+  /** Inline image/chart (full data URL, e.g. "data:image/jpeg;base64,..."). */
+  image?: string
 }
 
 export const READING_TYPE_LABEL: Record<ReadingQuestionType, string> = {

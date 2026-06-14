@@ -9,6 +9,7 @@ export interface DraftQuestion {
   choices: string[]
   answer: number
   points?: number
+  image?: string
 }
 
 export function emptyDraftQuestion(type: ReadingQuestionType = 'standard'): DraftQuestion {

@@ -18,6 +18,7 @@ function fromQuestion(q: ReadingQuestion): DraftQuestion {
     choices: choices.slice(0, 5),
     answer: q.answer,
     points: q.points,
+    image: q.image,
   }
 }
 
@@ -31,6 +32,7 @@ function trimDraft(q: DraftQuestion) {
     intro?: string
     summaryBox?: string
     points?: number
+    image?: string
   } = {
     type: q.type,
     q: q.q.trim(),
@@ -41,6 +43,7 @@ function trimDraft(q: DraftQuestion) {
   if (q.intro.trim()) out.intro = q.intro.trim()
   if (q.summaryBox.trim()) out.summaryBox = q.summaryBox.trim()
   if (q.points && q.points !== 2) out.points = q.points
+  if (q.image) out.image = q.image
   return out
 }
 

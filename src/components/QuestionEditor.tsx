@@ -1,9 +1,11 @@
+import { useRef, type ChangeEvent } from 'react'
 import {
   READING_TYPE_LABEL,
   READING_TYPE_PROMPT,
   type ReadingQuestionType,
 } from '../lib/types'
 import { handleUnderlineHotkey } from '../lib/textareaHotkeys'
+import { resizeImageForUpload } from '../lib/imageResize'
 import type { DraftQuestion } from './draftQuestion'
 
 const CHOICE_MARKS = ['①', '②', '③', '④', '⑤']
@@ -29,9 +31,26 @@ interface Props {
 export function QuestionEditor({ index, question, canRemove, onChange, onRemove }: Props) {
   const needIntro = question.type === 'order' || question.type === 'insert'
   const needSummary = question.type === 'summary'
+  const imageFileRef = useRef<HTMLInputElement>(null)
 
   function patch(p: Partial<DraftQuestion>) {
     onChange({ ...question, ...p })
+  }
+
+  async function onImagePick(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (file.size > 15 * 1024 * 1024) {
+      window.alert('이미지는 15MB 이하여야 합니다.')
+      return
+    }
+    try {
+      const r = await resizeImageForUpload(file)
+      patch({ image: `data:${r.mediaType};base64,${r.base64}` })
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : '이미지를 처리하지 못했습니다.')
+    }
   }
 
   function changeType(next: ReadingQuestionType) {
@@ -141,6 +160,55 @@ export function QuestionEditor({ index, question, canRemove, onChange, onRemove 
           />
         </div>
       )}
+
+      <div>
+        <label className="block text-xs font-medium text-slate-600 mb-1">
+          도표 / 그림{' '}
+          <span className="text-slate-400 font-normal">
+            (도표 문제처럼 그림이 필요한 문항에 첨부)
+          </span>
+        </label>
+        <input
+          ref={imageFileRef}
+          type="file"
+          accept="image/png,image/jpeg,image/gif,image/webp"
+          onChange={onImagePick}
+          className="hidden"
+        />
+        {question.image ? (
+          <div className="flex items-start gap-3">
+            <img
+              src={question.image}
+              alt="도표"
+              className="max-h-48 rounded border border-slate-300 bg-white"
+            />
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => imageFileRef.current?.click()}
+                className="rounded-md border border-slate-300 text-slate-700 text-xs font-medium px-3 py-1.5 hover:bg-slate-100"
+              >
+                교체
+              </button>
+              <button
+                type="button"
+                onClick={() => patch({ image: undefined })}
+                className="rounded-md text-red-600 text-xs font-medium px-3 py-1.5 hover:bg-red-50"
+              >
+                제거
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => imageFileRef.current?.click()}
+            className="rounded-md border border-slate-300 bg-white text-slate-700 text-xs font-medium px-3 py-1.5 hover:bg-slate-100"
+          >
+            + 이미지 첨부
+          </button>
+        )}
+      </div>
 
       <div>
         <label className="block text-xs font-medium text-slate-600 mb-1">선지 (정답을 선택하세요)</label>

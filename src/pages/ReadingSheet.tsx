@@ -136,6 +136,19 @@ export function ReadingSheet() {
                   </div>
                 )}
 
+                {q.image && (
+                  <div className="grid grid-cols-3 gap-6 mt-3">
+                    <div className="col-span-2 flex justify-center">
+                      <img
+                        src={q.image}
+                        alt="도표"
+                        className="max-w-full max-h-[14cm] border border-slate-300"
+                      />
+                    </div>
+                    <div />
+                  </div>
+                )}
+
                 {q.summaryBox && q.summaryBox.trim() && (
                   <div className="grid grid-cols-3 gap-6 mt-3">
                     <div className="col-span-2 border border-slate-700 p-4 text-[11pt] leading-[1.7] whitespace-pre-wrap font-myeongjo">
