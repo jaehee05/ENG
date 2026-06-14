@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import {
@@ -10,6 +10,51 @@ import {
 } from '../lib/firestore'
 import type { Reading } from '../lib/types'
 
+const TITLE_RE = /^(.+?)\s+(\d+)\s*(?:번|문제)?\s*$/
+
+interface GroupedItem {
+  reading: Reading
+  number: number | null
+}
+
+interface Group {
+  category: string
+  items: GroupedItem[]
+}
+
+function buildGroups(readings: Reading[]): Group[] {
+  const map = new Map<string, GroupedItem[]>()
+  for (const r of readings) {
+    const m = TITLE_RE.exec(r.title.trim())
+    const category = m ? m[1].trim() : '기타'
+    const number = m ? Number.parseInt(m[2], 10) : null
+    if (!map.has(category)) map.set(category, [])
+    map.get(category)!.push({ reading: r, number })
+  }
+  const groups: Group[] = []
+  for (const [category, items] of map) {
+    items.sort((a, b) => {
+      if (a.number !== null && b.number !== null) return a.number - b.number
+      if (a.number === null) return 1
+      if (b.number === null) return -1
+      return a.reading.title.localeCompare(b.reading.title, 'ko', {
+        numeric: true,
+        sensitivity: 'base',
+      })
+    })
+    groups.push({ category, items })
+  }
+  groups.sort((a, b) => {
+    if (a.category === '기타') return 1
+    if (b.category === '기타') return -1
+    return a.category.localeCompare(b.category, 'ko', {
+      numeric: true,
+      sensitivity: 'base',
+    })
+  })
+  return groups
+}
+
 export function ReadingList() {
   const { profile } = useAuth()
   const isAdmin = profile?.role === 'admin'
@@ -18,6 +63,7 @@ export function ReadingList() {
   const [error, setError] = useState<string | null>(null)
   const [reorderMode, setReorderMode] = useState(false)
   const [savingOrder, setSavingOrder] = useState(false)
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     Promise.all([listReadings(), getReadingOrder()])
@@ -25,15 +71,14 @@ export function ReadingList() {
         if (order.length > 0) {
           setItems(applyReadingOrder(readings, order))
         } else {
-          const sorted = [...readings].sort((a, b) =>
-            a.title.localeCompare(b.title, 'ko', { numeric: true, sensitivity: 'base' }),
-          )
-          setItems(sorted)
+          setItems(readings)
         }
       })
       .catch((e) => setError(e instanceof Error ? e.message : '목록을 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
   }, [])
+
+  const groups = useMemo(() => buildGroups(items), [items])
 
   async function persist(next: Reading[]) {
     setItems(next)
@@ -61,6 +106,15 @@ export function ReadingList() {
     const [picked] = next.splice(idx, 1)
     next.unshift(picked)
     void persist(next)
+  }
+
+  function toggle(category: string) {
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (next.has(category)) next.delete(category)
+      else next.add(category)
+      return next
+    })
   }
 
   return (
@@ -109,9 +163,9 @@ export function ReadingList() {
         <p className="text-slate-500 text-sm">등록된 지문이 없습니다.</p>
       )}
 
-      <div className="space-y-3">
-        {items.map((r, i) =>
-          reorderMode && isAdmin ? (
+      {reorderMode && isAdmin ? (
+        <div className="space-y-3">
+          {items.map((r, i) => (
             <div
               key={r.id}
               className="rounded-lg border border-slate-200 bg-white p-4 flex items-start gap-3"
@@ -147,35 +201,78 @@ export function ReadingList() {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between gap-3">
-                  <h2 className="text-base font-semibold text-slate-900 truncate">{r.title}</h2>
+                  <h2 className="text-base font-semibold text-slate-900 truncate">
+                    {r.title}
+                  </h2>
                   <span className="text-xs text-slate-500 whitespace-nowrap">
                     {formatDate(r.createdAt)}
                   </span>
                 </div>
                 <p className="text-sm text-slate-500 mt-1">
-                  {r.questions.length}문항 · 단어 {r.glossary.length}개 · {r.createdByName}
+                  {r.questions.length}문항 · 단어 {r.glossary.length}개 ·{' '}
+                  {r.createdByName}
                 </p>
               </div>
             </div>
-          ) : (
-            <Link
-              key={r.id}
-              to={isAdmin ? `/reading/${r.id}` : `/reading/${r.id}/take`}
-              className="block rounded-lg border border-slate-200 bg-white p-4 hover:border-brand-300 hover:shadow-md transition"
-            >
-              <div className="flex items-baseline justify-between gap-3">
-                <h2 className="text-base font-semibold text-slate-900 truncate">{r.title}</h2>
-                <span className="text-xs text-slate-500 whitespace-nowrap">
-                  {formatDate(r.createdAt)}
-                </span>
-              </div>
-              <p className="text-sm text-slate-500 mt-1">
-                {r.questions.length}문항 · 단어 {r.glossary.length}개 · {r.createdByName}
-              </p>
-            </Link>
-          ),
-        )}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {groups.map((g) => {
+            const isOpen = !collapsed.has(g.category)
+            return (
+              <section
+                key={g.category}
+                className="rounded-lg border border-slate-200 bg-white overflow-hidden"
+              >
+                <button
+                  type="button"
+                  onClick={() => toggle(g.category)}
+                  className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50"
+                >
+                  <div className="flex items-baseline gap-2 min-w-0">
+                    <h2 className="text-base font-semibold text-slate-900 truncate">
+                      {g.category}
+                    </h2>
+                    <span className="text-xs text-slate-500">
+                      {g.items.length}개
+                    </span>
+                  </div>
+                  <span className="text-slate-400 text-sm">{isOpen ? '−' : '+'}</span>
+                </button>
+                {isOpen && (
+                  <ul className="divide-y divide-slate-100 border-t border-slate-100">
+                    {g.items.map(({ reading: r, number }) => (
+                      <li key={r.id}>
+                        <Link
+                          to={isAdmin ? `/reading/${r.id}` : `/reading/${r.id}/take`}
+                          className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50"
+                        >
+                          <div className="flex items-baseline gap-3 min-w-0">
+                            {number !== null && (
+                              <span className="inline-flex items-center justify-center min-w-[2.25rem] px-2 py-0.5 rounded bg-brand-100 text-brand-700 text-sm font-semibold">
+                                {number}번
+                              </span>
+                            )}
+                            <span className="text-sm text-slate-700 truncate">
+                              {number !== null
+                                ? `${r.questions.length}문항 · 단어 ${r.glossary.length}개`
+                                : r.title}
+                            </span>
+                          </div>
+                          <span className="text-xs text-slate-400 whitespace-nowrap">
+                            {formatDate(r.createdAt)}
+                          </span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
