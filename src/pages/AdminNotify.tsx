@@ -35,20 +35,18 @@ function csvEscape(s: string): string {
 }
 
 const LS_TEMPLATE_CODE = 'eng_notify_template_code'
-const LS_EMPHASIS = 'eng_notify_emphasis'
-const LS_SUB_EMPHASIS = 'eng_notify_sub_emphasis'
+const LS_MSG_TYPE = 'eng_notify_msg_type'
 const LS_NOTICE = 'eng_notify_notice'
+
+type MsgType = '일반형' | '강조표기형'
 
 export function AdminNotify() {
   const [bundles, setBundles] = useState<StudentBundle[]>([])
   const [templateCode, setTemplateCode] = useState(
     () => localStorage.getItem(LS_TEMPLATE_CODE) ?? '',
   )
-  const [emphasis, setEmphasis] = useState(
-    () => localStorage.getItem(LS_EMPHASIS) ?? '',
-  )
-  const [subEmphasis, setSubEmphasis] = useState(
-    () => localStorage.getItem(LS_SUB_EMPHASIS) ?? '',
+  const [msgType, setMsgType] = useState<MsgType>(
+    () => (localStorage.getItem(LS_MSG_TYPE) as MsgType) || '강조표기형',
   )
   const [notice, setNotice] = useState(
     () => localStorage.getItem(LS_NOTICE) ?? '',
@@ -62,11 +60,8 @@ export function AdminNotify() {
     localStorage.setItem(LS_TEMPLATE_CODE, templateCode)
   }, [templateCode])
   useEffect(() => {
-    localStorage.setItem(LS_EMPHASIS, emphasis)
-  }, [emphasis])
-  useEffect(() => {
-    localStorage.setItem(LS_SUB_EMPHASIS, subEmphasis)
-  }, [subEmphasis])
+    localStorage.setItem(LS_MSG_TYPE, msgType)
+  }, [msgType])
   useEffect(() => {
     localStorage.setItem(LS_NOTICE, notice)
   }, [notice])
@@ -124,23 +119,12 @@ export function AdminNotify() {
   }
 
   function downloadCsv() {
-    const rows = [
-      [
-        '템플릿코드',
-        '수신번호',
-        '강조표기제목',
-        '강조표기보조문구',
-        '이름',
-        '1',
-        '2',
-      ],
-    ]
+    const rows = [['발송유형', '템플릿코드', '수신번호', '이름', '1', '2']]
     for (const b of visible) {
       rows.push([
+        msgType,
         templateCode,
         b.account.phone ?? '',
-        emphasis,
-        subEmphasis,
         b.account.displayName,
         statusValue(b),
         notice,
@@ -182,6 +166,19 @@ export function AdminNotify() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">
+              발송 유형
+            </label>
+            <select
+              value={msgType}
+              onChange={(e) => setMsgType(e.target.value as MsgType)}
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              <option value="일반형">일반형</option>
+              <option value="강조표기형">강조표기형</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">
               알림톡 템플릿 코드
             </label>
             <input
@@ -192,35 +189,10 @@ export function AdminNotify() {
               className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
           </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">
-              강조표기 제목{' '}
-              <span className="font-normal text-slate-400">(선택)</span>
-            </label>
-            <input
-              type="text"
-              value={emphasis}
-              onChange={(e) => setEmphasis(e.target.value)}
-              placeholder="예: 과제 현황 안내"
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="block text-xs font-medium text-slate-600 mb-1">
-              강조표기 보조문구{' '}
-              <span className="font-normal text-slate-400">(선택)</span>
-            </label>
-            <input
-              type="text"
-              value={subEmphasis}
-              onChange={(e) => setSubEmphasis(e.target.value)}
-              placeholder="예: 2027 재희T 1:1 개인 과외"
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-            />
-          </div>
         </div>
         <p className="text-xs text-slate-500">
-          입력 값은 브라우저에 저장되어 다음에 접속해도 그대로 유지됩니다.
+          입력 값은 브라우저에 자동 저장됩니다. 강조표기 제목/보조문구는 뿌리오에 등록된
+          템플릿에서 처리되므로 따로 입력하지 않습니다.
         </p>
       </div>
 
