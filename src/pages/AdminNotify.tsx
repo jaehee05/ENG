@@ -34,13 +34,42 @@ function csvEscape(s: string): string {
   return s
 }
 
+const LS_TEMPLATE_CODE = 'eng_notify_template_code'
+const LS_EMPHASIS = 'eng_notify_emphasis'
+const LS_SUB_EMPHASIS = 'eng_notify_sub_emphasis'
+const LS_NOTICE = 'eng_notify_notice'
+
 export function AdminNotify() {
   const [bundles, setBundles] = useState<StudentBundle[]>([])
-  const [notice, setNotice] = useState('')
+  const [templateCode, setTemplateCode] = useState(
+    () => localStorage.getItem(LS_TEMPLATE_CODE) ?? '',
+  )
+  const [emphasis, setEmphasis] = useState(
+    () => localStorage.getItem(LS_EMPHASIS) ?? '',
+  )
+  const [subEmphasis, setSubEmphasis] = useState(
+    () => localStorage.getItem(LS_SUB_EMPHASIS) ?? '',
+  )
+  const [notice, setNotice] = useState(
+    () => localStorage.getItem(LS_NOTICE) ?? '',
+  )
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [hideCompleted, setHideCompleted] = useState(false)
+
+  useEffect(() => {
+    localStorage.setItem(LS_TEMPLATE_CODE, templateCode)
+  }, [templateCode])
+  useEffect(() => {
+    localStorage.setItem(LS_EMPHASIS, emphasis)
+  }, [emphasis])
+  useEffect(() => {
+    localStorage.setItem(LS_SUB_EMPHASIS, subEmphasis)
+  }, [subEmphasis])
+  useEffect(() => {
+    localStorage.setItem(LS_NOTICE, notice)
+  }, [notice])
 
   useEffect(() => {
     let cancelled = false
@@ -95,10 +124,23 @@ export function AdminNotify() {
   }
 
   function downloadCsv() {
-    const rows = [['수신번호', '이름', '1', '2']]
+    const rows = [
+      [
+        '템플릿코드',
+        '수신번호',
+        '강조표기제목',
+        '강조표기보조문구',
+        '이름',
+        '1',
+        '2',
+      ],
+    ]
     for (const b of visible) {
       rows.push([
+        templateCode,
         b.account.phone ?? '',
+        emphasis,
+        subEmphasis,
         b.account.displayName,
         statusValue(b),
         notice,
@@ -127,10 +169,59 @@ export function AdminNotify() {
       </div>
 
       <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
-        <p className="text-xs font-semibold text-slate-600 mb-2">템플릿 양식</p>
+        <p className="text-xs font-semibold text-slate-600 mb-2">
+          템플릿 양식 (강조표기형)
+        </p>
         <pre className="text-xs leading-relaxed text-slate-800 whitespace-pre-wrap font-sans">
           {TEMPLATE_PREVIEW}
         </pre>
+      </div>
+
+      <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
+        <p className="text-sm font-semibold text-slate-700">뿌리오 발송 정보</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">
+              알림톡 템플릿 코드
+            </label>
+            <input
+              type="text"
+              value={templateCode}
+              onChange={(e) => setTemplateCode(e.target.value)}
+              placeholder="예: TPL_20260613_001"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">
+              강조표기 제목{' '}
+              <span className="font-normal text-slate-400">(선택)</span>
+            </label>
+            <input
+              type="text"
+              value={emphasis}
+              onChange={(e) => setEmphasis(e.target.value)}
+              placeholder="예: 과제 현황 안내"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-medium text-slate-600 mb-1">
+              강조표기 보조문구{' '}
+              <span className="font-normal text-slate-400">(선택)</span>
+            </label>
+            <input
+              type="text"
+              value={subEmphasis}
+              onChange={(e) => setSubEmphasis(e.target.value)}
+              placeholder="예: 2027 재희T 1:1 개인 과외"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </div>
+        </div>
+        <p className="text-xs text-slate-500">
+          입력 값은 브라우저에 저장되어 다음에 접속해도 그대로 유지됩니다.
+        </p>
       </div>
 
       <div className="rounded-lg border border-brand-200 bg-brand-50/40 p-4 space-y-3">
