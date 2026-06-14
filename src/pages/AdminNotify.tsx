@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { listAccounts } from '../lib/account'
-import { listAssignmentsForStudent, listAttemptsForUser } from '../lib/firestore'
+import {
+  getPpurioSettings,
+  listAssignmentsForStudent,
+  listAttemptsForUser,
+  setPpurioSettings,
+  type PpurioSettings,
+} from '../lib/firestore'
 import type { Assignment, UserAccount } from '../lib/types'
 
 interface StudentBundle {
@@ -58,6 +64,44 @@ export function AdminNotify() {
   const [error, setError] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [hideCompleted, setHideCompleted] = useState(false)
+
+  const [creds, setCreds] = useState<PpurioSettings>({
+    account: '',
+    apiKey: '',
+    senderProfile: '',
+    footer: '',
+  })
+  const [credsLoaded, setCredsLoaded] = useState(false)
+  const [credsSaving, setCredsSaving] = useState(false)
+  const [credsNotice, setCredsNotice] = useState<string | null>(null)
+  const [showApiKey, setShowApiKey] = useState(false)
+  const [credsOpen, setCredsOpen] = useState(false)
+
+  useEffect(() => {
+    getPpurioSettings()
+      .then((s) => {
+        if (s) {
+          setCreds(s)
+          setCredsLoaded(true)
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  async function saveCreds() {
+    setCredsNotice(null)
+    setCredsSaving(true)
+    try {
+      await setPpurioSettings(creds)
+      setCredsLoaded(true)
+      setCredsNotice('저장되었습니다.')
+      setTimeout(() => setCredsNotice((cur) => (cur === '저장되었습니다.' ? null : cur)), 2000)
+    } catch (e) {
+      setCredsNotice(e instanceof Error ? e.message : '저장에 실패했습니다.')
+    } finally {
+      setCredsSaving(false)
+    }
+  }
 
   useEffect(() => {
     localStorage.setItem(LS_TEMPLATE_CODE, templateCode)
@@ -162,6 +206,102 @@ export function AdminNotify() {
         <pre className="text-xs leading-relaxed text-slate-800 whitespace-pre-wrap font-sans">
           {TEMPLATE_PREVIEW}
         </pre>
+      </div>
+
+      <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
+        <button
+          type="button"
+          onClick={() => setCredsOpen((v) => !v)}
+          className="w-full flex items-center justify-between text-left"
+        >
+          <span className="text-sm font-semibold text-slate-700">
+            뿌리오 발신 설정
+            <span className="ml-2 text-xs font-normal text-slate-500">
+              {credsLoaded ? '저장됨' : '미설정'}
+            </span>
+          </span>
+          <span className="text-slate-400 text-sm">{credsOpen ? '−' : '+'}</span>
+        </button>
+        {credsOpen && (
+          <div className="space-y-3 pt-2 border-t border-slate-100">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  뿌리오 계정 (ID)
+                </label>
+                <input
+                  type="text"
+                  value={creds.account}
+                  onChange={(e) => setCreds({ ...creds, account: e.target.value })}
+                  placeholder="뿌리오 로그인 아이디"
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  API Key
+                </label>
+                <div className="relative">
+                  <input
+                    type={showApiKey ? 'text' : 'password'}
+                    value={creds.apiKey}
+                    onChange={(e) => setCreds({ ...creds, apiKey: e.target.value })}
+                    placeholder="뿌리오 발급 API Key"
+                    className="w-full rounded-md border border-slate-300 px-3 py-2 pr-16 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKey((v) => !v)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-500 hover:text-slate-900"
+                  >
+                    {showApiKey ? '숨기기' : '보기'}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  발신프로필 (@채널)
+                </label>
+                <input
+                  type="text"
+                  value={creds.senderProfile}
+                  onChange={(e) => setCreds({ ...creds, senderProfile: e.target.value })}
+                  placeholder="예: @kjhedu"
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  공통 푸터{' '}
+                  <span className="font-normal text-slate-400">(선택)</span>
+                </label>
+                <input
+                  type="text"
+                  value={creds.footer}
+                  onChange={(e) => setCreds({ ...creds, footer: e.target.value })}
+                  placeholder="예: 수신거부: 0808-xxx-xxxx"
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={saveCreds}
+                disabled={credsSaving}
+                className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700 disabled:opacity-50"
+              >
+                {credsSaving ? '저장 중...' : '저장'}
+              </button>
+              {credsNotice && <span className="text-xs text-brand-700">{credsNotice}</span>}
+            </div>
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              자격증명은 Firestore <code>settings/ppurio</code>에 저장됩니다. 현재 보안 규칙이
+              공개라 누구나 읽을 수 있으니, 운영 시 규칙을 잠그고 서버에서만 접근하도록 바꿔야
+              합니다. 또한 뿌리오 IP 화이트리스트를 사용하는 경우 별도 발송 프록시가 필요합니다.
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-3">

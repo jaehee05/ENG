@@ -107,6 +107,35 @@ export async function deleteReading(id: string): Promise<void> {
   await deleteDoc(doc(db, 'readings', id))
 }
 
+export interface PpurioSettings {
+  account: string
+  apiKey: string
+  senderProfile: string
+  footer: string
+}
+
+export async function getPpurioSettings(): Promise<PpurioSettings | null> {
+  const snap = await getDoc(doc(db, 'settings', 'ppurio'))
+  if (!snap.exists()) return null
+  const d = snap.data() as Partial<PpurioSettings>
+  return {
+    account: d.account ?? '',
+    apiKey: d.apiKey ?? '',
+    senderProfile: d.senderProfile ?? '',
+    footer: d.footer ?? '',
+  }
+}
+
+export async function setPpurioSettings(input: PpurioSettings): Promise<void> {
+  await setDoc(doc(db, 'settings', 'ppurio'), {
+    account: input.account.trim(),
+    apiKey: input.apiKey.trim(),
+    senderProfile: input.senderProfile.trim(),
+    footer: input.footer.trim(),
+    updatedAt: serverTimestamp(),
+  })
+}
+
 export async function getReadingOrder(): Promise<string[]> {
   const snap = await getDoc(doc(db, 'meta', 'readingOrder'))
   if (!snap.exists()) return []
