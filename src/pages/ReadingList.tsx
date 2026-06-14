@@ -26,7 +26,7 @@ export function ReadingList() {
           setItems(applyReadingOrder(readings, order))
         } else {
           const sorted = [...readings].sort((a, b) =>
-            a.title.localeCompare(b.title, 'ko'),
+            a.title.localeCompare(b.title, 'ko', { numeric: true, sensitivity: 'base' }),
           )
           setItems(sorted)
         }

@@ -16,7 +16,7 @@ export function VocabList() {
     listVocabSets()
       .then((all) => {
         const sorted = [...all].sort((a, b) =>
-          a.title.localeCompare(b.title, 'ko'),
+          a.title.localeCompare(b.title, 'ko', { numeric: true, sensitivity: 'base' }),
         )
         setSets(sorted)
       })
