@@ -16,24 +16,18 @@ function statusLines(b: StudentBundle): string[] {
   })
 }
 
-const TEMPLATE_PREFIX = `2027 재희T 1:1 개인 과외
-과제 현황 안내`
-
-function buildMessage(name: string, lines: string[], notice: string): string {
-  const part1 = lines.length > 0 ? lines.join('\n') : '(부여된 과제가 없습니다)'
-  const trimmedNotice = notice.trim()
-  return [
-    TEMPLATE_PREFIX,
-    `${name}님, 과제 현황 안내입니다.`,
-    '',
-    part1,
-    '',
-    trimmedNotice,
-  ]
-    .join('\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trimEnd()
+function statusValue(b: StudentBundle): string {
+  const lines = statusLines(b)
+  return lines.length > 0 ? lines.join('\n') : '(부여된 과제가 없습니다)'
 }
+
+const TEMPLATE_PREVIEW = `2027 재희T 1:1 개인 과외
+과제 현황 안내
+[*이름*]님, 과제 현황 안내입니다.
+
+[*1*]
+
+[*2*]`
 
 function csvEscape(s: string): string {
   if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`
@@ -101,10 +95,14 @@ export function AdminNotify() {
   }
 
   function downloadCsv() {
-    const rows = [['이름', '연락처', '메시지']]
+    const rows = [['수신번호', '이름', '1', '2']]
     for (const b of visible) {
-      const msg = buildMessage(b.account.displayName, statusLines(b), notice)
-      rows.push([b.account.displayName, b.account.phone ?? '', msg])
+      rows.push([
+        b.account.phone ?? '',
+        b.account.displayName,
+        statusValue(b),
+        notice,
+      ])
     }
     const csv = rows.map((r) => r.map(csvEscape).join(',')).join('\n')
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
@@ -113,7 +111,7 @@ export function AdminNotify() {
     const today = new Date()
     const stamp = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
     a.href = url
-    a.download = `알림톡_과제현황_${stamp}.csv`
+    a.download = `뿌리오_알림톡_과제현황_${stamp}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -121,11 +119,18 @@ export function AdminNotify() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">알림톡 발송 도우미</h1>
+        <h1 className="text-2xl font-semibold text-slate-900">알림톡 발송 도우미 (뿌리오)</h1>
         <p className="text-sm text-slate-500 mt-1">
-          학생별 과제 현황을 자동으로 채워 알림톡 메시지를 만듭니다. 학생당 "복사" 버튼으로
-          하나씩 복사하거나, 아래 CSV로 일괄 다운로드 받아 발송 서비스에 업로드하세요.
+          학생별 과제 현황을 자동으로 채워 뿌리오 알림톡 변수 CSV를 만듭니다. 다운로드 받아
+          뿌리오 대량발송에 그대로 업로드하세요.
         </p>
+      </div>
+
+      <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
+        <p className="text-xs font-semibold text-slate-600 mb-2">템플릿 양식</p>
+        <pre className="text-xs leading-relaxed text-slate-800 whitespace-pre-wrap font-sans">
+          {TEMPLATE_PREVIEW}
+        </pre>
       </div>
 
       <div className="rounded-lg border border-brand-200 bg-brand-50/40 p-4 space-y-3">
@@ -176,8 +181,7 @@ export function AdminNotify() {
 
       <ul className="space-y-3">
         {visible.map((b) => {
-          const lines = statusLines(b)
-          const msg = buildMessage(b.account.displayName, lines, notice)
+          const v1 = statusValue(b)
           const totalCnt = b.assignments.length
           const doneCnt = b.assignments.filter((a) =>
             b.completedKeys.has(`${a.type}:${a.refId}`),
@@ -185,7 +189,7 @@ export function AdminNotify() {
           return (
             <li
               key={b.account.id}
-              className="rounded-lg border border-slate-200 bg-white p-4 space-y-3"
+              className="rounded-lg border border-slate-200 bg-white p-4 space-y-2"
             >
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div className="min-w-0">
@@ -201,14 +205,17 @@ export function AdminNotify() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => copyText(b.account.id, msg)}
+                  onClick={() => copyText(b.account.id, v1)}
                   className="rounded-md border border-slate-300 text-slate-700 text-sm font-medium px-3 py-1.5 hover:bg-slate-100"
                 >
-                  {copiedId === b.account.id ? '복사됨!' : '메시지 복사'}
+                  {copiedId === b.account.id ? '복사됨!' : '[*1*] 복사'}
                 </button>
               </div>
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                [*1*] 변수 값
+              </p>
               <pre className="rounded-md bg-slate-50 border border-slate-200 p-3 text-xs leading-relaxed text-slate-800 whitespace-pre-wrap font-sans">
-                {msg}
+                {v1}
               </pre>
             </li>
           )
