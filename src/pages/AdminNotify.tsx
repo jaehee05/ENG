@@ -54,6 +54,13 @@ type MsgType = '기본형' | '이미지형' | '강조표기형' | '아이템리�
 
 const MSG_TYPES: MsgType[] = ['기본형', '이미지형', '강조표기형', '아이템리스트형']
 
+const MSG_TYPE_CODE: Record<MsgType, string> = {
+  기본형: 'AT',
+  이미지형: 'AI',
+  강조표기형: 'ALH',
+  아이템리스트형: 'ALI',
+}
+
 export function AdminNotify() {
   const [bundles, setBundles] = useState<StudentBundle[]>([])
   const [templateCode, setTemplateCode] = useState(
@@ -242,7 +249,7 @@ export function AdminNotify() {
       }))
       const out = await sendBatchAlimtalk({
         templateCode: templateCode.trim(),
-        messageType: msgType === '강조표기형' ? 'AT' : msgType === '이미지형' ? 'AI' : 'AT',
+        messageType: MSG_TYPE_CODE[msgType],
         recipients,
       })
       setSendResults(out.results)
