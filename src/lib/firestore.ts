@@ -79,12 +79,15 @@ export async function getVocabSeries(id: string): Promise<VocabSeries | null> {
 export async function createVocabSeries(input: {
   title: string
   maxAttempts?: number
+  words?: WordEntry[]
+  perDay?: number
   createdBy: string
   createdByName: string
 }): Promise<string> {
   const payload: Record<string, unknown> = {
     title: input.title,
     lastDayNumber: 0,
+    usedCount: 0,
     createdBy: input.createdBy,
     createdByName: input.createdByName,
     createdAt: serverTimestamp(),
@@ -92,6 +95,12 @@ export async function createVocabSeries(input: {
   }
   if (input.maxAttempts && input.maxAttempts > 0) {
     payload.maxAttempts = Math.trunc(input.maxAttempts)
+  }
+  if (input.perDay && input.perDay > 0) {
+    payload.perDay = Math.trunc(input.perDay)
+  }
+  if (input.words && input.words.length > 0) {
+    payload.words = input.words
   }
   const ref = await addDoc(collection(db, 'vocabSeries'), payload)
   return ref.id
@@ -105,6 +114,22 @@ export async function bumpVocabSeries(
     lastDayNumber: newLastDay,
     updatedAt: serverTimestamp(),
   })
+}
+
+export async function updateVocabSeries(
+  id: string,
+  patch: Partial<
+    Pick<
+      VocabSeries,
+      'title' | 'maxAttempts' | 'words' | 'perDay' | 'usedCount' | 'lastDayNumber'
+    >
+  >,
+): Promise<void> {
+  const update: Record<string, unknown> = { updatedAt: serverTimestamp() }
+  for (const [k, v] of Object.entries(patch)) {
+    if (v !== undefined) update[k] = v
+  }
+  await updateDoc(doc(db, 'vocabSeries', id), update)
 }
 
 export async function deleteVocabSeries(id: string): Promise<void> {

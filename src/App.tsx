@@ -27,6 +27,9 @@ import { AdminStudents } from './pages/AdminStudents'
 import { AdminStudentDetail } from './pages/AdminStudentDetail'
 import { AdminNotify } from './pages/AdminNotify'
 import { MyHistory } from './pages/MyHistory'
+import { CorporaList } from './pages/CorporaList'
+import { CorpusNew } from './pages/CorpusNew'
+import { CorpusDetail } from './pages/CorpusDetail'
 
 function App() {
   return (
@@ -64,6 +67,9 @@ function App() {
           <Route element={<ProtectedRoute adminOnly />}>
             <Route element={<Layout />}>
               <Route path="/vocab/new" element={<VocabNew />} />
+              <Route path="/vocab/corpora" element={<CorporaList />} />
+              <Route path="/vocab/corpora/new" element={<CorpusNew />} />
+              <Route path="/vocab/corpora/:id" element={<CorpusDetail />} />
               <Route path="/reading/new" element={<ReadingNew />} />
               <Route path="/reading/import" element={<ReadingImport />} />
               <Route path="/reading/:id/edit" element={<ReadingEdit />} />

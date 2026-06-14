@@ -61,6 +61,12 @@ export interface VocabSeries {
   title: string
   lastDayNumber: number
   maxAttempts?: number
+  /** Master word list — all words that may be used to spawn DAY tests. */
+  words?: WordEntry[]
+  /** Default words per DAY when generating next test. */
+  perDay?: number
+  /** How many words have already been used in DAY tests (cursor). */
+  usedCount?: number
   createdBy: string
   createdByName: string
   createdAt: Timestamp | null
