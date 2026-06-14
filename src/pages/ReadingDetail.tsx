@@ -152,10 +152,17 @@ export function ReadingDetail() {
           </h2>
           <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5 space-y-4">
             {r.questions.map((q, qi) => (
-              <div key={qi} className="space-y-1">
+              <div key={qi} className="space-y-2">
                 <p className="text-sm font-medium text-slate-800 whitespace-pre-wrap">
                   {qi + 1}. {renderUnderlines(q.q)}
                 </p>
+                {q.image && (
+                  <img
+                    src={q.image}
+                    alt="도표"
+                    className="max-w-full max-h-72 rounded border border-slate-200"
+                  />
+                )}
                 <GlossedPassage
                   passage={q.choices.map((c, ci) => `${CHOICE_MARKS[ci]} ${c}`).join('\n')}
                   glossary={choicesGlossary}
