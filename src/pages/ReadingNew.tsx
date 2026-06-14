@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -8,7 +9,7 @@ import {
 } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
-import { createReading } from '../lib/firestore'
+import { createReading, listReadings } from '../lib/firestore'
 import { extractGlossary, parseReadingText, wordsToText } from '../lib/api'
 import { parseWordList, type ReadingQuestionType } from '../lib/types'
 import { handleUnderlineHotkey } from '../lib/textareaHotkeys'
@@ -69,6 +70,45 @@ export function ReadingNew() {
   const { profile } = useAuth()
   const navigate = useNavigate()
   const [title, setTitle] = useState('')
+  const [titleAutoFilled, setTitleAutoFilled] = useState(false)
+  const [categoryMode, setCategoryMode] = useState<'pick' | 'new'>('pick')
+  const [selectedCategory, setSelectedCategory] = useState('')
+  const [newCategory, setNewCategory] = useState('')
+  const [questionNumber, setQuestionNumber] = useState('')
+  const [knownCategories, setKnownCategories] = useState<string[]>([])
+
+  useEffect(() => {
+    listReadings()
+      .then((all) => {
+        const TITLE_RE = /^(.+?)\s+(\d+)\s*(?:번|문제)?\s*$/
+        const set = new Set<string>()
+        for (const r of all) {
+          const m = TITLE_RE.exec(r.title.trim())
+          if (m) set.add(m[1].trim())
+        }
+        setKnownCategories(
+          [...set].sort((a, b) =>
+            a.localeCompare(b, 'ko', { numeric: true, sensitivity: 'base' }),
+          ),
+        )
+      })
+      .catch(() => {})
+  }, [])
+
+  const activeCategory =
+    categoryMode === 'new' ? newCategory.trim() : selectedCategory.trim()
+
+  useEffect(() => {
+    if (!activeCategory) return
+    if (title && !titleAutoFilled) return
+    const num = Number.parseInt(questionNumber, 10)
+    const next = Number.isFinite(num) && num > 0
+      ? `${activeCategory} ${num}번`
+      : activeCategory
+    setTitle(next)
+    setTitleAutoFilled(true)
+  }, [activeCategory, questionNumber])
+
   const [passage, setPassage] = useState('')
   const [glossaryRaw, setGlossaryRaw] = useState('')
   const [choicesGlossaryRaw, setChoicesGlossaryRaw] = useState('')
@@ -330,13 +370,88 @@ export function ReadingNew() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="rounded-md border border-slate-200 bg-slate-50 p-4 space-y-3">
+          <p className="text-sm font-semibold text-slate-700">시험명 / 번호</p>
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                시험명
+              </label>
+              {categoryMode === 'pick' ? (
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => {
+                    if (e.target.value === '__new__') {
+                      setCategoryMode('new')
+                      setSelectedCategory('')
+                    } else {
+                      setSelectedCategory(e.target.value)
+                    }
+                  }}
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                >
+                  <option value="">— 선택 —</option>
+                  {knownCategories.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                  <option value="__new__">+ 새 시험명 추가...</option>
+                </select>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newCategory}
+                    onChange={(e) => setNewCategory(e.target.value)}
+                    placeholder="예: 2027학년도 6월 모의평가"
+                    autoFocus
+                    className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCategoryMode('pick')
+                      setNewCategory('')
+                    }}
+                    className="text-xs text-slate-500 hover:text-slate-900 px-2"
+                  >
+                    취소
+                  </button>
+                </div>
+              )}
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                문항 번호
+              </label>
+              <input
+                type="number"
+                min={1}
+                value={questionNumber}
+                onChange={(e) => setQuestionNumber(e.target.value)}
+                placeholder="18"
+                className="w-24 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
+          </div>
+        </div>
+
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">제목</label>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            제목{' '}
+            <span className="font-normal text-slate-500">
+              (위 시험명·번호로 자동 생성, 직접 수정도 가능)
+            </span>
+          </label>
           <input
             type="text"
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="예: 2024학년도 6월 모평 31번"
+            onChange={(e) => {
+              setTitle(e.target.value)
+              setTitleAutoFilled(false)
+            }}
+            placeholder="예: 2027학년도 6월 모의평가 18번"
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
         </div>
