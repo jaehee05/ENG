@@ -5,6 +5,7 @@ import { getAccount } from '../lib/account'
 import {
   createAssignment,
   deleteAssignment,
+  deleteAttempt,
   listAssignmentsForStudent,
   listAttemptsForUser,
   listReadings,
@@ -161,12 +162,71 @@ export function AdminStudentDetail() {
     return map
   }, [attempts])
 
+  const [bundleMode, setBundleMode] = useState(false)
+  const [bundleCategory, setBundleCategory] = useState('')
+
+  const readingCategories = useMemo(() => {
+    const TITLE_RE = /^(.+?)\s+(\d+)\s*(?:번|문제)?\s*$/
+    const map = new Map<string, Reading[]>()
+    for (const r of readings) {
+      const m = TITLE_RE.exec(r.title.trim())
+      if (!m) continue
+      const cat = m[1].trim()
+      if (!map.has(cat)) map.set(cat, [])
+      map.get(cat)!.push(r)
+    }
+    return [...map.entries()]
+      .map(([category, list]) => ({ category, list }))
+      .sort((a, b) =>
+        a.category.localeCompare(b.category, 'ko', { numeric: true }),
+      )
+  }, [readings])
+
   const assignOptions = assignType === 'vocab' ? vocabSets : readings
 
   async function handleAssign(e: React.FormEvent) {
     e.preventDefault()
     setAssignError(null)
     if (!id || !account || !profile) return
+    const dueDate = assignDue ? new Date(assignDue) : null
+    if (dueDate && Number.isNaN(dueDate.getTime())) {
+      setAssignError('마감일이 올바르지 않습니다.')
+      return
+    }
+
+    if (bundleMode && assignType === 'reading') {
+      const group = readingCategories.find((g) => g.category === bundleCategory)
+      if (!group || group.list.length === 0) {
+        setAssignError('묶음 과제로 부여할 시험명을 선택하세요.')
+        return
+      }
+      setAssigning(true)
+      try {
+        for (const r of group.list) {
+          await createAssignment({
+            studentUid: id,
+            studentName: account.displayName,
+            assignedBy: profile.id,
+            assignedByName: profile.displayName,
+            type: 'reading',
+            refId: r.id,
+            refTitle: r.title,
+            note: assignNote,
+            dueAt: dueDate,
+          })
+        }
+        setBundleCategory('')
+        setAssignDue('')
+        setAssignNote('')
+        await reloadAssignments()
+      } catch (err) {
+        setAssignError(err instanceof Error ? err.message : '과제 부여에 실패했습니다.')
+      } finally {
+        setAssigning(false)
+      }
+      return
+    }
+
     if (!assignRefId) {
       setAssignError('과제로 부여할 항목을 선택하세요.')
       return
@@ -175,11 +235,6 @@ export function AdminStudentDetail() {
     const target = source.find((s) => s.id === assignRefId)
     if (!target) {
       setAssignError('선택한 항목을 찾을 수 없습니다.')
-      return
-    }
-    const dueDate = assignDue ? new Date(assignDue) : null
-    if (dueDate && Number.isNaN(dueDate.getTime())) {
-      setAssignError('마감일이 올바르지 않습니다.')
       return
     }
     setAssigning(true)
@@ -210,6 +265,16 @@ export function AdminStudentDetail() {
     if (!window.confirm(`"${asn.refTitle}" 과제를 삭제하시겠습니까?`)) return
     await deleteAssignment(asn.id)
     await reloadAssignments()
+  }
+
+  async function handleDeleteAttempt(att: Attempt) {
+    if (!window.confirm(`"${att.refTitle}" 시험 기록을 삭제하시겠습니까?`)) return
+    try {
+      await deleteAttempt(att.id)
+      setAttempts((prev) => prev.filter((a) => a.id !== att.id))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '삭제 실패')
+    }
   }
 
   if (loading) return <p className="text-slate-500 text-sm">불러오는 중...</p>
@@ -314,20 +379,51 @@ export function AdminStudentDetail() {
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">
-                {assignType === 'vocab' ? '단어 시험지' : '지문'} 선택
+                {assignType === 'vocab'
+                  ? '단어 시험지'
+                  : bundleMode
+                    ? '시험명 묶음'
+                    : '지문'}{' '}
+                선택
               </label>
-              <select
-                value={assignRefId}
-                onChange={(e) => setAssignRefId(e.target.value)}
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              >
-                <option value="">— 선택 —</option>
-                {assignOptions.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.title}
-                  </option>
-                ))}
-              </select>
+              {assignType === 'reading' && bundleMode ? (
+                <select
+                  value={bundleCategory}
+                  onChange={(e) => setBundleCategory(e.target.value)}
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                >
+                  <option value="">— 선택 —</option>
+                  {readingCategories.map((g) => (
+                    <option key={g.category} value={g.category}>
+                      {g.category} ({g.list.length}개)
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <select
+                  value={assignRefId}
+                  onChange={(e) => setAssignRefId(e.target.value)}
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                >
+                  <option value="">— 선택 —</option>
+                  {assignOptions.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.title}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {assignType === 'reading' && readingCategories.length > 0 && (
+                <label className="mt-1.5 flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={bundleMode}
+                    onChange={(e) => setBundleMode(e.target.checked)}
+                    className="accent-brand-600"
+                  />
+                  시험명 묶음(풀세트)으로 부여
+                </label>
+              )}
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">
@@ -445,6 +541,7 @@ export function AdminStudentDetail() {
                   <th className="px-4 py-3 text-left font-semibold">점수</th>
                   <th className="px-4 py-3 text-left font-semibold">정답률</th>
                   <th className="px-4 py-3 text-left font-semibold">날짜</th>
+                  <th className="px-4 py-3 text-left font-semibold w-12"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -476,6 +573,16 @@ export function AdminStudentDetail() {
                       </td>
                       <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">
                         {fmtDate(a.createdAt)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteAttempt(a)}
+                          className="text-xs text-slate-400 hover:text-red-600"
+                          aria-label="삭제"
+                        >
+                          삭제
+                        </button>
                       </td>
                     </tr>
                   )

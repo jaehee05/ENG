@@ -296,6 +296,10 @@ export async function getAttempt(id: string): Promise<Attempt | null> {
   return { id: snap.id, ...(snap.data() as Omit<Attempt, 'id'>) }
 }
 
+export async function deleteAttempt(id: string): Promise<void> {
+  await deleteDoc(doc(db, 'attempts', id))
+}
+
 export async function listAttemptsForUser(uid: string): Promise<Attempt[]> {
   const snap = await getDocs(
     query(

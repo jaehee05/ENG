@@ -27,6 +27,8 @@ export default {
           'system-ui',
           'sans-serif',
         ],
+        myeongjo: ['"Nanum Myeongjo"', 'serif'],
+        gothic: ['"Nanum Gothic"', 'sans-serif'],
       },
       boxShadow: {
         soft: '0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px -8px rgba(15, 23, 42, 0.08)',

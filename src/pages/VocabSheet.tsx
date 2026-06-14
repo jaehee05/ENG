@@ -173,7 +173,10 @@ export function VocabSheet() {
                             {w.ko}
                           </span>
                         ) : (
-                          <span className="flex-1 min-w-[120px] border-b border-slate-400 h-5" />
+                          <span
+                            className="flex-1 min-w-[120px] border-b border-slate-500"
+                            style={{ height: '1.4em', marginTop: '0.35em' }}
+                          />
                         )}
                       </div>
                       {showHints &&

@@ -1,6 +1,7 @@
 import {
   arrayUnion,
   collection,
+  deleteDoc,
   doc,
   getDocs,
   increment,
@@ -54,4 +55,26 @@ export async function listMyWordbookKeys(uid: string): Promise<Set<string>> {
     if (en) set.add(en.toLowerCase())
   }
   return set
+}
+
+export async function deleteWordbookEntry(uid: string, en: string): Promise<void> {
+  await deleteDoc(doc(db, 'users', uid, 'wordLookups', lookupDocId(en)))
+}
+
+export async function addWordbookEntry(input: {
+  uid: string
+  en: string
+  ko: string
+}): Promise<void> {
+  const ref = doc(db, 'users', input.uid, 'wordLookups', lookupDocId(input.en))
+  await setDoc(
+    ref,
+    {
+      en: input.en.trim(),
+      ko: input.ko.trim(),
+      count: increment(1),
+      lastSeenAt: serverTimestamp(),
+    },
+    { merge: true },
+  )
 }
