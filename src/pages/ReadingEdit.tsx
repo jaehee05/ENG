@@ -98,8 +98,15 @@ export function ReadingEdit() {
       if (q.choices.some((c) => !c.trim()))
         return setError(`${i + 1}번 문제의 선지를 모두 채우세요.`)
     }
-    if (!passage.trim() && questions.some((q) => !q.body.trim() && q.type === 'standard')) {
-      return setError('일반 유형 문제가 있으면 지문을 입력하거나 문제별 본문을 채워주세요.')
+    if (
+      !passage.trim() &&
+      questions.some(
+        (q) => !q.body.trim() && !q.image && q.type === 'standard',
+      )
+    ) {
+      return setError(
+        '일반 유형 문제가 있으면 지문/문제 본문/도표 중 하나는 채워야 합니다.',
+      )
     }
 
     setSubmitting(true)

@@ -27,8 +27,9 @@ export function QuestionView({
   selected,
   onSelect,
 }: Props) {
-  const body = question.body?.trim() ? question.body : fallbackPassage
-  const showBody = body && body.trim().length > 0
+  const explicitBody = question.body?.trim() ? question.body : null
+  const body = explicitBody ?? (question.image ? null : fallbackPassage)
+  const showBody = !!body && body.trim().length > 0
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5 space-y-4">

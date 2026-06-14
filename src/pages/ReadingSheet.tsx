@@ -30,7 +30,9 @@ function GlossaryColumn({ items, label }: { items: { en: string; ko: string }[];
 }
 
 function bodyFor(q: ReadingQuestion, fallbackPassage: string): string {
-  return q.body?.trim() ? q.body : fallbackPassage
+  if (q.body?.trim()) return q.body
+  if (q.image) return ''
+  return fallbackPassage
 }
 
 export function ReadingSheet() {
