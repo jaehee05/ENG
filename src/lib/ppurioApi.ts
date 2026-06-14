@@ -1,5 +1,7 @@
-const DEFAULT_BASE = 'https://asia-northeast3-engh-c5082.cloudfunctions.net'
-const BASE = (import.meta.env.VITE_FUNCTIONS_BASE ?? DEFAULT_BASE).replace(/\/$/, '')
+// Cloud Run 2세대 함수의 직접 URL. VITE_PPURIO_ADMIN_URL이 지정되면 그것을 우선.
+const DEFAULT_URL = 'https://ppurioadmin-cfq2cexd2a-du.a.run.app'
+const ENDPOINT_URL =
+  import.meta.env.VITE_PPURIO_ADMIN_URL ?? DEFAULT_URL
 const LS_SECRET = 'eng_admin_secret'
 
 export interface PpurioSettingsView {
@@ -43,7 +45,7 @@ export function setAdminSecret(s: string): void {
 async function call<T>(action: string, payload?: unknown): Promise<T> {
   const secret = getAdminSecret()
   if (!secret) throw new Error('관리자 비밀키가 설정되지 않았습니다.')
-  const res = await fetch(`${BASE}/ppurioAdmin`, {
+  const res = await fetch(ENDPOINT_URL, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',

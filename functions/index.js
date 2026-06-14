@@ -21,7 +21,7 @@ function verifySecret(req) {
   return fromHeader === expected || fromBody === expected;
 }
 
-exports.ppurioAdmin = onRequest(async (req, res) => {
+exports.ppurioAdmin = onRequest({ invoker: "public" }, async (req, res) => {
   setCors(res);
   if (req.method === "OPTIONS") return res.status(204).send("");
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
