@@ -23,6 +23,9 @@ export function CorpusDetail() {
   const [generating, setGenerating] = useState(false)
   const [appending, setAppending] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  const [editingIdx, setEditingIdx] = useState<number | null>(null)
+  const [editEn, setEditEn] = useState('')
+  const [editKo, setEditKo] = useState('')
 
   useEffect(() => {
     if (!id) return
@@ -116,6 +119,63 @@ export function CorpusDetail() {
       setNotice(err instanceof Error ? err.message : '추가 실패')
     } finally {
       setAppending(false)
+    }
+  }
+
+  function startEdit(i: number) {
+    if (!series) return
+    const w = series.words?.[i]
+    if (!w) return
+    setEditingIdx(i)
+    setEditEn(w.en)
+    setEditKo(w.ko)
+  }
+
+  function cancelEdit() {
+    setEditingIdx(null)
+    setEditEn('')
+    setEditKo('')
+  }
+
+  async function saveEdit(i: number) {
+    if (!series) return
+    const newEn = editEn.trim()
+    const newKo = editKo.trim()
+    if (!newEn || !newKo) {
+      setNotice('영단어와 한국어 뜻을 모두 입력하세요.')
+      return
+    }
+    const updated = [...(series.words ?? [])]
+    updated[i] = { ...updated[i], en: newEn, ko: newKo }
+    try {
+      await updateVocabSeries(series.id, { words: updated })
+      const refreshed = await getVocabSeries(series.id)
+      if (refreshed) setSeries(refreshed)
+      cancelEdit()
+      setNotice('수정되었습니다.')
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : '저장 실패')
+    }
+  }
+
+  async function deleteWord(i: number) {
+    if (!series) return
+    const w = series.words?.[i]
+    if (!w) return
+    if (!window.confirm(`"${w.en}" 단어를 교재에서 삭제하시겠습니까?`)) return
+    const updated = [...(series.words ?? [])]
+    updated.splice(i, 1)
+    const newUsed = i < used ? Math.max(0, used - 1) : used
+    try {
+      await updateVocabSeries(series.id, {
+        words: updated,
+        usedCount: newUsed,
+      })
+      const refreshed = await getVocabSeries(series.id)
+      if (refreshed) setSeries(refreshed)
+      setNotice('삭제되었습니다.')
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : '삭제 실패')
     }
   }
 
@@ -251,24 +311,86 @@ export function CorpusDetail() {
           <h2 className="text-sm font-semibold text-slate-700 mb-2">
             전체 단어 ({series.words.length}개)
           </h2>
-          <div className="max-h-96 overflow-y-auto border border-slate-100 rounded">
+          <div className="max-h-[32rem] overflow-y-auto border border-slate-100 rounded">
             <ul className="divide-y divide-slate-100">
               {series.words.map((w, i) => {
                 const inUse = i < used
+                const editing = editingIdx === i
                 return (
                   <li
                     key={i}
-                    className={`px-3 py-2 flex items-baseline gap-3 text-sm ${
-                      inUse ? 'text-slate-400' : 'text-slate-800'
+                    className={`px-3 py-2 text-sm ${
+                      inUse ? 'text-slate-500' : 'text-slate-800'
                     }`}
                   >
-                    <span className="text-xs text-slate-400 w-12">
-                      {String(i + 1).padStart(4, '0')}
-                    </span>
-                    <span className="font-medium">{w.en}</span>
-                    <span className="text-slate-500">{w.ko}</span>
-                    {inUse && (
-                      <span className="ml-auto text-[10px] text-slate-400">사용됨</span>
+                    {editing ? (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs text-slate-400 w-12">
+                          {String(i + 1).padStart(4, '0')}
+                        </span>
+                        <input
+                          type="text"
+                          value={editEn}
+                          onChange={(e) => setEditEn(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveEdit(i)
+                            if (e.key === 'Escape') cancelEdit()
+                          }}
+                          autoFocus
+                          className="rounded border border-slate-300 px-2 py-1 text-sm w-40 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                        />
+                        <input
+                          type="text"
+                          value={editKo}
+                          onChange={(e) => setEditKo(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveEdit(i)
+                            if (e.key === 'Escape') cancelEdit()
+                          }}
+                          className="rounded border border-slate-300 px-2 py-1 text-sm flex-1 min-w-[160px] focus:outline-none focus:ring-2 focus:ring-brand-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => saveEdit(i)}
+                          className="text-xs text-white bg-brand-600 hover:bg-brand-700 rounded px-2 py-1"
+                        >
+                          저장
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelEdit}
+                          className="text-xs text-slate-500 hover:text-slate-900 px-2 py-1"
+                        >
+                          취소
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-baseline gap-3">
+                        <span className="text-xs text-slate-400 w-12">
+                          {String(i + 1).padStart(4, '0')}
+                        </span>
+                        <span className="font-medium">{w.en}</span>
+                        <span className="text-slate-500">{w.ko}</span>
+                        {inUse && (
+                          <span className="text-[10px] text-slate-400">사용됨</span>
+                        )}
+                        <div className="ml-auto flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => startEdit(i)}
+                            className="text-xs text-slate-500 hover:text-slate-900"
+                          >
+                            수정
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteWord(i)}
+                            className="text-xs text-slate-400 hover:text-red-600"
+                          >
+                            삭제
+                          </button>
+                        </div>
+                      </div>
                     )}
                   </li>
                 )
