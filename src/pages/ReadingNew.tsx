@@ -204,9 +204,16 @@ export function ReadingNew() {
       }
       if (result.title && !title.trim()) setTitle(result.title)
       if (result.passage) setPassage(result.passage)
+      const chartImages = images.length > 0 ? images.map((i) => i.previewUrl) : []
+      let chartCursor = 0
       const drafts: DraftQuestion[] = result.questions.map((q) => {
         const choices = q.choices.slice(0, 5)
         while (choices.length < 5) choices.push('')
+        let image: string | undefined
+        if (q.hasChart && chartImages.length > 0) {
+          image = chartImages[Math.min(chartCursor, chartImages.length - 1)]
+          chartCursor++
+        }
         return {
           type: toReadingType(q.type),
           q: q.q,
@@ -216,6 +223,7 @@ export function ReadingNew() {
           choices,
           answer: Math.min(4, Math.max(0, q.answer ?? 0)),
           points: q.points && q.points >= 1 && q.points <= 5 ? q.points : undefined,
+          image,
         }
       })
       setQuestions(drafts)

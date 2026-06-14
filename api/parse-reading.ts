@@ -47,7 +47,8 @@ submit_reading을 호출하지 않고 텍스트만 출력해도 되는 경우는
 - choices: 정확히 5개. ①~⑤ 마커는 빼고 텍스트만.
   - summary 유형: "(A) ...... (B) ......" 형태로 한 항목에 함께
   - order 유형: "(A) - (C) - (B)" 같은 순서 표기 그대로
-- answer: 원문에 정답 표시("정답: ③", "Answer: 3" 등)가 있으면 그 인덱스(0~4). 없으면 0.`
+- answer: 원문에 정답 표시("정답: ③", "Answer: 3" 등)가 있으면 그 인덱스(0~4). 없으면 0.
+- hasChart: 해당 문항에 **표·그래프·다이어그램·도표·그림**(텍스트로 옮기기 어려운 시각 자료)이 포함돼 있으면 true, 아니면 false. 단순 텍스트 박스나 ①~⑤ 마커는 도표가 아님.`
 
 const ALLOWED_TYPES = [
   'standard',
@@ -71,6 +72,7 @@ interface ParsedQuestion {
   choices: string[]
   answer: number
   points?: number
+  hasChart?: boolean
 }
 
 interface ParseResult {
@@ -103,6 +105,7 @@ function normalizeQuestion(raw: unknown): ParsedQuestion | null {
     choices: choices.slice(0, 5),
     answer,
     points,
+    hasChart: r.hasChart === true,
   }
 }
 
@@ -207,6 +210,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     },
                     answer: { type: 'integer', minimum: 0, maximum: 4 },
                     points: { type: 'integer', minimum: 1, maximum: 5 },
+                    hasChart: { type: 'boolean' },
                   },
                 },
               },

@@ -142,6 +142,7 @@ export interface ParsedReadingQuestion {
   choices: string[]
   answer: number
   points?: number
+  hasChart?: boolean
 }
 
 export interface ParsedReadingResult {
