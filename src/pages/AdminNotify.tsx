@@ -38,16 +38,19 @@ const LS_TEMPLATE_CODE = 'eng_notify_template_code'
 const LS_MSG_TYPE = 'eng_notify_msg_type'
 const LS_NOTICE = 'eng_notify_notice'
 
-type MsgType = '일반형' | '강조표기형'
+type MsgType = '기본형' | '이미지형' | '강조표기형' | '아이템리스트형'
+
+const MSG_TYPES: MsgType[] = ['기본형', '이미지형', '강조표기형', '아이템리스트형']
 
 export function AdminNotify() {
   const [bundles, setBundles] = useState<StudentBundle[]>([])
   const [templateCode, setTemplateCode] = useState(
     () => localStorage.getItem(LS_TEMPLATE_CODE) ?? '',
   )
-  const [msgType, setMsgType] = useState<MsgType>(
-    () => (localStorage.getItem(LS_MSG_TYPE) as MsgType) || '강조표기형',
-  )
+  const [msgType, setMsgType] = useState<MsgType>(() => {
+    const v = localStorage.getItem(LS_MSG_TYPE) as MsgType | null
+    return v && MSG_TYPES.includes(v) ? v : '강조표기형'
+  })
   const [notice, setNotice] = useState(
     () => localStorage.getItem(LS_NOTICE) ?? '',
   )
@@ -173,8 +176,11 @@ export function AdminNotify() {
               onChange={(e) => setMsgType(e.target.value as MsgType)}
               className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             >
-              <option value="일반형">일반형</option>
-              <option value="강조표기형">강조표기형</option>
+              {MSG_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
             </select>
           </div>
           <div>
