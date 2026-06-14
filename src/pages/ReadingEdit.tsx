@@ -95,8 +95,6 @@ export function ReadingEdit() {
     if (questions.length === 0) return setError('문제를 1개 이상 입력하세요.')
     for (const [i, q] of questions.entries()) {
       if (!q.q.trim()) return setError(`${i + 1}번 문제의 발문을 입력하세요.`)
-      if (q.choices.some((c) => !c.trim()))
-        return setError(`${i + 1}번 문제의 선지를 모두 채우세요.`)
     }
     if (
       !passage.trim() &&
