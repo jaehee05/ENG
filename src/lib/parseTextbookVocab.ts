@@ -30,14 +30,18 @@ export function parseSenseBody(text: string): {
     rest = rest.slice(0, eqMatch.index).trim()
   }
 
-  // ' [definition]'은 rest가 ']'로 끝날 때만 떼어냄 (가장 오른쪽 [ ~ ]).
+  // ' [definition]'은 rest가 ']'로 끝나고 그 [...] 내용이 영어(한글 없음)일
+  // 때만 떼어냄. ko 안의 [출간]·[매우] 같은 한글 대괄호는 그대로 ko에 둠.
   let definitionEn: string | undefined
   if (rest.endsWith(']')) {
     const lastClose = rest.length - 1
     const lastOpen = rest.lastIndexOf('[', lastClose - 1)
     if (lastOpen >= 0) {
-      definitionEn = rest.slice(lastOpen + 1, lastClose).trim() || undefined
-      rest = rest.slice(0, lastOpen).trim()
+      const candidate = rest.slice(lastOpen + 1, lastClose).trim()
+      if (candidate && !HANGUL_RE.test(candidate)) {
+        definitionEn = candidate
+        rest = rest.slice(0, lastOpen).trim()
+      }
     }
   }
 

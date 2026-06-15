@@ -307,6 +307,18 @@ export async function deleteAttempt(id: string): Promise<void> {
   await deleteDoc(doc(db, 'attempts', id))
 }
 
+export async function updateVocabResults(
+  id: string,
+  vocabResults: VocabResult[],
+): Promise<void> {
+  const correct = vocabResults.filter((r) => r.correct).length
+  await updateDoc(doc(db, 'attempts', id), {
+    vocabResults,
+    correct,
+    total: vocabResults.length,
+  })
+}
+
 export async function listAttemptsForUser(uid: string): Promise<Attempt[]> {
   const snap = await getDocs(
     query(
