@@ -1,8 +1,8 @@
 import type { VocabSense, WordEntry } from './types'
 
 const HEAD_RE = /^(\d{2,5})\s+([^\[]+?)\s+\[([^\]]+)\]\s*$/
-const SENSE_RE =
-  /^(n\.|v\.|adj\.|adv\.|prep\.|conj\.|int\.)\s*([❶❷❸❹❺❻❼❽❾❿])\s*(.+?)(?:\s*\[(.+?)\])?(?:\s*=\s*(.+?))?\s*$/
+const SENSE_HEAD_RE =
+  /^(n\.|v\.|adj\.|adv\.|prep\.|conj\.|int\.)\s*([❶❷❸❹❺❻❼❽❾❿])\s*(.+)$/
 const DASH_RE = /^[-–—]\s+(.+)$/
 const HANGUL_RE = /[ㄱ-힝]/
 
@@ -10,6 +10,38 @@ function splitSynonyms(s: string | undefined): string[] | undefined {
   if (!s) return undefined
   const list = s.split(/[,，]\s*/).map((x) => x.trim()).filter(Boolean)
   return list.length > 0 ? list : undefined
+}
+
+// 한 sense 줄의 본문(품사·마커 뒷부분)에서 ko / 영영 정의 / 유의어 분리.
+// 우측 끝부터 ` = synonyms` → ` [definition]` 순으로 떼어내야
+// ko에 [출간] 같은 내부 대괄호가 있어도 안전하게 분리됨.
+function parseSenseBody(text: string): {
+  ko: string
+  definitionEn?: string
+  synonyms?: string[]
+} {
+  let rest = text.trim()
+
+  // ' = synonyms' (오른쪽 끝)
+  let synonyms: string[] | undefined
+  const eqMatch = rest.match(/\s=\s(.+)$/)
+  if (eqMatch && eqMatch.index !== undefined) {
+    synonyms = splitSynonyms(eqMatch[1])
+    rest = rest.slice(0, eqMatch.index).trim()
+  }
+
+  // ' [definition]'은 rest가 ']'로 끝날 때만 떼어냄 (가장 오른쪽 [ ~ ]).
+  let definitionEn: string | undefined
+  if (rest.endsWith(']')) {
+    const lastClose = rest.length - 1
+    const lastOpen = rest.lastIndexOf('[', lastClose - 1)
+    if (lastOpen >= 0) {
+      definitionEn = rest.slice(lastOpen + 1, lastClose).trim() || undefined
+      rest = rest.slice(0, lastOpen).trim()
+    }
+  }
+
+  return { ko: rest, definitionEn, synonyms }
 }
 
 export function looksLikeTextbookVocab(text: string): boolean {
@@ -45,14 +77,15 @@ export function parseTextbookVocab(text: string): WordEntry[] {
       curSense = null
       continue
     }
-    const sense = SENSE_RE.exec(line)
+    const sense = SENSE_HEAD_RE.exec(line)
     if (sense && cur) {
       pushPendingEn()
+      const parsed = parseSenseBody(sense[3])
       curSense = {
         pos: sense[1],
-        ko: sense[3].trim(),
-        definitionEn: sense[4]?.trim() || undefined,
-        synonyms: splitSynonyms(sense[5]),
+        ko: parsed.ko,
+        definitionEn: parsed.definitionEn,
+        synonyms: parsed.synonyms,
         examples: [],
       }
       cur.senses = cur.senses ?? []
