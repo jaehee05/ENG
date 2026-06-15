@@ -98,6 +98,11 @@ export interface ReadingQuestion {
   points?: number
   /** Inline image/chart (full data URL, e.g. "data:image/jpeg;base64,..."). */
   image?: string
+  /** For 'order' type: paragraphs labelled (A), (B), (C), optionally (D). */
+  partA?: string
+  partB?: string
+  partC?: string
+  partD?: string
 }
 
 export const READING_TYPE_LABEL: Record<ReadingQuestionType, string> = {

@@ -10,6 +10,10 @@ export interface DraftQuestion {
   answer: number
   points?: number
   image?: string
+  partA: string
+  partB: string
+  partC: string
+  partD: string
 }
 
 export function emptyDraftQuestion(type: ReadingQuestionType = 'standard'): DraftQuestion {
@@ -21,5 +25,9 @@ export function emptyDraftQuestion(type: ReadingQuestionType = 'standard'): Draf
     summaryBox: '',
     choices: ['', '', '', '', ''],
     answer: 0,
+    partA: '',
+    partB: '',
+    partC: '',
+    partD: '',
   }
 }

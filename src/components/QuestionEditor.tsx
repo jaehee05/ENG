@@ -31,6 +31,7 @@ interface Props {
 export function QuestionEditor({ index, question, canRemove, onChange, onRemove }: Props) {
   const needIntro = question.type === 'order' || question.type === 'insert'
   const needSummary = question.type === 'summary'
+  const isOrder = question.type === 'order'
   const imageFileRef = useRef<HTMLInputElement>(null)
 
   function patch(p: Partial<DraftQuestion>) {
@@ -127,21 +128,49 @@ export function QuestionEditor({ index, question, canRemove, onChange, onRemove 
         </div>
       )}
 
-      <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">
-          본문{' '}
-          <span className="text-slate-400 font-normal">
-            (비워두면 지문 본문을 사용)
-          </span>
-        </label>
-        <textarea
-          value={question.body}
-          onChange={(e) => patch({ body: e.target.value })}
-          onKeyDown={(e) => handleUnderlineHotkey(e, (next) => patch({ body: next }))}
-          rows={6}
-          className={inputCls}
-        />
-      </div>
+      {isOrder ? (
+        <div className="space-y-2">
+          {(['A', 'B', 'C', 'D'] as const).map((tag) => {
+            const key = (`part${tag}` as const) as 'partA' | 'partB' | 'partC' | 'partD'
+            const optional = tag === 'D'
+            return (
+              <div key={tag}>
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  ({tag}) 단락{' '}
+                  {optional && (
+                    <span className="text-slate-400 font-normal">(선택)</span>
+                  )}
+                </label>
+                <textarea
+                  value={question[key]}
+                  onChange={(e) => patch({ [key]: e.target.value })}
+                  onKeyDown={(e) =>
+                    handleUnderlineHotkey(e, (next) => patch({ [key]: next }))
+                  }
+                  rows={4}
+                  className={inputCls}
+                />
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1">
+            본문{' '}
+            <span className="text-slate-400 font-normal">
+              (비워두면 지문 본문을 사용)
+            </span>
+          </label>
+          <textarea
+            value={question.body}
+            onChange={(e) => patch({ body: e.target.value })}
+            onKeyDown={(e) => handleUnderlineHotkey(e, (next) => patch({ body: next }))}
+            rows={6}
+            className={inputCls}
+          />
+        </div>
+      )}
 
       {needSummary && (
         <div>

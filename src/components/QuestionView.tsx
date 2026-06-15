@@ -28,8 +28,24 @@ export function QuestionView({
   onSelect,
 }: Props) {
   const explicitBody = question.body?.trim() ? question.body : null
-  const body = explicitBody ?? (question.image ? null : fallbackPassage)
+  const isOrder = question.type === 'order'
+  const hasParts =
+    isOrder &&
+    (!!question.partA?.trim() ||
+      !!question.partB?.trim() ||
+      !!question.partC?.trim())
+  const body = hasParts
+    ? null
+    : explicitBody ?? (question.image ? null : fallbackPassage)
   const showBody = !!body && body.trim().length > 0
+  const orderParts: { tag: string; text?: string }[] = isOrder
+    ? [
+        { tag: 'A', text: question.partA },
+        { tag: 'B', text: question.partB },
+        { tag: 'C', text: question.partC },
+        { tag: 'D', text: question.partD },
+      ].filter((p) => !!p.text?.trim())
+    : []
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5 space-y-4">
@@ -70,6 +86,24 @@ export function QuestionView({
             viewedWords={viewedWords}
             onWordLookup={onWordLookup}
           />
+        </div>
+      )}
+
+      {orderParts.length > 0 && (
+        <div className="space-y-3">
+          {orderParts.map((p) => (
+            <div key={p.tag} className="flex gap-3">
+              <span className="shrink-0 text-sm font-semibold text-slate-700">
+                ({p.tag})
+              </span>
+              <GlossedPassage
+                passage={p.text!}
+                glossary={passageGlossary}
+                viewedWords={viewedWords}
+                onWordLookup={onWordLookup}
+              />
+            </div>
+          ))}
         </div>
       )}
 

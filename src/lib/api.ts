@@ -143,6 +143,10 @@ export interface ParsedReadingQuestion {
   answer: number
   points?: number
   hasChart?: boolean
+  partA?: string
+  partB?: string
+  partC?: string
+  partD?: string
 }
 
 export interface ParsedReadingResult {

@@ -107,7 +107,17 @@ export function ReadingSheet() {
           </header>
 
           {r.questions.map((q, qi) => {
-            const body = bodyFor(q, r.passage)
+            const isOrder = q.type === 'order'
+            const orderParts = isOrder
+              ? [
+                  { tag: 'A', text: q.partA },
+                  { tag: 'B', text: q.partB },
+                  { tag: 'C', text: q.partC },
+                  { tag: 'D', text: q.partD },
+                ].filter((p) => !!p.text?.trim())
+              : []
+            const hasParts = orderParts.length > 0
+            const body = hasParts ? '' : bodyFor(q, r.passage)
             return (
               <section key={qi} className={qi > 0 ? 'mt-10 print:break-before-page' : ''}>
                 <p className="text-[12pt] font-bold mb-3 font-gothic leading-snug">
@@ -146,6 +156,22 @@ export function ReadingSheet() {
                   <div className="grid grid-cols-3 gap-6">
                     <div className="col-span-2 text-[11.5pt] leading-[1.85] whitespace-pre-wrap text-justify font-myeongjo text-slate-900">
                       {renderWithUnderlines(body)}
+                    </div>
+                    <GlossaryColumn items={r.glossary} label="지문 단어" />
+                  </div>
+                )}
+
+                {hasParts && (
+                  <div className="grid grid-cols-3 gap-6 space-y-0">
+                    <div className="col-span-2 space-y-3 font-myeongjo text-[11.5pt] leading-[1.85] text-slate-900">
+                      {orderParts.map((p) => (
+                        <div key={p.tag} className="flex gap-2">
+                          <span className="shrink-0 font-semibold">({p.tag})</span>
+                          <span className="whitespace-pre-wrap text-justify">
+                            {renderWithUnderlines(p.text ?? '')}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                     <GlossaryColumn items={r.glossary} label="지문 단어" />
                   </div>

@@ -63,6 +63,13 @@ export async function deleteVocabSet(id: string): Promise<void> {
   await deleteDoc(doc(db, 'vocabSets', id))
 }
 
+export async function updateVocabSetWords(
+  id: string,
+  words: WordEntry[],
+): Promise<void> {
+  await updateDoc(doc(db, 'vocabSets', id), { words })
+}
+
 export async function listVocabSeries(): Promise<VocabSeries[]> {
   const snap = await getDocs(
     query(collection(db, 'vocabSeries'), orderBy('createdAt', 'desc')),

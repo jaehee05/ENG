@@ -54,6 +54,10 @@ function trimDraft(q: DraftQuestion) {
     summaryBox?: string
     points?: number
     image?: string
+    partA?: string
+    partB?: string
+    partC?: string
+    partD?: string
   } = {
     type: q.type,
     q: q.q.trim(),
@@ -65,6 +69,10 @@ function trimDraft(q: DraftQuestion) {
   if (q.summaryBox.trim()) out.summaryBox = q.summaryBox.trim()
   if (q.points && q.points !== 2) out.points = q.points
   if (q.image) out.image = q.image
+  if (q.partA.trim()) out.partA = q.partA.trim()
+  if (q.partB.trim()) out.partB = q.partB.trim()
+  if (q.partC.trim()) out.partC = q.partC.trim()
+  if (q.partD.trim()) out.partD = q.partD.trim()
   return out
 }
 
@@ -224,6 +232,10 @@ export function ReadingNew() {
           answer: Math.min(4, Math.max(0, q.answer ?? 0)),
           points: q.points && q.points >= 1 && q.points <= 5 ? q.points : undefined,
           image,
+          partA: q.partA ?? '',
+          partB: q.partB ?? '',
+          partC: q.partC ?? '',
+          partD: q.partD ?? '',
         }
       })
       setQuestions(drafts)
