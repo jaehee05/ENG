@@ -6,6 +6,7 @@ import {
   createAssignment,
   deleteAssignment,
   deleteAttempt,
+  isAssignmentDone,
   listAssignmentsForStudent,
   listAttemptsForUser,
   listReadings,
@@ -64,6 +65,7 @@ export function AdminStudentDetail() {
   const [assignRefId, setAssignRefId] = useState('')
   const [assignDue, setAssignDue] = useState('')
   const [assignNote, setAssignNote] = useState('')
+  const [assignMinCorrect, setAssignMinCorrect] = useState('')
   const [assigning, setAssigning] = useState(false)
   const [assignError, setAssignError] = useState<string | null>(null)
 
@@ -150,18 +152,6 @@ export function AdminStudentDetail() {
     }
   }, [attempts, vocabSets, readings])
 
-  const completedRefIds = useMemo(() => {
-    const map: Record<AssignmentType, Set<string>> = {
-      vocab: new Set(
-        attempts.filter((a) => a.type === 'vocab' && a.refId).map((a) => a.refId),
-      ),
-      reading: new Set(
-        attempts.filter((a) => a.type === 'reading' && a.refId).map((a) => a.refId),
-      ),
-    }
-    return map
-  }, [attempts])
-
   const [bundleMode, setBundleMode] = useState(false)
   const [bundleCategory, setBundleCategory] = useState('')
 
@@ -237,6 +227,11 @@ export function AdminStudentDetail() {
       setAssignError('선택한 항목을 찾을 수 없습니다.')
       return
     }
+    let minCorrect: number | undefined
+    if (assignType === 'vocab' && assignMinCorrect.trim()) {
+      const n = Number.parseInt(assignMinCorrect, 10)
+      if (Number.isFinite(n) && n > 0) minCorrect = n
+    }
     setAssigning(true)
     try {
       await createAssignment({
@@ -248,11 +243,13 @@ export function AdminStudentDetail() {
         refId: assignRefId,
         refTitle: target.title,
         note: assignNote,
+        minCorrect,
         dueAt: dueDate,
       })
       setAssignRefId('')
       setAssignDue('')
       setAssignNote('')
+      setAssignMinCorrect('')
       await reloadAssignments()
     } catch (err) {
       setAssignError(err instanceof Error ? err.message : '과제 부여에 실패했습니다.')
@@ -448,6 +445,27 @@ export function AdminStudentDetail() {
                 className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
             </div>
+            {assignType === 'vocab' && !bundleMode && (
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  완료 기준{' '}
+                  <span className="text-slate-400 font-normal">
+                    (최소 정답 개수, 선택)
+                  </span>
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  value={assignMinCorrect}
+                  onChange={(e) => setAssignMinCorrect(e.target.value)}
+                  placeholder="예: 25"
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  비워두면 한 번이라도 응시하면 완료로 표시됩니다.
+                </p>
+              </div>
+            )}
           </div>
           {assignError && <p className="text-sm text-red-600">{assignError}</p>}
           <div className="flex justify-end">
@@ -468,7 +486,7 @@ export function AdminStudentDetail() {
         ) : (
           <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
             {assignments.map((a) => {
-              const done = completedRefIds[a.type].has(a.refId)
+              const done = isAssignmentDone(a, attempts)
               return (
                 <li key={a.id} className="px-4 py-3 flex items-center justify-between gap-3">
                   <div className="min-w-0">
@@ -490,6 +508,9 @@ export function AdminStudentDetail() {
                     <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500 mt-1">
                       {a.dueAt && <span>마감: {fmtDate(a.dueAt)}</span>}
                       <span>부여: {fmtDate(a.createdAt)}</span>
+                      {a.minCorrect && a.minCorrect > 0 && (
+                        <span className="text-slate-600">완료 기준: {a.minCorrect}개 이상 정답</span>
+                      )}
                       {a.note && <span className="text-slate-600">· {a.note}</span>}
                     </div>
                   </div>
@@ -547,6 +568,12 @@ export function AdminStudentDetail() {
               <tbody className="divide-y divide-slate-100">
                 {filteredAttempts.map((a) => {
                   const ratio = a.total > 0 ? Math.round((a.correct / a.total) * 100) : 0
+                  const resultPath =
+                    a.type === 'vocab'
+                      ? `/vocab/${a.refId}/result/${a.id}`
+                      : a.type === 'reading'
+                        ? `/reading/${a.refId}/result/${a.id}`
+                        : `/wordbook/result/${a.id}`
                   return (
                     <tr key={a.id}>
                       <td className="px-4 py-3 whitespace-nowrap">
@@ -554,7 +581,14 @@ export function AdminStudentDetail() {
                           {TYPE_LABEL[a.type]}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-slate-900">{a.refTitle}</td>
+                      <td className="px-4 py-3 text-slate-900">
+                        <Link
+                          to={resultPath}
+                          className="text-slate-900 hover:text-brand-700 hover:underline"
+                        >
+                          {a.refTitle}
+                        </Link>
+                      </td>
                       <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
                         {a.correct} / {a.total}
                       </td>

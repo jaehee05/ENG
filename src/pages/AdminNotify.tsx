@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { listAccounts } from '../lib/account'
 import {
+  isAssignmentDone,
   listAssignmentsForStudent,
   listAttemptsForUser,
 } from '../lib/firestore'
@@ -13,17 +14,17 @@ import {
   type PpurioSettingsView,
   type SendResultItem,
 } from '../lib/ppurioApi'
-import type { Assignment, UserAccount } from '../lib/types'
+import type { Assignment, Attempt, UserAccount } from '../lib/types'
 
 interface StudentBundle {
   account: UserAccount
   assignments: Assignment[]
-  completedKeys: Set<string>
+  attempts: Attempt[]
 }
 
 function statusLines(b: StudentBundle): string[] {
   return b.assignments.map((a) => {
-    const done = b.completedKeys.has(`${a.type}:${a.refId}`)
+    const done = isAssignmentDone(a, b.attempts)
     return `▶ ${a.refTitle} - ${done ? '완료' : '미완료'}`
   })
 }
@@ -176,13 +177,7 @@ export function AdminNotify() {
               listAssignmentsForStudent(account.id),
               listAttemptsForUser(account.id),
             ])
-            const completedKeys = new Set<string>()
-            for (const at of attempts) {
-              if (at.refId && (at.type === 'vocab' || at.type === 'reading')) {
-                completedKeys.add(`${at.type}:${at.refId}`)
-              }
-            }
-            return { account, assignments, completedKeys }
+            return { account, assignments, attempts }
           }),
         )
         if (!cancelled) setBundles(bundles)
@@ -200,7 +195,7 @@ export function AdminNotify() {
   const visible = useMemo(() => {
     if (!hideCompleted) return bundles
     return bundles.filter((b) =>
-      b.assignments.some((a) => !b.completedKeys.has(`${a.type}:${a.refId}`)),
+      b.assignments.some((a) => !isAssignmentDone(a, b.attempts)),
     )
   }, [bundles, hideCompleted])
 
@@ -555,7 +550,7 @@ export function AdminNotify() {
           const v1 = statusValue(b)
           const totalCnt = b.assignments.length
           const doneCnt = b.assignments.filter((a) =>
-            b.completedKeys.has(`${a.type}:${a.refId}`),
+            isAssignmentDone(a, b.attempts),
           ).length
           return (
             <li

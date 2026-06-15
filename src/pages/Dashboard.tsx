@@ -3,10 +3,11 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import {
   formatDate,
+  isAssignmentDone,
   listAssignmentsForStudent,
   listAttemptsForUser,
 } from '../lib/firestore'
-import type { Assignment, AssignmentType } from '../lib/types'
+import type { Assignment, Attempt } from '../lib/types'
 
 const iconCls = 'h-6 w-6'
 const iconProps = {
@@ -98,7 +99,7 @@ function isOverdue(a: Assignment): boolean {
 export function Dashboard() {
   const { profile } = useAuth()
   const [assignments, setAssignments] = useState<Assignment[]>([])
-  const [completedKeys, setCompletedKeys] = useState<Set<string>>(new Set())
+  const [attempts, setAttempts] = useState<Attempt[]>([])
 
   useEffect(() => {
     if (!profile) return
@@ -108,13 +109,7 @@ export function Dashboard() {
     ])
       .then(([asn, atts]) => {
         setAssignments(asn)
-        const keys = new Set<string>()
-        for (const a of atts) {
-          if (a.refId && (a.type === 'vocab' || a.type === 'reading')) {
-            keys.add(`${a.type}:${a.refId}`)
-          }
-        }
-        setCompletedKeys(keys)
+        setAttempts(atts)
       })
       .catch(() => {
         // dashboard 보조 정보. 실패해도 카드는 보여야 함
@@ -124,13 +119,13 @@ export function Dashboard() {
   const open = useMemo(
     () =>
       assignments
-        .filter((a) => !completedKeys.has(`${a.type as AssignmentType}:${a.refId}`))
+        .filter((a) => !isAssignmentDone(a, attempts))
         .sort((a, b) => {
           const ad = a.dueAt?.toMillis() ?? Infinity
           const bd = b.dueAt?.toMillis() ?? Infinity
           return ad - bd
         }),
-    [assignments, completedKeys],
+    [assignments, attempts],
   )
 
   const greeting = (() => {

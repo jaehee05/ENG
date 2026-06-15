@@ -320,6 +320,7 @@ export async function createAssignment(input: {
   refId: string
   refTitle: string
   note?: string
+  minCorrect?: number
   dueAt?: Date | null
 }): Promise<string> {
   const payload: Record<string, unknown> = {
@@ -334,8 +335,22 @@ export async function createAssignment(input: {
     dueAt: input.dueAt ? Timestamp.fromDate(input.dueAt) : null,
   }
   if (input.note && input.note.trim()) payload.note = input.note.trim()
+  if (input.minCorrect && input.minCorrect > 0) {
+    payload.minCorrect = Math.trunc(input.minCorrect)
+  }
   const ref = await addDoc(collection(db, 'assignments'), payload)
   return ref.id
+}
+
+export function isAssignmentDone(asn: Assignment, atts: Attempt[]): boolean {
+  const matched = atts.filter(
+    (a) => a.type === asn.type && a.refId === asn.refId && !a.practice,
+  )
+  if (matched.length === 0) return false
+  if (asn.minCorrect && asn.minCorrect > 0) {
+    return matched.some((a) => (a.correct ?? 0) >= (asn.minCorrect ?? 0))
+  }
+  return true
 }
 
 export async function listAssignmentsForStudent(uid: string): Promise<Assignment[]> {

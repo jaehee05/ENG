@@ -15,7 +15,7 @@ function splitSynonyms(s: string | undefined): string[] | undefined {
 // 한 sense 줄의 본문(품사·마커 뒷부분)에서 ko / 영영 정의 / 유의어 분리.
 // 우측 끝부터 ` = synonyms` → ` [definition]` 순으로 떼어내야
 // ko에 [출간] 같은 내부 대괄호가 있어도 안전하게 분리됨.
-function parseSenseBody(text: string): {
+export function parseSenseBody(text: string): {
   ko: string
   definitionEn?: string
   synonyms?: string[]

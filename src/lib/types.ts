@@ -182,6 +182,8 @@ export interface Assignment {
   refId: string
   refTitle: string
   note?: string
+  /** For vocab: minimum correct count required to consider done. */
+  minCorrect?: number
   dueAt: Timestamp | null
   createdAt: Timestamp | null
 }

@@ -7,8 +7,17 @@ import {
   getVocabSeries,
   updateVocabSeries,
 } from '../lib/firestore'
-import { parseWordList, type WordEntry, type VocabSeries } from '../lib/types'
-import { looksLikeTextbookVocab, parseTextbookVocab } from '../lib/parseTextbookVocab'
+import {
+  parseWordList,
+  type VocabSense,
+  type VocabSeries,
+  type WordEntry,
+} from '../lib/types'
+import {
+  looksLikeTextbookVocab,
+  parseSenseBody,
+  parseTextbookVocab,
+} from '../lib/parseTextbookVocab'
 
 export function CorpusDetail() {
   const { id } = useParams<{ id: string }>()
@@ -236,6 +245,54 @@ export function CorpusDetail() {
     }
   }
 
+  function reprocessWord(w: WordEntry): WordEntry {
+    if (!w.senses || w.senses.length === 0) return w
+    const newSenses: VocabSense[] = w.senses.map((s) => {
+      const parts: string[] = []
+      if (s.ko) parts.push(s.ko)
+      if (s.definitionEn) parts.push(`[${s.definitionEn}]`)
+      if (s.synonyms && s.synonyms.length > 0)
+        parts.push(`= ${s.synonyms.join(', ')}`)
+      const body = parts.join(' ')
+      const parsed = parseSenseBody(body)
+      const cs: VocabSense = { ko: parsed.ko || s.ko }
+      if (s.pos) cs.pos = s.pos
+      if (parsed.definitionEn) cs.definitionEn = parsed.definitionEn
+      if (parsed.synonyms && parsed.synonyms.length > 0)
+        cs.synonyms = parsed.synonyms
+      if (s.examples && s.examples.length > 0) cs.examples = s.examples
+      return cs
+    })
+    const first = newSenses[0]
+    const next: WordEntry = { ...w, ko: first.ko, senses: newSenses }
+    if (first.pos) next.pos = first.pos
+    if (first.definitionEn) next.definitionEn = first.definitionEn
+    else delete next.definitionEn
+    if (first.synonyms && first.synonyms.length > 0) next.synonyms = first.synonyms
+    else delete next.synonyms
+    return next
+  }
+
+  async function handleReprocess() {
+    if (!series) return
+    if (
+      !window.confirm(
+        `교재의 ${series.words?.length ?? 0}개 단어를 새 파서로 다시 정리합니다. 계속하시겠습니까?`,
+      )
+    )
+      return
+    setNotice(null)
+    try {
+      const updated = (series.words ?? []).map(reprocessWord)
+      await updateVocabSeries(series.id, { words: updated })
+      const refreshed = await getVocabSeries(series.id)
+      if (refreshed) setSeries(refreshed)
+      setNotice('단어 재분석 완료.')
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : '재분석 실패')
+    }
+  }
+
   async function handleDelete() {
     if (!series) return
     if (
@@ -268,13 +325,23 @@ export function CorpusDetail() {
             {series.lastDayNumber}까지 생성
           </p>
         </div>
-        <button
-          type="button"
-          onClick={handleDelete}
-          className="rounded-md border border-red-200 text-red-600 text-sm font-medium px-3 py-1.5 hover:bg-red-50"
-        >
-          교재 삭제
-        </button>
+        <div className="flex gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={handleReprocess}
+            className="rounded-md border border-slate-300 text-slate-700 text-sm font-medium px-3 py-1.5 hover:bg-slate-100"
+            title="옛 파서로 잘못 갈라진 단어를 새 파서로 재정리"
+          >
+            단어 재분석
+          </button>
+          <button
+            type="button"
+            onClick={handleDelete}
+            className="rounded-md border border-red-200 text-red-600 text-sm font-medium px-3 py-1.5 hover:bg-red-50"
+          >
+            교재 삭제
+          </button>
+        </div>
       </div>
 
       {notice && (
