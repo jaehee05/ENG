@@ -63,7 +63,6 @@ async function sendOne({ phone, name, changeWord, templateCode, messageType }) {
   if (cleanPhone.length < 9) throw new Error("phone 형식이 올바르지 않습니다.");
 
   const token = await getToken(settings);
-  const merged = { footer: settings.footer || "", ...changeWord };
 
   const params = {
     account: settings.ppurioAccount,
@@ -73,7 +72,7 @@ async function sendOne({ phone, name, changeWord, templateCode, messageType }) {
     duplicateFlag: "Y",
     isResend: "N",
     targetCount: 1,
-    targets: [{ to: cleanPhone, name: name || "", changeWord: merged }],
+    targets: [{ to: cleanPhone, name: name || "", changeWord: changeWord || {} }],
     refKey: randomRefKey("hw"),
   };
 
