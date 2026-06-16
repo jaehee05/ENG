@@ -1,7 +1,13 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { deleteReading, getReading, updateReadingContent } from '../lib/firestore'
-import type { Reading, ReadingQuestion } from '../lib/types'
+import {
+  deleteReading,
+  getReading,
+  updateReadingContent,
+  updateReadingGlossaries,
+} from '../lib/firestore'
+import { parseWordList, type Reading, type ReadingQuestion } from '../lib/types'
+import { extractGlossary, wordsToText } from '../lib/api'
 import { handleUnderlineHotkey } from '../lib/textareaHotkeys'
 import { QuestionEditor } from '../components/QuestionEditor'
 import { emptyDraftQuestion, type DraftQuestion } from '../components/draftQuestion'
@@ -68,8 +74,17 @@ export function ReadingEdit() {
   const [title, setTitle] = useState('')
   const [passage, setPassage] = useState('')
   const [questions, setQuestions] = useState<DraftQuestion[]>([emptyDraftQuestion()])
+  const [glossaryRaw, setGlossaryRaw] = useState('')
+  const [choicesGlossaryRaw, setChoicesGlossaryRaw] = useState('')
+  const [extracting, setExtracting] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [deleting, setDeleting] = useState(false)
+
+  const glossary = useMemo(() => parseWordList(glossaryRaw), [glossaryRaw])
+  const choicesGlossary = useMemo(
+    () => parseWordList(choicesGlossaryRaw),
+    [choicesGlossaryRaw],
+  )
 
   useEffect(() => {
     if (!id) return
@@ -87,6 +102,8 @@ export function ReadingEdit() {
         setQuestions(
           r.questions.length > 0 ? r.questions.map(fromQuestion) : [emptyDraftQuestion()],
         )
+        setGlossaryRaw(wordsToText(r.glossary ?? []))
+        setChoicesGlossaryRaw(wordsToText(r.choicesGlossary ?? []))
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : '불러오기에 실패했습니다.')
@@ -98,6 +115,30 @@ export function ReadingEdit() {
       cancelled = true
     }
   }, [id])
+
+  async function handleExtract() {
+    setError(null)
+    if (!passage.trim() && !questions.some((q) => q.body.trim())) {
+      setError('지문 또는 문제 본문이 비어 있습니다.')
+      return
+    }
+    setExtracting(true)
+    try {
+      const bodyParts = questions.map((q) => q.body.trim()).filter(Boolean)
+      const combined = [passage.trim(), ...bodyParts].filter(Boolean).join('\n\n')
+      const allChoices = questions.flatMap((q) => q.choices).filter((c) => c.trim())
+      const result = await extractGlossary({
+        passage: combined,
+        choices: allChoices,
+      })
+      setGlossaryRaw(wordsToText(result.glossary))
+      setChoicesGlossaryRaw(wordsToText(result.choicesGlossary))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'AI 추출에 실패했습니다.')
+    } finally {
+      setExtracting(false)
+    }
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -126,6 +167,7 @@ export function ReadingEdit() {
         passage: passage.trim(),
         questions: questions.map(trimDraft),
       })
+      await updateReadingGlossaries(original.id, glossary, choicesGlossary)
       navigate(`/reading/${original.id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : '저장에 실패했습니다.')
@@ -160,9 +202,6 @@ export function ReadingEdit() {
     <div className="space-y-6 max-w-3xl">
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">지문 수정</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          단어장 항목은 상세 페이지의 "단어장 수정"에서 관리합니다.
-        </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -219,6 +258,44 @@ export function ReadingEdit() {
               onRemove={() => setQuestions((prev) => prev.filter((_, idx) => idx !== i))}
             />
           ))}
+        </div>
+
+        <div className="rounded-md border border-slate-200 bg-slate-50 p-4 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-slate-700">단어 풀이</h3>
+            <button
+              type="button"
+              onClick={handleExtract}
+              disabled={extracting}
+              className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700 disabled:opacity-50"
+            >
+              {extracting ? '추출 중...' : 'AI로 단어 추출 (덮어쓰기)'}
+            </button>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">
+              지문 단어풀이 ({glossary.length}개)
+            </label>
+            <textarea
+              value={glossaryRaw}
+              onChange={(e) => setGlossaryRaw(e.target.value)}
+              rows={10}
+              placeholder="abandon : 버리다, 포기하다"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">
+              선지 단어풀이 ({choicesGlossary.length}개)
+            </label>
+            <textarea
+              value={choicesGlossaryRaw}
+              onChange={(e) => setChoicesGlossaryRaw(e.target.value)}
+              rows={6}
+              placeholder="paradigm : 패러다임, 인식 틀"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </div>
         </div>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
