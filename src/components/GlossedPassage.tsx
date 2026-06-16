@@ -193,8 +193,10 @@ export function GlossedPassage({
             if (!seg.underlined) return <span key={si}>{inner}</span>
             return (
               <span key={si}>
-                {seg.marker && <sup className="text-slate-600 mr-0.5">{seg.marker}</sup>}
-                <span className="underline decoration-slate-900 decoration-2 underline-offset-4">
+                {seg.marker && (
+                  <span className="text-slate-600 mr-0.5">{seg.marker}</span>
+                )}
+                <span className="underline decoration-slate-900 decoration-[1px] underline-offset-[3px]">
                   {inner}
                 </span>
               </span>

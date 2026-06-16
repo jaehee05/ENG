@@ -13,8 +13,8 @@ export function renderUnderlines(text: string): ReactNode {
     if (m[1]) {
       out.push(
         <Fragment key={key++}>
-          <sup className="text-slate-600 mr-0.5">{m[1]}</sup>
-          <span className="underline decoration-slate-900 decoration-2 underline-offset-[3px]">
+          <span className="text-slate-600 mr-0.5">{m[1]}</span>
+          <span className="underline decoration-slate-900 decoration-[1px] underline-offset-[3px]">
             {m[2]}
           </span>
         </Fragment>,
@@ -23,7 +23,7 @@ export function renderUnderlines(text: string): ReactNode {
       out.push(
         <span
           key={key++}
-          className="underline decoration-slate-900 decoration-2 underline-offset-[3px]"
+          className="underline decoration-slate-900 decoration-[1px] underline-offset-[3px]"
         >
           {m[3]}
         </span>,
