@@ -88,8 +88,13 @@ export function GlossedPassage({
       for (const m of text.matchAll(pattern)) {
         const start = m.index ?? 0
         if (start > last) tokens.push({ text: text.slice(last, start), ko: null })
-        tokens.push({ text: m[0], ko: lookup.get(m[0].toLowerCase()) ?? '' })
-        last = start + m[0].length
+        // 단어 뒤에 붙은 구두점·따옴표를 같은 토큰에 묶어 줄바꿈 시 분리되지 않게.
+        let matchEnd = start + m[0].length
+        const tail = text.slice(matchEnd).match(/^[.,;:!?'"’”\]\)]+/)
+        const tokenText = tail ? m[0] + tail[0] : m[0]
+        if (tail) matchEnd += tail[0].length
+        tokens.push({ text: tokenText, ko: lookup.get(m[0].toLowerCase()) ?? '' })
+        last = matchEnd
       }
       if (last < text.length) tokens.push({ text: text.slice(last), ko: null })
       if (tokens.length === 0) tokens.push({ text: '', ko: null })
@@ -168,7 +173,7 @@ export function GlossedPassage({
                     className={
                       viewed
                         ? 'bg-brand-100 rounded-sm cursor-pointer touch-manipulation transition-colors hover:bg-brand-200'
-                        : 'cursor-pointer touch-manipulation transition-colors hover:bg-brand-50 rounded-sm'
+                        : 'bg-slate-100 rounded-sm cursor-pointer touch-manipulation transition-colors hover:bg-brand-50'
                     }
                   >
                     {tok.text}

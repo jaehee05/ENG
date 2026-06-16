@@ -126,10 +126,8 @@ export function QuestionView({
         {question.choices.map((c, ci) => (
           <label
             key={ci}
-            className={`flex items-start gap-3 rounded border px-3 py-2 cursor-pointer transition ${
-              selected === ci
-                ? 'border-brand-500 bg-brand-50/40'
-                : 'border-slate-200 hover:bg-slate-50'
+            className={`flex items-start gap-3 rounded px-2 py-2 cursor-pointer transition ${
+              selected === ci ? 'bg-brand-50/40' : 'hover:bg-slate-50'
             }`}
           >
             <input
@@ -137,10 +135,19 @@ export function QuestionView({
               name={`q-${index}`}
               checked={selected === ci}
               onChange={() => onSelect(ci)}
-              className="mt-1.5 accent-brand-600"
+              className="sr-only"
             />
-            <span className="text-slate-800 w-5 mt-0.5 font-myeongjo">{CHOICE_MARKS[ci]}</span>
-            <span className="flex-1">
+            <span
+              className={`shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-full text-base font-myeongjo transition ${
+                selected === ci
+                  ? 'bg-slate-900 text-white'
+                  : 'text-slate-800 hover:bg-slate-200'
+              }`}
+              aria-hidden
+            >
+              {CHOICE_MARKS[ci]}
+            </span>
+            <span className="flex-1 pt-0.5">
               <GlossedPassage
                 passage={c}
                 glossary={choicesGlossary}
