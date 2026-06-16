@@ -131,22 +131,22 @@ export function ReadingImport() {
       for (const it of items) {
         const t = coerceType(it.type)
         const title = `${titlePrefix.trim() ? `${titlePrefix.trim()} ` : ''}${it.number}번`
+        const q: Record<string, unknown> = {
+          type: t,
+          q: it.q,
+          choices: it.choices,
+          answer: it.answer,
+        }
+        if (it.body?.trim()) q.body = it.body.trim()
+        if (it.intro?.trim()) q.intro = it.intro.trim()
+        if (it.summaryBox?.trim()) q.summaryBox = it.summaryBox.trim()
         await createReading({
           title,
           passage: '',
           glossary: [],
           choicesGlossary: [],
-          questions: [
-            {
-              type: t,
-              q: it.q,
-              body: it.body?.trim() ? it.body : undefined,
-              intro: it.intro?.trim() ? it.intro : undefined,
-              summaryBox: it.summaryBox?.trim() ? it.summaryBox : undefined,
-              choices: it.choices,
-              answer: it.answer,
-            },
-          ],
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          questions: [q as any],
           createdBy: profile.id,
           createdByName: profile.displayName,
         })
