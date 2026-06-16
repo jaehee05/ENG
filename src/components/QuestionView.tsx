@@ -47,25 +47,28 @@ export function QuestionView({
       ].filter((p) => !!p.text?.trim())
     : []
 
+  const bodyTextCls =
+    'text-base sm:text-lg leading-8 sm:leading-9 text-slate-900 break-words whitespace-pre-wrap text-justify font-myeongjo'
+
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5 space-y-4">
-      <p className="text-sm font-semibold text-slate-900 whitespace-pre-wrap">
+    <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-6 space-y-5">
+      <p className="text-base font-bold text-slate-900 whitespace-pre-wrap font-gothic">
         {index + 1}. {renderUnderlines(question.q)}
         {question.points && question.points >= 3 && (
-          <span className="ml-2 inline-block rounded bg-brand-100 text-brand-700 text-[10px] font-semibold px-1.5 py-0.5 align-middle">
-            {question.points}점
+          <span className="ml-2 text-sm font-normal text-slate-600">
+            [{question.points}점]
           </span>
         )}
       </p>
 
       {question.intro && question.intro.trim() && (
-        <div className="rounded-lg border border-slate-300 bg-slate-50 p-4">
+        <div className="border border-slate-700 px-4 sm:px-5 py-3 sm:py-4 bg-white">
           <GlossedPassage
             passage={question.intro}
             glossary={passageGlossary}
             viewedWords={viewedWords}
             onWordLookup={onWordLookup}
-            className="text-sm leading-7 text-slate-800 break-words whitespace-pre-wrap"
+            className={bodyTextCls}
           />
         </div>
       )}
@@ -74,26 +77,25 @@ export function QuestionView({
         <img
           src={question.image}
           alt="도표"
-          className="w-full max-h-[600px] object-contain rounded border border-slate-200"
+          className="w-full max-h-[600px] object-contain"
         />
       )}
 
       {showBody && (
-        <div className={question.intro ? '' : ''}>
-          <GlossedPassage
-            passage={body!}
-            glossary={passageGlossary}
-            viewedWords={viewedWords}
-            onWordLookup={onWordLookup}
-          />
-        </div>
+        <GlossedPassage
+          passage={body!}
+          glossary={passageGlossary}
+          viewedWords={viewedWords}
+          onWordLookup={onWordLookup}
+          className={bodyTextCls}
+        />
       )}
 
       {orderParts.length > 0 && (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {orderParts.map((p) => (
-            <div key={p.tag} className="flex gap-3">
-              <span className="shrink-0 text-sm font-semibold text-slate-700">
+            <div key={p.tag} className="flex gap-2">
+              <span className={`shrink-0 font-bold ${bodyTextCls.replace('text-justify', '')}`}>
                 ({p.tag})
               </span>
               <GlossedPassage
@@ -101,6 +103,7 @@ export function QuestionView({
                 glossary={passageGlossary}
                 viewedWords={viewedWords}
                 onWordLookup={onWordLookup}
+                className={bodyTextCls}
               />
             </div>
           ))}
@@ -108,18 +111,18 @@ export function QuestionView({
       )}
 
       {question.summaryBox && question.summaryBox.trim() && (
-        <div className="rounded-lg border border-slate-300 bg-slate-50 p-4">
+        <div className="border border-slate-700 px-4 sm:px-5 py-3 sm:py-4 bg-white">
           <GlossedPassage
             passage={question.summaryBox}
             glossary={passageGlossary}
             viewedWords={viewedWords}
             onWordLookup={onWordLookup}
-            className="text-sm leading-7 text-slate-800 break-words whitespace-pre-wrap"
+            className={bodyTextCls}
           />
         </div>
       )}
 
-      <div className="space-y-2">
+      <div className="space-y-2 pt-1">
         {question.choices.map((c, ci) => (
           <label
             key={ci}
@@ -134,16 +137,16 @@ export function QuestionView({
               name={`q-${index}`}
               checked={selected === ci}
               onChange={() => onSelect(ci)}
-              className="mt-1 accent-brand-600"
+              className="mt-1.5 accent-brand-600"
             />
-            <span className="text-sm text-slate-700 w-5 mt-0.5">{CHOICE_MARKS[ci]}</span>
-            <span className="text-sm flex-1">
+            <span className="text-slate-800 w-5 mt-0.5 font-myeongjo">{CHOICE_MARKS[ci]}</span>
+            <span className="flex-1">
               <GlossedPassage
                 passage={c}
                 glossary={choicesGlossary}
                 viewedWords={viewedWords}
                 onWordLookup={onWordLookup}
-                className="text-sm leading-6 text-slate-700 break-words whitespace-pre-wrap"
+                className="text-base leading-7 text-slate-800 break-words whitespace-pre-wrap font-myeongjo"
               />
             </span>
           </label>
