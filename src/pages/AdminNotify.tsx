@@ -78,6 +78,8 @@ export function AdminNotify() {
   const [error, setError] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [hideCompleted, setHideCompleted] = useState(false)
+  const [testPhone, setTestPhone] = useState('')
+  const [testName, setTestName] = useState('테스트')
 
   const [adminSecret, setAdminSecretState] = useState(() => getAdminSecret())
   const [ppurioAccount, setPpurioAccount] = useState('')
@@ -206,6 +208,52 @@ export function AdminNotify() {
       setTimeout(() => setCopiedId((cur) => (cur === id ? null : cur)), 1500)
     } catch {
       window.alert('클립보드 복사에 실패했습니다.')
+    }
+  }
+
+  async function handleTestSend() {
+    if (!adminSecret) {
+      setCredsNotice('관리자 비밀키를 먼저 입력하세요.')
+      return
+    }
+    if (!templateCode.trim()) {
+      setCredsNotice('템플릿 코드를 입력하세요.')
+      return
+    }
+    const phone = (testPhone || '').replace(/\D/g, '')
+    if (phone.length < 9) {
+      setCredsNotice('테스트 수신번호를 올바르게 입력하세요.')
+      return
+    }
+    setSending(true)
+    setSendResults(null)
+    try {
+      const sampleStatus = bundles[0]
+        ? statusValue(bundles[0])
+        : '▶ 샘플 단어 시험 DAY 1 - 미완료\n▶ 샘플 지문 문제풀이 - 완료'
+      const out = await sendBatchAlimtalk({
+        templateCode: templateCode.trim(),
+        messageType: MSG_TYPE_CODE[msgType],
+        recipients: [
+          {
+            label: '테스트',
+            phone,
+            name: '테스트',
+            changeWord: {
+              이름: testName.trim() || '테스트',
+              '1': sampleStatus,
+              '2': notice || '(안내사항 미입력)',
+            },
+          },
+        ],
+      })
+      setSendResults(out.results)
+      const ok = out.sent > 0
+      setCredsNotice(ok ? '테스트 발송 완료.' : '테스트 발송 실패. 결과 확인.')
+    } catch (e) {
+      setCredsNotice(e instanceof Error ? e.message : '테스트 발송 실패')
+    } finally {
+      setSending(false)
     }
   }
 
@@ -484,6 +532,48 @@ export function AdminNotify() {
             className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
         </div>
+        <div className="rounded-md border border-amber-200 bg-amber-50/40 p-3 space-y-2">
+          <p className="text-sm font-semibold text-slate-700">테스트 발송</p>
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-end">
+            <div>
+              <label className="block text-xs text-slate-600 mb-1">
+                테스트 수신번호
+              </label>
+              <input
+                type="tel"
+                value={testPhone}
+                onChange={(e) => setTestPhone(e.target.value)}
+                placeholder="010-1234-5678"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-600 mb-1">
+                테스트 이름
+              </label>
+              <input
+                type="text"
+                value={testName}
+                onChange={(e) => setTestName(e.target.value)}
+                placeholder="테스트"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleTestSend}
+              disabled={sending || !testPhone}
+              className="rounded-md bg-amber-600 text-white text-sm font-medium px-4 py-2 hover:bg-amber-700 disabled:opacity-50"
+            >
+              {sending ? '발송 중...' : '테스트 1건 발송'}
+            </button>
+          </div>
+          <p className="text-[11px] text-slate-500">
+            첫 학생의 과제 현황을 샘플로 사용. 안내사항은 위 [*2*] 칸 값. 실제 학생 전체
+            발송 전에 양식을 점검하세요.
+          </p>
+        </div>
+
         <div className="flex items-center justify-between flex-wrap gap-2">
           <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none">
             <input
