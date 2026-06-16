@@ -53,7 +53,7 @@ function chunkNums(nums: number[], size: number): number[][] {
   return chunks
 }
 
-const CHUNK_SIZE = 3
+const CHUNK_SIZE = 1
 
 export function ReadingImport() {
   const { profile } = useAuth()
