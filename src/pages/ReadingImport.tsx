@@ -1,7 +1,7 @@
-import { useState, type ChangeEvent, type FormEvent } from 'react'
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
-import { createReading } from '../lib/firestore'
+import { createReading, listReadings } from '../lib/firestore'
 import { fileToBase64, importReadingsFromPdf, type ImportedReadingItem } from '../lib/api'
 import {
   READING_TYPE_LABEL,
@@ -59,7 +59,10 @@ export function ReadingImport() {
   const { profile } = useAuth()
   const navigate = useNavigate()
   const [file, setFile] = useState<File | null>(null)
-  const [titlePrefix, setTitlePrefix] = useState('')
+  const [categoryMode, setCategoryMode] = useState<'pick' | 'new'>('pick')
+  const [selectedCategory, setSelectedCategory] = useState('')
+  const [newCategory, setNewCategory] = useState('')
+  const [knownCategories, setKnownCategories] = useState<string[]>([])
   const [range, setRange] = useState('')
   const [answerKey, setAnswerKey] = useState('')
   const [importing, setImporting] = useState(false)
@@ -68,6 +71,27 @@ export function ReadingImport() {
   const [savedCount, setSavedCount] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [items, setItems] = useState<ImportedReadingItem[] | null>(null)
+
+  useEffect(() => {
+    listReadings()
+      .then((all) => {
+        const TITLE_RE = /^(.+?)\s+(\d+)\s*(?:번|문제)?\s*$/
+        const set = new Set<string>()
+        for (const r of all) {
+          const m = TITLE_RE.exec(r.title.trim())
+          if (m) set.add(m[1].trim())
+        }
+        setKnownCategories(
+          [...set].sort((a, b) =>
+            a.localeCompare(b, 'ko', { numeric: true, sensitivity: 'base' }),
+          ),
+        )
+      })
+      .catch(() => {})
+  }, [])
+
+  const activeCategory =
+    categoryMode === 'new' ? newCategory.trim() : selectedCategory.trim()
 
   function onFileChange(e: ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
@@ -130,7 +154,7 @@ export function ReadingImport() {
     try {
       for (const it of items) {
         const t = coerceType(it.type)
-        const title = `${titlePrefix.trim() ? `${titlePrefix.trim()} ` : ''}${it.number}번`
+        const title = `${activeCategory ? `${activeCategory} ` : ''}${it.number}번`
         const q: Record<string, unknown> = {
           type: t,
           q: it.q,
@@ -190,16 +214,54 @@ export function ReadingImport() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">제목 접두사 (선택)</label>
-          <input
-            type="text"
-            value={titlePrefix}
-            onChange={(e) => setTitlePrefix(e.target.value)}
-            placeholder="예: 2027학년도 6월 모평"
-            className={inputCls}
-          />
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            시험명
+          </label>
+          {categoryMode === 'pick' ? (
+            <select
+              value={selectedCategory}
+              onChange={(e) => {
+                if (e.target.value === '__new__') {
+                  setCategoryMode('new')
+                  setSelectedCategory('')
+                } else {
+                  setSelectedCategory(e.target.value)
+                }
+              }}
+              className={inputCls}
+            >
+              <option value="">— 선택 —</option>
+              {knownCategories.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+              <option value="__new__">+ 새 시험명 추가...</option>
+            </select>
+          ) : (
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newCategory}
+                onChange={(e) => setNewCategory(e.target.value)}
+                placeholder="예: 2027학년도 6월 모의평가"
+                autoFocus
+                className={inputCls}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setCategoryMode('pick')
+                  setNewCategory('')
+                }}
+                className="text-xs text-slate-500 hover:text-slate-900 px-2"
+              >
+                취소
+              </button>
+            </div>
+          )}
           <p className="text-xs text-slate-500 mt-1">
-            저장 시 각 지문 제목은 "{titlePrefix.trim() || '(제목 접두사)'} 31번" 형식이 됩니다.
+            저장 시 각 지문 제목은 "{activeCategory || '(시험명)'} 31번" 형식이 됩니다.
           </p>
         </div>
 
