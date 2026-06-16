@@ -16,9 +16,9 @@ import {
 import { enrichVocab } from '../lib/api'
 import { looksLikeTextbookVocab, parseTextbookVocab } from '../lib/parseTextbookVocab'
 
-const PLACEHOLDER = `abandon - 버리다, 포기하다
-brilliant - 훌륭한, 빛나는
-emerge - 나타나다, 부각되다
+const PLACEHOLDER = `abandon : 버리다, 포기하다
+brilliant : 훌륭한, 빛나는
+emerge : 나타나다, 부각되다
 
 또는 교재 형식 그대로 붙여넣어도 됩니다:
 0001 advent [ǽdvent]
@@ -360,7 +360,7 @@ export function VocabNew() {
             단어 목록{' '}
             <span className="font-normal text-slate-500">
               (한 줄에 한 단어,{' '}
-              <code className="bg-slate-100 px-1 rounded">영어 - 한국어</code> 형식)
+              <code className="bg-slate-100 px-1 rounded">영어 : 한국어</code> 형식)
             </span>
           </label>
           <textarea

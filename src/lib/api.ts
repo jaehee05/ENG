@@ -32,7 +32,7 @@ export async function extractGlossary(input: {
 }
 
 export function wordsToText(words: WordEntry[]): string {
-  return words.map((w) => `${w.en} - ${w.ko}`).join('\n')
+  return words.map((w) => `${w.en} : ${w.ko}`).join('\n')
 }
 
 export interface ImportedReadingItem {

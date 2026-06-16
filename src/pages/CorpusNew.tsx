@@ -150,7 +150,7 @@ export function CorpusNew() {
             onChange={(e) => setRaw(e.target.value)}
             rows={14}
             placeholder={
-              'abandon - 버리다, 포기하다\n또는 교재 형식 ("0001 advent [ǽdvent] / n. ❶ 도래, 출현 ...")'
+              'abandon : 버리다, 포기하다\n또는 교재 형식 ("0001 advent [ǽdvent] / n. ❶ 도래, 출현 ...")'
             }
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500"
           />

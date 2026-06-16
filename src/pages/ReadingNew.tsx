@@ -550,7 +550,7 @@ export function ReadingNew() {
               value={glossaryRaw}
               onChange={(e) => setGlossaryRaw(e.target.value)}
               rows={10}
-              placeholder="abandon - 버리다, 포기하다"
+              placeholder="abandon : 버리다, 포기하다"
               className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
           </div>
@@ -563,7 +563,7 @@ export function ReadingNew() {
               value={choicesGlossaryRaw}
               onChange={(e) => setChoicesGlossaryRaw(e.target.value)}
               rows={6}
-              placeholder="paradigm - 패러다임, 인식 틀"
+              placeholder="paradigm : 패러다임, 인식 틀"
               className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
           </div>

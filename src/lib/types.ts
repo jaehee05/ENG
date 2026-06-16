@@ -207,7 +207,9 @@ export function parseWordList(text: string): WordEntry[] {
     .map((line) => line.trim())
     .filter(Boolean)
     .map((line) => {
-      const m = line.match(/^(.+?)\s*[-–—:\t]\s*(.+)$/)
+      // ':' 또는 탭만 구분자로. '-'는 단어 자체(예: stem from, follow-up,
+      // back-and-forth)와 충돌하므로 사용하지 않음.
+      const m = line.match(/^(.+?)\s*[:\t]\s*(.+)$/)
       if (m) return { en: m[1].trim(), ko: m[2].trim() }
       return { en: line, ko: '' }
     })
