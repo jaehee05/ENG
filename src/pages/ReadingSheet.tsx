@@ -108,6 +108,7 @@ export function ReadingSheet() {
 
           {r.questions.map((q, qi) => {
             const isOrder = q.type === 'order'
+            const isSummary = q.type === 'summary'
             const orderParts = isOrder
               ? [
                   { tag: 'A', text: q.partA },
@@ -118,6 +119,7 @@ export function ReadingSheet() {
               : []
             const hasParts = orderParts.length > 0
             const body = hasParts ? '' : bodyFor(q, r.passage)
+            const showSummary = !!q.summaryBox && q.summaryBox.trim().length > 0
             return (
               <section key={qi} className={qi > 0 ? 'mt-10 print:break-before-page' : ''}>
                 <p className="text-[12pt] font-bold mb-3 font-gothic leading-snug">
@@ -152,12 +154,37 @@ export function ReadingSheet() {
                   </div>
                 )}
 
-                {body && body.trim() && (
-                  <div className="grid grid-cols-3 gap-6">
-                    <div className="col-span-2 text-[11.5pt] leading-[1.85] whitespace-pre-wrap text-justify font-myeongjo text-slate-900">
-                      {renderWithUnderlines(body)}
+                {body && body.trim() &&
+                  (isSummary ? (
+                    <div className="grid grid-cols-3 gap-6">
+                      <div className="col-span-2 border border-slate-700 p-4 text-[11.5pt] leading-[1.85] whitespace-pre-wrap text-justify font-myeongjo text-slate-900">
+                        {renderWithUnderlines(body)}
+                      </div>
+                      <GlossaryColumn items={r.glossary} label="지문 단어" />
                     </div>
-                    <GlossaryColumn items={r.glossary} label="지문 단어" />
+                  ) : (
+                    <div className="grid grid-cols-3 gap-6">
+                      <div className="col-span-2 text-[11.5pt] leading-[1.85] whitespace-pre-wrap text-justify font-myeongjo text-slate-900">
+                        {renderWithUnderlines(body)}
+                      </div>
+                      <GlossaryColumn items={r.glossary} label="지문 단어" />
+                    </div>
+                  ))}
+
+                {isSummary && body && body.trim() && showSummary && (
+                  <div className="grid grid-cols-3 gap-6 my-2">
+                    <div className="col-span-2 flex justify-center">
+                      <svg
+                        width="26"
+                        height="30"
+                        viewBox="0 0 22 26"
+                        fill="currentColor"
+                        aria-hidden
+                      >
+                        <path d="M7 0h8v14h5L11 26 1 14h6z" />
+                      </svg>
+                    </div>
+                    <div />
                   </div>
                 )}
 

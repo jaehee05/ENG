@@ -240,9 +240,9 @@ export function AdminNotify() {
             phone,
             name: '테스트',
             changeWord: {
-              이름: testName.trim() || '테스트',
-              '1': sampleStatus,
-              '2': notice || '(안내사항 미입력)',
+              '#{이름}': testName.trim() || '테스트',
+              '#{1}': sampleStatus,
+              '#{2}': notice || '(안내사항 미입력)',
             },
           },
         ],
@@ -285,9 +285,9 @@ export function AdminNotify() {
         phone: b.account.phone ?? '',
         name: b.account.displayName,
         changeWord: {
-          이름: b.account.displayName,
-          '1': statusValue(b),
-          '2': notice,
+          '#{이름}': b.account.displayName,
+          '#{1}': statusValue(b),
+          '#{2}': notice,
         },
       }))
       const out = await sendBatchAlimtalk({

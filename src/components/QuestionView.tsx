@@ -29,6 +29,7 @@ export function QuestionView({
 }: Props) {
   const explicitBody = question.body?.trim() ? question.body : null
   const isOrder = question.type === 'order'
+  const isSummary = question.type === 'summary'
   const hasParts =
     isOrder &&
     (!!question.partA?.trim() ||
@@ -46,6 +47,8 @@ export function QuestionView({
         { tag: 'D', text: question.partD },
       ].filter((p) => !!p.text?.trim())
     : []
+  const showSummaryBox =
+    !!question.summaryBox && question.summaryBox.trim().length > 0
 
   const bodyTextCls =
     'text-base sm:text-lg leading-8 sm:leading-9 text-slate-900 break-words whitespace-pre-wrap text-justify font-myeongjo'
@@ -81,14 +84,39 @@ export function QuestionView({
         />
       )}
 
-      {showBody && (
-        <GlossedPassage
-          passage={body!}
-          glossary={passageGlossary}
-          viewedWords={viewedWords}
-          onWordLookup={onWordLookup}
-          className={bodyTextCls}
-        />
+      {showBody &&
+        (isSummary ? (
+          <div className="border border-slate-700 px-4 sm:px-5 py-3 sm:py-4 bg-white">
+            <GlossedPassage
+              passage={body!}
+              glossary={passageGlossary}
+              viewedWords={viewedWords}
+              onWordLookup={onWordLookup}
+              className={bodyTextCls}
+            />
+          </div>
+        ) : (
+          <GlossedPassage
+            passage={body!}
+            glossary={passageGlossary}
+            viewedWords={viewedWords}
+            onWordLookup={onWordLookup}
+            className={bodyTextCls}
+          />
+        ))}
+
+      {isSummary && showBody && showSummaryBox && (
+        <div className="flex justify-center text-slate-700 leading-none -my-1">
+          <svg
+            width="22"
+            height="26"
+            viewBox="0 0 22 26"
+            fill="currentColor"
+            aria-hidden
+          >
+            <path d="M7 0h8v14h5L11 26 1 14h6z" />
+          </svg>
+        </div>
       )}
 
       {orderParts.length > 0 && (
@@ -110,10 +138,10 @@ export function QuestionView({
         </div>
       )}
 
-      {question.summaryBox && question.summaryBox.trim() && (
+      {showSummaryBox && (
         <div className="border border-slate-700 px-4 sm:px-5 py-3 sm:py-4 bg-white">
           <GlossedPassage
-            passage={question.summaryBox}
+            passage={question.summaryBox!}
             glossary={passageGlossary}
             viewedWords={viewedWords}
             onWordLookup={onWordLookup}
