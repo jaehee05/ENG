@@ -2,14 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getReading, listAttemptsForUser, updateReadingGlossaries } from '../lib/firestore'
 import { useAuth } from '../contexts/useAuth'
-import { GlossedPassage } from '../components/GlossedPassage'
 import { GlossaryEditor } from '../components/GlossaryEditor'
 import { MyAttemptsBox } from '../components/MyAttemptsBox'
+import { QuestionView } from '../components/QuestionView'
 import { useGlossQueue, type GlossEntry } from '../components/useGlossQueue'
-import { renderUnderlines } from '../lib/renderUnderlines'
 import type { Attempt, Reading, WordEntry } from '../lib/types'
-
-const CHOICE_MARKS = ['①', '②', '③', '④', '⑤']
 
 function mergeEntries(base: WordEntry[], adds: { en: string; ko: string }[]): WordEntry[] {
   const next = [...base]
@@ -134,46 +131,33 @@ export function ReadingDetail() {
         />
       )}
 
-      <div>
-        <h2 className="text-sm font-semibold text-slate-700 mb-2">지문</h2>
-        <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
-          <GlossedPassage
-            passage={r.passage}
-            glossary={r.glossary}
-            onSelectWord={isAdmin ? (w) => addWord(w, 'glossary') : undefined}
-          />
-        </div>
-      </div>
-
       {isAdmin && (
-        <div>
-          <h2 className="text-sm font-semibold text-slate-700 mb-2">
-            선지 · 단어를 드래그하면 선지 단어장에 추가됩니다
-          </h2>
-          <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5 space-y-4">
-            {r.questions.map((q, qi) => (
-              <div key={qi} className="space-y-2">
-                <p className="text-sm font-medium text-slate-800 whitespace-pre-wrap">
-                  {qi + 1}. {renderUnderlines(q.q)}
-                </p>
-                {q.image && (
-                  <img
-                    src={q.image}
-                    alt="도표"
-                    className="max-w-full max-h-72 rounded border border-slate-200"
-                  />
-                )}
-                <GlossedPassage
-                  passage={q.choices.map((c, ci) => `${CHOICE_MARKS[ci]} ${c}`).join('\n')}
-                  glossary={choicesGlossary}
-                  onSelectWord={(w) => addWord(w, 'choices')}
-                  className="text-sm sm:text-base leading-7 text-slate-700 break-words whitespace-pre-wrap"
-                />
-              </div>
-            ))}
-          </div>
-        </div>
+        <p className="text-xs text-slate-500">
+          학생이 보는 화면 그대로의 미리보기입니다. 본문이나 선지에서 단어를 드래그하면
+          단어장에 자동으로 추가됩니다.
+        </p>
       )}
+
+      <div className="space-y-4">
+        {r.questions.map((q, qi) => (
+          <QuestionView
+            key={qi}
+            index={qi}
+            question={q}
+            fallbackPassage={r.passage}
+            passageGlossary={r.glossary}
+            choicesGlossary={choicesGlossary}
+            selected={-1}
+            onSelect={() => {}}
+            onSelectPassageWord={
+              isAdmin ? (w) => addWord(w, 'glossary') : undefined
+            }
+            onSelectChoiceWord={
+              isAdmin ? (w) => addWord(w, 'choices') : undefined
+            }
+          />
+        ))}
+      </div>
 
       {isAdmin && (
         <div className="space-y-3">

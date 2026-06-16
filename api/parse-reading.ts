@@ -39,8 +39,8 @@ submit_reading을 호출하지 않고 텍스트만 출력해도 되는 경우는
 - points: 발문 끝에 [3점]이 있었으면 3, 그 외엔 2.
 - body: **기본적으로 비우세요(빈 문자열)**. passage를 사용합니다. 이 필드는 해당 문항만 다른 본문이 필요한 특수 케이스에만 채웁니다.
   - 빈칸은 8개 이상 밑줄(________)로
-  - insert, irrelevant, underline-* 유형은 본문에 ①~⑤ 마커 유지
-  - underline-grammar / underline-vocab 유형은 밑줄 범위를 \`①{...}\` 형식으로 감쌀 것. 예: "He ①{liked} to ②{walking} home." 마커와 중괄호 사이 공백 X.
+  - insert, irrelevant, underline-* 유형은 본문에 원본 마커 유지 (①②③④⑤ 또는 ⓐⓑⓒⓓⓔ)
+  - underline-grammar / underline-vocab 유형은 밑줄 범위를 \`마커{...}\` 형식으로 감쌀 것. **원본의 마커 종류 그대로 유지** — 원본이 ①②③④⑤이면 그대로, (a)(b)(c)(d)(e) 또는 ⓐⓑⓒⓓⓔ이면 ⓐⓑⓒⓓⓔ로 변환해 사용. 절대 ⓐⓑⓒ를 ①②③으로 임의로 바꾸지 말 것. 예: "He ①{liked} ②{walking}" 또는 "He ⓐ{liked} ⓑ{walking}". 마커와 중괄호 사이 공백 X.
   - 그 외에 본문에 단순히 밑줄 친 부분이 있고 발문이 그걸 가리키는 경우(예: "밑줄 친 ~가 의미하는 바로 가장 적절한 것은?"), 그 부분을 \`{{...}}\`로 감쌀 것. 예: "He {{kicked the bucket}} last night."
 - intro: order/insert에서 박스로 주어진 글/문장
 - partA, partB, partC, partD: **order 유형 전용**. 본문 순서를 묻는 (A), (B), (C), (D) 단락을 각각 분리해서 채웁니다. body는 사용하지 말 것. (D)가 없으면 partD는 빈 문자열.

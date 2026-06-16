@@ -14,6 +14,10 @@ interface Props {
   onWordLookup?: (en: string, ko: string) => void
   selected: number
   onSelect: (i: number) => void
+  /** Optional: drag-to-add a passage-side word (admin glossary editing). */
+  onSelectPassageWord?: (word: string) => void
+  /** Optional: drag-to-add a choice-side word. */
+  onSelectChoiceWord?: (word: string) => void
 }
 
 export function QuestionView({
@@ -26,6 +30,8 @@ export function QuestionView({
   onWordLookup,
   selected,
   onSelect,
+  onSelectPassageWord,
+  onSelectChoiceWord,
 }: Props) {
   const explicitBody = question.body?.trim() ? question.body : null
   const isOrder = question.type === 'order'
@@ -71,6 +77,7 @@ export function QuestionView({
             glossary={passageGlossary}
             viewedWords={viewedWords}
             onWordLookup={onWordLookup}
+            onSelectWord={onSelectPassageWord}
             className={bodyTextCls}
           />
         </div>
@@ -92,6 +99,7 @@ export function QuestionView({
               glossary={passageGlossary}
               viewedWords={viewedWords}
               onWordLookup={onWordLookup}
+              onSelectWord={onSelectPassageWord}
               className={bodyTextCls}
             />
           </div>
@@ -101,6 +109,7 @@ export function QuestionView({
             glossary={passageGlossary}
             viewedWords={viewedWords}
             onWordLookup={onWordLookup}
+            onSelectWord={onSelectPassageWord}
             className={bodyTextCls}
           />
         ))}
@@ -128,6 +137,7 @@ export function QuestionView({
               glossary={passageGlossary}
               viewedWords={viewedWords}
               onWordLookup={onWordLookup}
+              onSelectWord={onSelectPassageWord}
               className={`${bodyTextCls.replace('text-justify', '').trim()} pl-9 [text-indent:-2.25rem]`}
             />
           ))}
@@ -177,6 +187,7 @@ export function QuestionView({
                 glossary={choicesGlossary}
                 viewedWords={viewedWords}
                 onWordLookup={onWordLookup}
+                onSelectWord={onSelectChoiceWord}
                 className="text-base leading-7 text-slate-800 break-words whitespace-pre-wrap font-myeongjo"
               />
             </span>

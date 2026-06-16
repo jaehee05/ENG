@@ -1,6 +1,6 @@
 import { Fragment, type ReactNode } from 'react'
 
-const UNDERLINE_RE = /([①②③④⑤])\s*\{([^}]+)\}|\{\{([^}]+)\}\}/g
+const UNDERLINE_RE = /([①②③④⑤ⓐⓑⓒⓓⓔ])\s*\{([^}]+)\}|\{\{([^}]+)\}\}/g
 
 export function renderUnderlines(text: string): ReactNode {
   if (!text) return text

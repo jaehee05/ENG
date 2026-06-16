@@ -32,7 +32,7 @@ interface Props {
   className?: string
 }
 
-const UNDERLINE_RE = /([①②③④⑤])\s*\{([^}]+)\}|\{\{([^}]+)\}\}/g
+const UNDERLINE_RE = /([①②③④⑤ⓐⓑⓒⓓⓔ])\s*\{([^}]+)\}|\{\{([^}]+)\}\}/g
 
 interface RawSegment {
   text: string
