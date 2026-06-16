@@ -192,12 +192,13 @@ export function ReadingSheet() {
                   <div className="grid grid-cols-3 gap-6 space-y-0">
                     <div className="col-span-2 space-y-3 font-myeongjo text-[11.5pt] leading-[1.85] text-slate-900">
                       {orderParts.map((p) => (
-                        <div key={p.tag} className="flex gap-2">
-                          <span className="shrink-0 font-semibold">({p.tag})</span>
-                          <span className="whitespace-pre-wrap text-justify">
-                            {renderWithUnderlines(p.text ?? '')}
-                          </span>
-                        </div>
+                        <p
+                          key={p.tag}
+                          className="whitespace-pre-wrap"
+                          style={{ paddingLeft: '2.4em', textIndent: '-2.4em' }}
+                        >
+                          ({p.tag}) {renderWithUnderlines(p.text ?? '')}
+                        </p>
                       ))}
                     </div>
                     <GlossaryColumn items={r.glossary} label="지문 단어" />

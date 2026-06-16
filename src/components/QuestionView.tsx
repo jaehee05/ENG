@@ -122,18 +122,14 @@ export function QuestionView({
       {orderParts.length > 0 && (
         <div className="space-y-4">
           {orderParts.map((p) => (
-            <div key={p.tag} className="flex gap-2">
-              <span className={`shrink-0 font-bold ${bodyTextCls.replace('text-justify', '')}`}>
-                ({p.tag})
-              </span>
-              <GlossedPassage
-                passage={p.text!}
-                glossary={passageGlossary}
-                viewedWords={viewedWords}
-                onWordLookup={onWordLookup}
-                className={bodyTextCls}
-              />
-            </div>
+            <GlossedPassage
+              key={p.tag}
+              passage={`(${p.tag}) ${p.text!}`}
+              glossary={passageGlossary}
+              viewedWords={viewedWords}
+              onWordLookup={onWordLookup}
+              className={`${bodyTextCls.replace('text-justify', '').trim()} pl-9 [text-indent:-2.25rem]`}
+            />
           ))}
         </div>
       )}
