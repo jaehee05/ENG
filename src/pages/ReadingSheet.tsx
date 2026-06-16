@@ -101,7 +101,14 @@ export function ReadingSheet() {
               </h2>
               <div className="text-[10pt] text-slate-600 font-gothic flex gap-4">
                 <span>이름: ____________________</span>
-                <span>점수: ______ / {r.questions.length * 5}점</span>
+                <span>
+                  점수: ______ /{' '}
+                  {r.questions.reduce(
+                    (sum, q) => sum + (q.points && q.points > 0 ? q.points : 2),
+                    0,
+                  )}
+                  점
+                </span>
               </div>
             </div>
           </header>
