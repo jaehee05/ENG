@@ -130,7 +130,7 @@ export function ReadingSheet() {
             return (
               <section key={qi} className={qi > 0 ? 'mt-10 print:break-before-page' : ''}>
                 <p className="text-[12pt] font-bold mb-3 font-gothic leading-snug">
-                  <span className="text-slate-900">{qi + 1}.</span>{' '}
+                  <span className="text-slate-900">{q.number ?? qi + 1}.</span>{' '}
                   <span className="text-slate-800">{renderWithUnderlines(q.q)}</span>
                   {q.points && q.points >= 3 && (
                     <span className="ml-2 text-[10pt] font-normal text-slate-600">

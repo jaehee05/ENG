@@ -86,6 +86,8 @@ export type ReadingQuestionType =
 export interface ReadingQuestion {
   type?: ReadingQuestionType
   q: string
+  /** Original question number in the source exam (e.g., 41, 42). Falls back to position+1 if missing. */
+  number?: number
   /** Question-specific body text. Falls back to reading.passage if omitted. */
   body?: string
   /** Boxed "given" content shown above the body (order/insert types). */

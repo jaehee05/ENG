@@ -62,7 +62,7 @@ export function QuestionView({
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-6 space-y-5">
       <p className="text-base font-bold text-slate-900 whitespace-pre-wrap font-gothic">
-        {index + 1}. {renderUnderlines(question.q)}
+        {question.number ?? index + 1}. {renderUnderlines(question.q)}
         {question.points && question.points >= 3 && (
           <span className="ml-2 text-sm font-normal text-slate-600">
             [{question.points}점]

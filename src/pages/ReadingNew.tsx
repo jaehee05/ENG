@@ -53,6 +53,7 @@ function trimDraft(q: DraftQuestion) {
     intro?: string
     summaryBox?: string
     points?: number
+    number?: number
     image?: string
     partA?: string
     partB?: string
@@ -68,6 +69,7 @@ function trimDraft(q: DraftQuestion) {
   if (q.intro.trim()) out.intro = q.intro.trim()
   if (q.summaryBox.trim()) out.summaryBox = q.summaryBox.trim()
   if (q.points && q.points !== 2) out.points = q.points
+  if (q.number && q.number > 0) out.number = q.number
   if (q.image) out.image = q.image
   if (q.partA.trim()) out.partA = q.partA.trim()
   if (q.partB.trim()) out.partB = q.partB.trim()
@@ -111,10 +113,8 @@ export function ReadingNew() {
   useEffect(() => {
     if (!activeCategory) return
     if (title && !titleAutoFilled) return
-    const num = Number.parseInt(questionNumber, 10)
-    const next = Number.isFinite(num) && num > 0
-      ? `${activeCategory} ${num}번`
-      : activeCategory
+    const trimmed = questionNumber.trim()
+    const next = trimmed ? `${activeCategory} ${trimmed}번` : activeCategory
     setTitle(next)
     setTitleAutoFilled(true)
   }, [activeCategory, questionNumber])
@@ -231,6 +231,7 @@ export function ReadingNew() {
           choices,
           answer: Math.min(4, Math.max(0, q.answer ?? 0)),
           points: q.points && q.points >= 1 && q.points <= 5 ? q.points : undefined,
+          number: q.number && q.number > 0 ? q.number : undefined,
           image,
           partA: q.partA ?? '',
           partB: q.partB ?? '',
@@ -239,6 +240,14 @@ export function ReadingNew() {
         }
       })
       setQuestions(drafts)
+      const nums = drafts
+        .map((d) => d.number)
+        .filter((n): n is number => typeof n === 'number')
+      if (nums.length > 0) {
+        const lo = Math.min(...nums)
+        const hi = Math.max(...nums)
+        setQuestionNumber(lo === hi ? String(lo) : `${lo}-${hi}`)
+      }
       setParseNotice(
         `${drafts.length}개 문항을 자동 입력했습니다. 정답·본문을 확인 후 저장하세요.`,
       )
@@ -454,12 +463,11 @@ export function ReadingNew() {
                 문항 번호
               </label>
               <input
-                type="number"
-                min={1}
+                type="text"
                 value={questionNumber}
                 onChange={(e) => setQuestionNumber(e.target.value)}
-                placeholder="18"
-                className="w-24 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                placeholder="18 또는 41-42"
+                className="w-32 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
             </div>
           </div>

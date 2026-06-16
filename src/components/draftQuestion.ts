@@ -3,6 +3,7 @@ import { READING_TYPE_PROMPT, type ReadingQuestionType } from '../lib/types'
 export interface DraftQuestion {
   type: ReadingQuestionType
   q: string
+  number?: number
   body: string
   intro: string
   summaryBox: string

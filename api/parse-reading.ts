@@ -35,7 +35,8 @@ submit_reading을 호출하지 않고 텍스트만 출력해도 되는 경우는
   - underline-grammar: 본문 ①~⑤ 밑줄 중 어법상 틀린 것
   - underline-vocab: 본문 ①~⑤ 밑줄 중 문맥상 부적절한 낱말
   - standard: 그 외 (제목/주제/주장/요지/심정/일치/도표 등)
-- q: 발문 (예: "다음 빈칸에 들어갈 말로 가장 적절한 것은?"). 발문 끝의 [3점]/[2점] 같은 배점 표기는 빼고 깨끗한 발문만.
+- q: 발문 (예: "다음 빈칸에 들어갈 말로 가장 적절한 것은?"). 발문 끝의 [3점]/[2점] 같은 배점 표기는 빼고 깨끗한 발문만. 문항 번호("41.", "[43~45]" 등)도 빼고 발문만.
+- number: 원문에 표시된 문항 번호 (예: 41, 42, 43). 발견 못하면 0. 세트(41~42)면 각 문항이 41, 42를 따로 가짐.
 - points: 발문 끝에 [3점]이 있었으면 3, 그 외엔 2.
 - body: **기본적으로 비우세요(빈 문자열)**. passage를 사용합니다. 이 필드는 해당 문항만 다른 본문이 필요한 특수 케이스에만 채웁니다.
   - 빈칸은 8개 이상 밑줄(________)로
@@ -73,6 +74,7 @@ interface ParsedQuestion {
   choices: string[]
   answer: number
   points?: number
+  number?: number
   hasChart?: boolean
   partA?: string
   partB?: string
@@ -101,6 +103,8 @@ function normalizeQuestion(raw: unknown): ParsedQuestion | null {
     typeof r.answer === 'number' && r.answer >= 0 && r.answer <= 4 ? Math.trunc(r.answer) : 0
   const pointsRaw = typeof r.points === 'number' ? Math.trunc(r.points) : 0
   const points = pointsRaw >= 1 && pointsRaw <= 5 ? pointsRaw : undefined
+  const numberRaw = typeof r.number === 'number' ? Math.trunc(r.number) : 0
+  const number = numberRaw > 0 && numberRaw < 100 ? numberRaw : undefined
   return {
     type,
     q,
@@ -110,6 +114,7 @@ function normalizeQuestion(raw: unknown): ParsedQuestion | null {
     choices: choices.slice(0, 5),
     answer,
     points,
+    number,
     hasChart: r.hasChart === true,
     partA: typeof r.partA === 'string' ? r.partA.trim() : '',
     partB: typeof r.partB === 'string' ? r.partB.trim() : '',
@@ -219,6 +224,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     },
                     answer: { type: 'integer', minimum: 0, maximum: 4 },
                     points: { type: 'integer', minimum: 1, maximum: 5 },
+                    number: { type: 'integer', minimum: 0, maximum: 99 },
                     hasChart: { type: 'boolean' },
                     partA: { type: 'string' },
                     partB: { type: 'string' },
