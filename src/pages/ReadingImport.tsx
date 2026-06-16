@@ -27,6 +27,34 @@ function coerceType(type: string): ReadingQuestionType {
 
 const CHOICE_MARKS = ['①', '②', '③', '④', '⑤']
 
+function parseRange(s: string): number[] {
+  const out: number[] = []
+  for (const raw of s.split(',')) {
+    const t = raw.trim()
+    const m = t.match(/^(\d+)\s*[-~–—]\s*(\d+)$/)
+    if (m) {
+      const a = Number.parseInt(m[1], 10)
+      const b = Number.parseInt(m[2], 10)
+      const lo = Math.min(a, b)
+      const hi = Math.max(a, b)
+      for (let i = lo; i <= hi; i++) out.push(i)
+    } else if (/^\d+$/.test(t)) {
+      out.push(Number.parseInt(t, 10))
+    }
+  }
+  return Array.from(new Set(out)).sort((a, b) => a - b)
+}
+
+function chunkNums(nums: number[], size: number): number[][] {
+  const chunks: number[][] = []
+  for (let i = 0; i < nums.length; i += size) {
+    chunks.push(nums.slice(i, i + size))
+  }
+  return chunks
+}
+
+const CHUNK_SIZE = 3
+
 export function ReadingImport() {
   const { profile } = useAuth()
   const navigate = useNavigate()
@@ -35,6 +63,7 @@ export function ReadingImport() {
   const [range, setRange] = useState('')
   const [answerKey, setAnswerKey] = useState('')
   const [importing, setImporting] = useState(false)
+  const [importProgress, setImportProgress] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [savedCount, setSavedCount] = useState(0)
   const [error, setError] = useState<string | null>(null)
@@ -57,25 +86,39 @@ export function ReadingImport() {
     e.preventDefault()
     setError(null)
     if (!file) return setError('PDF 파일을 선택하세요.')
-    if (!range.trim()) return setError('문항 범위를 입력하세요. 예) 29-40, 31-35')
+    const nums = parseRange(range)
+    if (nums.length === 0)
+      return setError('문항 범위를 입력하세요. 예) 29-40, 31-35')
+    const chunks = chunkNums(nums, CHUNK_SIZE)
     setImporting(true)
+    setImportProgress(`0 / ${chunks.length}`)
     try {
       const base64 = await fileToBase64(file)
-      const list = await importReadingsFromPdf({
-        pdfBase64: base64,
-        range: range.trim(),
-        answerKey: answerKey.trim() || undefined,
-      })
-      if (list.length === 0) {
+      const merged = new Map<number, ImportedReadingItem>()
+      for (let i = 0; i < chunks.length; i++) {
+        const c = chunks[i]
+        setImportProgress(`${i + 1} / ${chunks.length} 묶음 처리 중...`)
+        const list = await importReadingsFromPdf({
+          pdfBase64: base64,
+          range: c.join(','),
+          answerKey: answerKey.trim() || undefined,
+        })
+        for (const it of list) {
+          if (!merged.has(it.number)) merged.set(it.number, it)
+        }
+      }
+      const all = [...merged.values()].sort((a, b) => a.number - b.number)
+      if (all.length === 0) {
         setError('추출된 문항이 없습니다. 범위 또는 PDF를 확인하세요.')
         setItems(null)
       } else {
-        setItems(list.sort((a, b) => a.number - b.number))
+        setItems(all)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '분석에 실패했습니다.')
     } finally {
       setImporting(false)
+      setImportProgress(null)
     }
   }
 
@@ -192,7 +235,9 @@ export function ReadingImport() {
             disabled={importing}
             className="rounded-md bg-brand-600 text-white text-sm font-medium px-5 py-2 hover:bg-brand-700 transition disabled:opacity-60"
           >
-            {importing ? '분석 중... (최대 1분)' : 'PDF 분석'}
+            {importing
+              ? `분석 중... ${importProgress ?? ''}`
+              : 'PDF 분석'}
           </button>
         </div>
       </form>

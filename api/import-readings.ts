@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import Anthropic from '@anthropic-ai/sdk'
 
 export const config = {
-  maxDuration: 60,
+  maxDuration: 300,
 }
 
 const SYSTEM_PROMPT = `당신은 한국 수능 영어 모의고사 문제지 분석가입니다.
