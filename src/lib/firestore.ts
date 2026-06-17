@@ -191,6 +191,13 @@ export async function updateReadingQuestions(
   await updateDoc(doc(db, 'readings', id), { questions })
 }
 
+export async function updateReadingPassageKo(
+  id: string,
+  passageKo: string,
+): Promise<void> {
+  await updateDoc(doc(db, 'readings', id), { passageKo })
+}
+
 /** 한 지문의 attempt 전부를 그 지문 questions[].answer 기준으로 재채점. */
 export async function regradeAllAttemptsForReading(
   readingId: string,

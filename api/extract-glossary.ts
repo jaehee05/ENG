@@ -1,18 +1,33 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import Anthropic from '@anthropic-ai/sdk'
 
-const SYSTEM_PROMPT = `당신은 영어가 약한 한국 학생을 위한 영어 모의고사 교재의 어휘 분석가입니다.
-주어진 영어 지문과 5지선다 보기를 읽고, **영어를 잘 못하는 학생** 기준으로 모를 가능성이 있는 단어·숙어·구문을 폭넓게 추출하여 한국어 뜻을 답니다. 의심되면 포함하는 쪽으로.
+const SYSTEM_PROMPT = `당신은 한국 고등학생을 위한 영어 지문 어휘 풀이 도구입니다.
+주어진 영어 지문과 5지선다 보기에 등장하는 **거의 모든 어휘**를 한국어 뜻과 함께 추출합니다.
+"학생이 알 만한가?"를 따지지 말고, 의미가 있는 단어·구는 전부 포함하세요.
 
-추출 기준:
-- 명사·동사·형용사·부사·전치사구·접속사 — 학생이 모를 만한 건 **초급 어휘까지 모두**
-- 숙어·관용표현 포함 (예: around the clock, be tied to, keep ~ humming)
-- 복합어·하이픈 표현 포함 (예: clock-oriented, machine-human relationship)
-- 의미 있는 구·연어(collocation) 포함 (예: take place, set up, give up)
-- 정말 누구나 아는 극히 기초 단어만 제외: 관사(a, the), be동사(is/are/was 등), 인칭대명사(I/you/he/she 등), 가장 흔한 조동사(do/does/did), 숫자, 요일, "and/or/but" 같은 기본 접속사
-- 그 외 일반 명사·동사·형용사는 **쉬워 보여도 포함** (예: people, place, time, big, small, run, walk, look, see, want, give, take 등 학생이 한국어 뜻을 정확히 모를 수 있음)
-- 지문 내 등장 순서대로 나열
-- 보기에 등장하는 표현은 choicesGlossary에 별도로 (지문과 중복되더라도 OK)
+포함 대상:
+- 모든 명사·동사·형용사·부사·전치사·접속사 (쉽다고 느껴도 포함)
+- 숙어·관용표현 (around the clock, be tied to, keep ~ humming 등)
+- 복합어·하이픈 표현 (clock-oriented, machine-human relationship 등)
+- 구동사·연어 (take place, set up, give up 등)
+- 본문 등장 순서대로 나열
+- 같은 단어는 한 번만 (중복 제외)
+
+제외 대상 (극히 기초 기능어만):
+- 관사: a, an, the
+- be동사 전체: is, are, was, were, be, been, being, am
+- 일반 조동사: do, does, did, will, would, can, could, may, might, should, must, shall, ought
+- 인칭대명사 및 소유격: I, me, my, mine, you, your, yours, he, him, his, she, her, hers, it, its, we, us, our, ours, they, them, their, theirs
+- 지시대명사: this, that, these, those
+- 단순 접속사: and, or, but, so, if, when, while, because (단, although/whereas 등은 포함)
+- 단순 전치사 중 of/to/in/on/at/by/for/with (단, into/onto/within/without/throughout 등은 포함)
+- 숫자, 요일, 월 이름
+- 사람·지명 고유명사
+
+(헷갈리면 포함하는 쪽으로.)
+
+선지(choices)에서도 동일 기준으로 choicesGlossary 추출.
+**선지가 모두 한국어로만 작성되어 있다면 choicesGlossary는 비워서 제출하세요.**
 
 **선지가 모두 한국어로만 작성되어 있다면 choicesGlossary는 비워서 제출하세요** (한국어 선지는 단어 풀이 불필요).
 
@@ -91,7 +106,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const msg = await client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
+      max_tokens: 8192,
       system: [
         {
           type: 'text',

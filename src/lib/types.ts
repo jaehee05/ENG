@@ -133,6 +133,8 @@ export interface Reading {
   id: string
   title: string
   passage: string
+  /** 지문 전체에 대한 한국어 해석. 학생이 문제를 틀리면 표시. */
+  passageKo?: string
   glossary: WordEntry[]
   choicesGlossary: WordEntry[]
   questions: ReadingQuestion[]
@@ -187,6 +189,8 @@ export interface ReadingResult {
   userAnswer: number
   correctAnswer: number
   correct: boolean
+  /** Original exam question number (e.g., 41). Falls back to position+1 if missing. */
+  number?: number
 }
 
 export interface Attempt {

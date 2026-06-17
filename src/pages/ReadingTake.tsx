@@ -69,13 +69,24 @@ export function ReadingTake() {
     setSubmitting(true)
     setError(null)
     try {
-      const results = r.questions.map((q, i) => ({
-        q: q.q,
-        choices: q.choices,
-        userAnswer: answers[i],
-        correctAnswer: q.answer,
-        correct: answers[i] === q.answer,
-      }))
+      const results = r.questions.map((q, i) => {
+        const base: {
+          q: string
+          choices: string[]
+          userAnswer: number
+          correctAnswer: number
+          correct: boolean
+          number?: number
+        } = {
+          q: q.q,
+          choices: q.choices,
+          userAnswer: answers[i],
+          correctAnswer: q.answer,
+          correct: answers[i] === q.answer,
+        }
+        if (q.number && q.number > 0) base.number = q.number
+        return base
+      })
       const attemptId = await createReadingAttempt({
         studentUid: profile.id,
         studentName: profile.displayName,

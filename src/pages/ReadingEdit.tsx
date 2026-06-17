@@ -6,9 +6,10 @@ import {
   regradeReadingAttempts,
   updateReadingContent,
   updateReadingGlossaries,
+  updateReadingPassageKo,
 } from '../lib/firestore'
 import { parseWordList, type Reading, type ReadingQuestion } from '../lib/types'
-import { extractGlossary, wordsToText } from '../lib/api'
+import { extractGlossary, translatePassage, wordsToText } from '../lib/api'
 import { handleUnderlineHotkey } from '../lib/textareaHotkeys'
 import { QuestionEditor } from '../components/QuestionEditor'
 import { emptyDraftQuestion, type DraftQuestion } from '../components/draftQuestion'
@@ -80,6 +81,8 @@ export function ReadingEdit() {
   const [questions, setQuestions] = useState<DraftQuestion[]>([emptyDraftQuestion()])
   const [glossaryRaw, setGlossaryRaw] = useState('')
   const [choicesGlossaryRaw, setChoicesGlossaryRaw] = useState('')
+  const [passageKo, setPassageKo] = useState('')
+  const [translating, setTranslating] = useState(false)
   const [extracting, setExtracting] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -108,6 +111,7 @@ export function ReadingEdit() {
         )
         setGlossaryRaw(wordsToText(r.glossary ?? []))
         setChoicesGlossaryRaw(wordsToText(r.choicesGlossary ?? []))
+        setPassageKo(r.passageKo ?? '')
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : '불러오기에 실패했습니다.')
@@ -175,6 +179,7 @@ export function ReadingEdit() {
         questions: trimmedQuestions,
       })
       await updateReadingGlossaries(original.id, glossary, choicesGlossary)
+      await updateReadingPassageKo(original.id, passageKo.trim())
       // 답이 바뀐 인덱스가 있으면 해당 문항만 학생 기록 재채점
       for (let i = 0; i < trimmedQuestions.length; i++) {
         const prev = original.questions[i]?.answer
@@ -188,6 +193,23 @@ export function ReadingEdit() {
       setError(err instanceof Error ? err.message : '저장에 실패했습니다.')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  async function handleTranslate() {
+    if (!passage.trim()) {
+      setError('번역할 지문이 비어 있습니다.')
+      return
+    }
+    setError(null)
+    setTranslating(true)
+    try {
+      const ko = await translatePassage(passage.trim())
+      setPassageKo(ko)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '번역에 실패했습니다.')
+    } finally {
+      setTranslating(false)
     }
   }
 
@@ -273,6 +295,32 @@ export function ReadingEdit() {
               onRemove={() => setQuestions((prev) => prev.filter((_, idx) => idx !== i))}
             />
           ))}
+        </div>
+
+        <div className="rounded-md border border-slate-200 bg-slate-50 p-4 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-slate-700">
+              지문 한글 해석{' '}
+              <span className="font-normal text-slate-500">
+                (학생이 틀린 문제에서 표시)
+              </span>
+            </h3>
+            <button
+              type="button"
+              onClick={handleTranslate}
+              disabled={translating}
+              className="rounded-md bg-brand-600 text-white text-sm font-medium px-3 py-1.5 hover:bg-brand-700 disabled:opacity-50"
+            >
+              {translating ? '번역 중...' : 'AI로 번역 (덮어쓰기)'}
+            </button>
+          </div>
+          <textarea
+            value={passageKo}
+            onChange={(e) => setPassageKo(e.target.value)}
+            rows={10}
+            placeholder="한국어 해석. 비워두면 학생에게 '아직 등록되지 않았습니다'로 안내됩니다."
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          />
         </div>
 
         <div className="rounded-md border border-slate-200 bg-slate-50 p-4 space-y-3">
