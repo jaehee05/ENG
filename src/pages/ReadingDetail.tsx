@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import {
   getReading,
   listAttemptsForUser,
+  regradeReadingAttempts,
   updateReadingGlossaries,
   updateReadingQuestions,
 } from '../lib/firestore'
@@ -88,14 +89,23 @@ export function ReadingDetail() {
 
   async function handleSetAnswer(qi: number, ci: number) {
     if (!r || !isAdmin) return
+    const prev = r.questions[qi]?.answer ?? -1
+    if (prev === ci) return
     const nextQuestions = r.questions.map((q, idx) =>
       idx === qi ? { ...q, answer: ci } : q,
     )
     setR({ ...r, questions: nextQuestions })
     try {
       await updateReadingQuestions(r.id, nextQuestions)
-      setSavedNote(`${qi + 1}번 정답을 ${'①②③④⑤'[ci]}로 저장했어요.`)
-      window.setTimeout(() => setSavedNote(null), 2000)
+      const touched = await regradeReadingAttempts(r.id, qi, ci)
+      const marker = '①②③④⑤'[ci] ?? `${ci + 1}`
+      const num = r.questions[qi]?.number ?? qi + 1
+      setSavedNote(
+        touched > 0
+          ? `${num}번 정답을 ${marker}로 저장 · 학생 기록 ${touched}건 재채점`
+          : `${num}번 정답을 ${marker}로 저장했어요.`,
+      )
+      window.setTimeout(() => setSavedNote(null), 2500)
     } catch (e) {
       setError(e instanceof Error ? e.message : '정답 저장 실패')
     }

@@ -191,6 +191,43 @@ export async function updateReadingQuestions(
   await updateDoc(doc(db, 'readings', id), { questions })
 }
 
+/**
+ * 지문의 정답을 바꾼 뒤, 이미 응시한 학생들의 attempt 기록도 재채점.
+ * 각 attempt.readingResults[qi]의 correctAnswer/correct를 갱신하고
+ * attempt.correct (총 맞은 수)를 다시 계산해 저장한다.
+ */
+export async function regradeReadingAttempts(
+  readingId: string,
+  qi: number,
+  newAnswer: number,
+): Promise<number> {
+  const snap = await getDocs(
+    query(
+      collection(db, 'attempts'),
+      where('type', '==', 'reading'),
+      where('refId', '==', readingId),
+    ),
+  )
+  let touched = 0
+  for (const d of snap.docs) {
+    const data = d.data() as Omit<Attempt, 'id'>
+    const results = (data.readingResults ?? []) as ReadingResult[]
+    if (!results[qi]) continue
+    const updated = results.map((r, i) => {
+      if (i !== qi) return r
+      const correct = r.userAnswer === newAnswer
+      return { ...r, correctAnswer: newAnswer, correct }
+    })
+    const totalCorrect = updated.reduce((sum, r) => sum + (r.correct ? 1 : 0), 0)
+    await updateDoc(doc(db, 'attempts', d.id), {
+      readingResults: updated,
+      correct: totalCorrect,
+    })
+    touched++
+  }
+  return touched
+}
+
 export async function deleteReading(id: string): Promise<void> {
   await deleteDoc(doc(db, 'readings', id))
 }

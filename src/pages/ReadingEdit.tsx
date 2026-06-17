@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import {
   deleteReading,
   getReading,
+  regradeReadingAttempts,
   updateReadingContent,
   updateReadingGlossaries,
 } from '../lib/firestore'
@@ -167,12 +168,21 @@ export function ReadingEdit() {
 
     setSubmitting(true)
     try {
+      const trimmedQuestions = questions.map(trimDraft)
       await updateReadingContent(original.id, {
         title: title.trim(),
         passage: passage.trim(),
-        questions: questions.map(trimDraft),
+        questions: trimmedQuestions,
       })
       await updateReadingGlossaries(original.id, glossary, choicesGlossary)
+      // 답이 바뀐 인덱스가 있으면 해당 문항만 학생 기록 재채점
+      for (let i = 0; i < trimmedQuestions.length; i++) {
+        const prev = original.questions[i]?.answer
+        const next = trimmedQuestions[i].answer
+        if (typeof prev === 'number' && prev !== next) {
+          await regradeReadingAttempts(original.id, i, next)
+        }
+      }
       navigate(`/reading/${original.id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : '저장에 실패했습니다.')
