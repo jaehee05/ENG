@@ -2,7 +2,11 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getReading } from '../lib/firestore'
 import { renderUnderlines as renderWithUnderlines } from '../lib/renderUnderlines'
-import type { Reading, ReadingQuestion } from '../lib/types'
+import {
+  passageFallbackPerQuestion,
+  type Reading,
+  type ReadingQuestion,
+} from '../lib/types'
 
 const CHOICE_MARKS = ['①', '②', '③', '④', '⑤']
 
@@ -29,10 +33,10 @@ function GlossaryColumn({ items, label }: { items: { en: string; ko: string }[];
   )
 }
 
-function bodyFor(q: ReadingQuestion, fallbackPassage: string): string {
+function bodyFor(q: ReadingQuestion, fallbackPassage: string | undefined): string {
   if (q.body?.trim()) return q.body
   if (q.image) return ''
-  return fallbackPassage
+  return fallbackPassage ?? ''
 }
 
 export function ReadingSheet() {
@@ -113,7 +117,9 @@ export function ReadingSheet() {
             </div>
           </header>
 
-          {r.questions.map((q, qi) => {
+          {(() => null)()}
+          {r.questions.map((q, qi, arr) => {
+            const fbList = passageFallbackPerQuestion(r.passage, arr)
             const isOrder = q.type === 'order'
             const isSummary = q.type === 'summary'
             const orderParts = isOrder
@@ -125,7 +131,7 @@ export function ReadingSheet() {
                 ].filter((p) => !!p.text?.trim())
               : []
             const hasParts = orderParts.length > 0
-            const body = hasParts ? '' : bodyFor(q, r.passage)
+            const body = hasParts ? '' : bodyFor(q, fbList[qi])
             const showSummary = !!q.summaryBox && q.summaryBox.trim().length > 0
             return (
               <section key={qi} className={qi > 0 ? 'mt-10 print:break-before-page' : ''}>

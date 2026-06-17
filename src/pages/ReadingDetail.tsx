@@ -12,7 +12,12 @@ import { GlossaryEditor } from '../components/GlossaryEditor'
 import { MyAttemptsBox } from '../components/MyAttemptsBox'
 import { QuestionView } from '../components/QuestionView'
 import { useGlossQueue, type GlossEntry } from '../components/useGlossQueue'
-import type { Attempt, Reading, WordEntry } from '../lib/types'
+import {
+  passageFallbackPerQuestion,
+  type Attempt,
+  type Reading,
+  type WordEntry,
+} from '../lib/types'
 
 function mergeEntries(base: WordEntry[], adds: { en: string; ko: string }[]): WordEntry[] {
   const next = [...base]
@@ -169,24 +174,27 @@ export function ReadingDetail() {
       )}
 
       <div className="space-y-4">
-        {r.questions.map((q, qi) => (
-          <QuestionView
-            key={qi}
-            index={qi}
-            question={q}
-            fallbackPassage={r.passage}
-            passageGlossary={r.glossary}
-            choicesGlossary={choicesGlossary}
-            selected={isAdmin ? q.answer : -1}
-            onSelect={isAdmin ? (ci) => handleSetAnswer(qi, ci) : () => {}}
-            onSelectPassageWord={
-              isAdmin ? (w) => addWord(w, 'glossary') : undefined
-            }
-            onSelectChoiceWord={
-              isAdmin ? (w) => addWord(w, 'choices') : undefined
-            }
-          />
-        ))}
+        {(() => {
+          const fbList = passageFallbackPerQuestion(r.passage, r.questions)
+          return r.questions.map((q, qi) => (
+            <QuestionView
+              key={qi}
+              index={qi}
+              question={q}
+              fallbackPassage={fbList[qi]}
+              passageGlossary={r.glossary}
+              choicesGlossary={choicesGlossary}
+              selected={isAdmin ? q.answer : -1}
+              onSelect={isAdmin ? (ci) => handleSetAnswer(qi, ci) : () => {}}
+              onSelectPassageWord={
+                isAdmin ? (w) => addWord(w, 'glossary') : undefined
+              }
+              onSelectChoiceWord={
+                isAdmin ? (w) => addWord(w, 'choices') : undefined
+              }
+            />
+          ))
+        })()}
       </div>
 
       {isAdmin && (

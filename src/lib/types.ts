@@ -141,6 +141,39 @@ export interface Reading {
   createdAt: Timestamp | null
 }
 
+/** 문항이 자체 본문(body/image/order parts)을 갖고 있는지 — 공용 지문이 필요 없음을 의미. */
+export function questionHasOwnBody(q: ReadingQuestion): boolean {
+  if (q.body && q.body.trim()) return true
+  if (q.image) return true
+  if (
+    q.type === 'order' &&
+    (q.partA?.trim() ||
+      q.partB?.trim() ||
+      q.partC?.trim() ||
+      q.partD?.trim())
+  ) {
+    return true
+  }
+  return false
+}
+
+/** 한 reading에서 공용 지문(passage)을 어느 문항 위에 표시할지 인덱스 배열을 만든다.
+ *  세트(41~42) 같이 모든 문항이 공용 지문을 쓰는 경우 첫 문항에만 표시되도록.
+ *  각 인덱스에 대해 fallback 문자열을 반환(없으면 undefined). */
+export function passageFallbackPerQuestion(
+  passage: string,
+  questions: ReadingQuestion[],
+): (string | undefined)[] {
+  let used = false
+  return questions.map((q) => {
+    if (questionHasOwnBody(q)) return undefined
+    if (used) return undefined
+    if (!passage || !passage.trim()) return undefined
+    used = true
+    return passage
+  })
+}
+
 export interface VocabResult {
   en: string
   ko: string
