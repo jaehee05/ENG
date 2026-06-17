@@ -55,6 +55,31 @@ export async function imageToHtml(image: string): Promise<string> {
   return data.html ?? ''
 }
 
+export async function parseExplanations(input: {
+  questions: { index: number; number: number; q: string }[]
+  text: string
+}): Promise<{ index: number; explanation: string }[]> {
+  const res = await fetch('/api/parse-explanations', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!res.ok) {
+    let message = `요청 실패 (HTTP ${res.status})`
+    try {
+      const body = (await res.json()) as { error?: string }
+      if (body.error) message = body.error
+    } catch {
+      // ignore
+    }
+    throw new Error(message)
+  }
+  const data = (await res.json()) as {
+    explanations?: { index: number; explanation: string }[]
+  }
+  return data.explanations ?? []
+}
+
 export async function translatePassage(passage: string): Promise<string> {
   const res = await fetch('/api/translate-passage', {
     method: 'POST',
