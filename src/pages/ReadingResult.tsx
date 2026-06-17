@@ -120,7 +120,9 @@ export function ReadingResult() {
                         ({p.tag})
                       </p>
                       <div className="border border-slate-700 px-3 py-2 text-sm text-slate-900 whitespace-pre-wrap leading-relaxed font-myeongjo">
-                        {p.ko || (
+                        {p.ko ? (
+                          renderUnderlines(p.ko)
+                        ) : (
                           <span className="text-slate-400 text-xs">
                             (이 단락 해석 미등록)
                           </span>
@@ -140,7 +142,7 @@ export function ReadingResult() {
                       </p>
                     )}
                     <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-myeongjo">
-                      {passageKo}
+                      {renderUnderlines(passageKo)}
                     </div>
                   </div>
                 )}
