@@ -636,10 +636,19 @@ export function AdminStudentDetail() {
                           >
                             {a.refTitle}
                           </Link>
-                          {a.type === 'vocab' && a.practice && (
-                            <span className="inline-block rounded-full bg-amber-50 text-amber-700 text-[10px] font-medium px-2 py-0.5 border border-amber-200">
-                              연습
-                            </span>
+                          {a.type === 'vocab' && (
+                            <button
+                              type="button"
+                              onClick={() => handleToggleAttemptPractice(a)}
+                              className={`rounded-full text-[10px] font-medium px-2 py-0.5 border transition ${
+                                a.practice
+                                  ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+                                  : 'bg-brand-50 text-brand-700 border-brand-200 hover:bg-brand-100'
+                              }`}
+                              title="클릭으로 연습 ↔ 시험 전환"
+                            >
+                              {a.practice ? '연습' : '시험'}
+                            </button>
                           )}
                         </div>
                       </td>
@@ -663,25 +672,7 @@ export function AdminStudentDetail() {
                         {fmtDate(a.createdAt)}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2 justify-end">
-                          {a.type === 'vocab' && (
-                            <button
-                              type="button"
-                              onClick={() => handleToggleAttemptPractice(a)}
-                              className={`rounded-full text-[11px] font-medium px-2.5 py-1 border transition ${
-                                a.practice
-                                  ? 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
-                                  : 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
-                              }`}
-                              title={
-                                a.practice
-                                  ? '시험 응시로 변경 (평균 정답률에 반영)'
-                                  : '연습 응시로 변경 (평균 정답률에서 제외)'
-                              }
-                            >
-                              {a.practice ? '시험으로' : '연습으로'}
-                            </button>
-                          )}
+                        <div className="flex items-center justify-end">
                           <button
                             type="button"
                             onClick={() => handleDeleteAttempt(a)}

@@ -6,11 +6,15 @@ import {
   listAttemptsForUser,
 } from '../lib/firestore'
 import {
+  DEFAULT_ASSIGNMENT_STATUS_SCHEDULE,
   fetchPpurioSettings,
+  fetchScheduleSettings,
   getAdminSecret,
   savePpurioSettings,
+  saveScheduleSettings,
   sendBatchAlimtalk,
   setAdminSecret,
+  type AssignmentStatusSchedule,
   type PpurioSettingsView,
   type SendResultItem,
 } from '../lib/ppurioApi'
@@ -22,25 +26,29 @@ interface StudentBundle {
   attempts: Attempt[]
 }
 
-function statusLines(b: StudentBundle): string[] {
-  return b.assignments.map((a) => {
-    const done = isAssignmentDone(a, b.attempts)
-    return `▶ ${a.refTitle} - ${done ? '완료' : '미완료'}`
-  })
+function doneLines(b: StudentBundle): string {
+  const lines = b.assignments
+    .filter((a) => isAssignmentDone(a, b.attempts))
+    .map((a) => `▶ ${a.refTitle}`)
+  return lines.length > 0 ? lines.join('\n') : '(완료한 과제가 없습니다)'
 }
 
-function statusValue(b: StudentBundle): string {
-  const lines = statusLines(b)
-  return lines.length > 0 ? lines.join('\n') : '(부여된 과제가 없습니다)'
+function incompleteLines(b: StudentBundle): string {
+  const lines = b.assignments
+    .filter((a) => !isAssignmentDone(a, b.attempts))
+    .map((a) => `▶ ${a.refTitle}`)
+  return lines.length > 0 ? lines.join('\n') : '(미완료 과제가 없습니다)'
 }
 
-const TEMPLATE_PREVIEW = `2027 재희T 1:1 개인 과외
-과제 현황 안내
-[*이름*]님, 과제 현황 안내입니다.
+const TEMPLATE_PREVIEW = `[*이름*]님, 과제 현황 안내입니다.
 
+[완료 과제]
 [*1*]
 
-[*2*]`
+[미완료 과제]
+[*2*]
+
+[*3*]`
 
 function csvEscape(s: string): string {
   if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`
@@ -81,6 +89,13 @@ export function AdminNotify() {
   const [testPhone, setTestPhone] = useState('')
   const [testName, setTestName] = useState('테스트')
 
+  const [schedule, setSchedule] = useState<AssignmentStatusSchedule>(
+    DEFAULT_ASSIGNMENT_STATUS_SCHEDULE,
+  )
+  const [scheduleLoaded, setScheduleLoaded] = useState(false)
+  const [scheduleSaving, setScheduleSaving] = useState(false)
+  const [scheduleNotice, setScheduleNotice] = useState<string | null>(null)
+
   const [adminSecret, setAdminSecretState] = useState(() => getAdminSecret())
   const [ppurioAccount, setPpurioAccount] = useState('')
   const [senderProfile, setSenderProfile] = useState('')
@@ -117,6 +132,36 @@ export function AdminNotify() {
       setCredsNotice(e instanceof Error ? e.message : '불러오기 실패')
     } finally {
       setCredsLoading(false)
+    }
+    try {
+      const sc = await fetchScheduleSettings()
+      if (sc.assignmentStatus) {
+        setSchedule({
+          ...DEFAULT_ASSIGNMENT_STATUS_SCHEDULE,
+          ...sc.assignmentStatus,
+        })
+      }
+      setScheduleLoaded(true)
+    } catch {
+      // schedule 처음 저장 전엔 정상
+      setScheduleLoaded(true)
+    }
+  }
+
+  async function handleSaveSchedule() {
+    setScheduleSaving(true)
+    setScheduleNotice(null)
+    try {
+      await saveScheduleSettings({ assignmentStatus: schedule })
+      setScheduleNotice('스케줄 저장됨')
+      setTimeout(
+        () => setScheduleNotice((cur) => (cur === '스케줄 저장됨' ? null : cur)),
+        2000,
+      )
+    } catch (e) {
+      setScheduleNotice(e instanceof Error ? e.message : '저장 실패')
+    } finally {
+      setScheduleSaving(false)
     }
   }
 
@@ -228,9 +273,12 @@ export function AdminNotify() {
     setSending(true)
     setSendResults(null)
     try {
-      const sampleStatus = bundles[0]
-        ? statusValue(bundles[0])
-        : '▶ 샘플 단어 시험 DAY 1 - 미완료\n▶ 샘플 지문 문제풀이 - 완료'
+      const sampleDone = bundles[0]
+        ? doneLines(bundles[0])
+        : '▶ 샘플 단어 시험 DAY 1'
+      const sampleIncomplete = bundles[0]
+        ? incompleteLines(bundles[0])
+        : '▶ 샘플 지문 문제풀이'
       const out = await sendBatchAlimtalk({
         templateCode: templateCode.trim(),
         messageType: MSG_TYPE_CODE[msgType],
@@ -240,8 +288,9 @@ export function AdminNotify() {
             phone,
             name: testName.trim() || '테스트',
             changeWord: {
-              var1: sampleStatus,
-              var2: notice || '(안내사항 미입력)',
+              var1: sampleDone,
+              var2: sampleIncomplete,
+              var3: notice || '(안내사항 미입력)',
             },
           },
         ],
@@ -284,8 +333,9 @@ export function AdminNotify() {
         phone: b.account.phone ?? '',
         name: b.account.displayName,
         changeWord: {
-          var1: statusValue(b),
-          var2: notice,
+          var1: doneLines(b),
+          var2: incompleteLines(b),
+          var3: notice,
         },
       }))
       const out = await sendBatchAlimtalk({
@@ -303,14 +353,15 @@ export function AdminNotify() {
   }
 
   function downloadCsv() {
-    const rows = [['발송유형', '템플릿코드', '수신번호', '이름', '1', '2']]
+    const rows = [['발송유형', '템플릿코드', '수신번호', '이름', '1', '2', '3']]
     for (const b of visible) {
       rows.push([
         msgType,
         templateCode,
         b.account.phone ?? '',
         b.account.displayName,
-        statusValue(b),
+        doneLines(b),
+        incompleteLines(b),
         notice,
       ])
     }
@@ -514,12 +565,144 @@ export function AdminNotify() {
         </p>
       </div>
 
+      <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <p className="text-sm font-semibold text-slate-700">
+            과제 현황 자동 발송 스케줄
+          </p>
+          {scheduleNotice && (
+            <span className="text-xs text-brand-700">{scheduleNotice}</span>
+          )}
+        </div>
+        <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={schedule.enabled}
+            onChange={(e) =>
+              setSchedule((s) => ({ ...s, enabled: e.target.checked }))
+            }
+            className="accent-brand-600"
+          />
+          자동 발송 사용
+        </label>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">
+              주기
+            </label>
+            <select
+              value={schedule.cadence}
+              onChange={(e) =>
+                setSchedule((s) => ({
+                  ...s,
+                  cadence: e.target.value as 'daily' | 'weekly',
+                }))
+              }
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              <option value="weekly">매주</option>
+              <option value="daily">매일</option>
+            </select>
+          </div>
+          {schedule.cadence === 'weekly' && (
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                요일
+              </label>
+              <select
+                value={schedule.dayOfWeek}
+                onChange={(e) =>
+                  setSchedule((s) => ({
+                    ...s,
+                    dayOfWeek: Number.parseInt(e.target.value, 10),
+                  }))
+                }
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                {['일', '월', '화', '수', '목', '금', '토'].map((d, i) => (
+                  <option key={d} value={i}>
+                    {d}요일
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">
+              시
+            </label>
+            <select
+              value={schedule.hour}
+              onChange={(e) =>
+                setSchedule((s) => ({
+                  ...s,
+                  hour: Number.parseInt(e.target.value, 10),
+                }))
+              }
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              {Array.from({ length: 24 }, (_, h) => (
+                <option key={h} value={h}>
+                  {String(h).padStart(2, '0')}시
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">
+              분
+            </label>
+            <select
+              value={schedule.minute}
+              onChange={(e) =>
+                setSchedule((s) => ({
+                  ...s,
+                  minute: Number.parseInt(e.target.value, 10),
+                }))
+              }
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map((m) => (
+                <option key={m} value={m}>
+                  {String(m).padStart(2, '0')}분
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={schedule.onlyIncomplete}
+            onChange={(e) =>
+              setSchedule((s) => ({ ...s, onlyIncomplete: e.target.checked }))
+            }
+            className="accent-brand-600"
+          />
+          미완료 과제 있는 학생에게만 발송
+        </label>
+        <p className="text-[11px] text-slate-500 leading-relaxed">
+          저장된 시각에 자동으로 위 템플릿 코드 · 안내사항(아래 [*3*] 칸 값)으로 발송됩니다.
+          서버가 KST(Asia/Seoul) 기준으로 5분마다 점검합니다. 동일 시각 중복 발송은 차단됩니다.
+        </p>
+        <div className="flex items-center justify-end">
+          <button
+            type="button"
+            onClick={handleSaveSchedule}
+            disabled={scheduleSaving || !adminSecret || !scheduleLoaded}
+            className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700 disabled:opacity-50"
+          >
+            {scheduleSaving ? '저장 중...' : '스케줄 저장'}
+          </button>
+        </div>
+      </div>
+
       <div className="rounded-lg border border-brand-200 bg-brand-50/40 p-4 space-y-3">
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">
             안내사항{' '}
             <span className="font-normal text-slate-500">
-              (모든 학생에게 동일하게 들어가는 [*2*] 칸)
+              (모든 학생에게 동일하게 들어가는 [*3*] 칸)
             </span>
           </label>
           <textarea
@@ -635,7 +818,8 @@ export function AdminNotify() {
 
       <ul className="space-y-3">
         {visible.map((b) => {
-          const v1 = statusValue(b)
+          const v1 = doneLines(b)
+          const v2 = incompleteLines(b)
           const totalCnt = b.assignments.length
           const doneCnt = b.assignments.filter((a) =>
             isAssignmentDone(a, b.attempts),
@@ -643,7 +827,7 @@ export function AdminNotify() {
           return (
             <li
               key={b.account.id}
-              className="rounded-lg border border-slate-200 bg-white p-4 space-y-2"
+              className="rounded-lg border border-slate-200 bg-white p-4 space-y-3"
             >
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div className="min-w-0">
@@ -657,20 +841,41 @@ export function AdminNotify() {
                     과제 {doneCnt} / {totalCnt} 완료
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => copyText(b.account.id, v1)}
-                  className="rounded-md border border-slate-300 text-slate-700 text-sm font-medium px-3 py-1.5 hover:bg-slate-100"
-                >
-                  {copiedId === b.account.id ? '복사됨!' : '[*1*] 복사'}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => copyText(`${b.account.id}-1`, v1)}
+                    className="rounded-md border border-slate-300 text-slate-700 text-xs font-medium px-2.5 py-1 hover:bg-slate-100"
+                  >
+                    {copiedId === `${b.account.id}-1` ? '복사됨' : '[*1*] 복사'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => copyText(`${b.account.id}-2`, v2)}
+                    className="rounded-md border border-slate-300 text-slate-700 text-xs font-medium px-2.5 py-1 hover:bg-slate-100"
+                  >
+                    {copiedId === `${b.account.id}-2` ? '복사됨' : '[*2*] 복사'}
+                  </button>
+                </div>
               </div>
-              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                [*1*] 변수 값
-              </p>
-              <pre className="rounded-md bg-slate-50 border border-slate-200 p-3 text-xs leading-relaxed text-slate-800 whitespace-pre-wrap font-sans">
-                {v1}
-              </pre>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div>
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                    [*1*] 완료 과제
+                  </p>
+                  <pre className="rounded-md bg-slate-50 border border-slate-200 p-3 text-xs leading-relaxed text-slate-800 whitespace-pre-wrap font-sans">
+                    {v1}
+                  </pre>
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                    [*2*] 미완료 과제
+                  </p>
+                  <pre className="rounded-md bg-slate-50 border border-slate-200 p-3 text-xs leading-relaxed text-slate-800 whitespace-pre-wrap font-sans">
+                    {v2}
+                  </pre>
+                </div>
+              </div>
             </li>
           )
         })}

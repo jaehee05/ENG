@@ -2,10 +2,40 @@ const admin = require("firebase-admin");
 admin.initializeApp();
 
 const { onRequest } = require("firebase-functions/v2/https");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const { sendOne } = require("./ppurio");
 
 setGlobalOptions({ region: "asia-northeast3", retry: false, maxInstances: 10 });
+
+const DEFAULT_SCHEDULE = {
+  enabled: false,
+  cadence: "weekly",
+  dayOfWeek: 0,
+  hour: 9,
+  minute: 0,
+  templateCode: "",
+  messageType: "ALH",
+  notice: "",
+  onlyIncomplete: false,
+  lastSentKey: "",
+};
+
+function normalizeSchedule(raw) {
+  const r = raw || {};
+  return {
+    enabled: !!r.enabled,
+    cadence: r.cadence === "daily" ? "daily" : "weekly",
+    dayOfWeek: Number.isInteger(r.dayOfWeek) ? r.dayOfWeek : 0,
+    hour: Number.isInteger(r.hour) ? Math.min(23, Math.max(0, r.hour)) : 9,
+    minute: Number.isInteger(r.minute) ? Math.min(59, Math.max(0, r.minute)) : 0,
+    templateCode: String(r.templateCode || ""),
+    messageType: String(r.messageType || "ALH"),
+    notice: String(r.notice || ""),
+    onlyIncomplete: !!r.onlyIncomplete,
+    lastSentKey: String(r.lastSentKey || ""),
+  };
+}
 
 function setCors(res) {
   res.set("Access-Control-Allow-Origin", "*");
@@ -66,6 +96,24 @@ exports.ppurioAdmin = onRequest({ invoker: "public" }, async (req, res) => {
       return res.json({ ok: true });
     }
 
+    if (action === "getSchedule") {
+      const snap = await admin.firestore().doc("settings/notifySchedules").get();
+      const d = snap.exists ? snap.data() : {};
+      return res.json({
+        assignmentStatus: normalizeSchedule(d.assignmentStatus),
+      });
+    }
+
+    if (action === "saveSchedule") {
+      const p = payload || {};
+      const sched = normalizeSchedule(p.assignmentStatus);
+      await admin.firestore().doc("settings/notifySchedules").set(
+        { assignmentStatus: sched, updatedAt: Date.now() },
+        { merge: true },
+      );
+      return res.json({ ok: true });
+    }
+
     if (action === "sendBatch") {
       const p = payload || {};
       const templateCode = String(p.templateCode || "").trim();
@@ -102,3 +150,132 @@ exports.ppurioAdmin = onRequest({ invoker: "public" }, async (req, res) => {
     return res.status(500).json({ error: String(err.message || err) });
   }
 });
+
+// ===== 자동 발송 스케줄러 =====
+// KST 5분마다 점검. settings/notifySchedules.assignmentStatus가 enabled이고
+// 현재 시각/요일이 매치하면 전체 학생에게 발송. 중복 방지를 위해 lastSentKey 비교.
+
+function nowKstParts() {
+  // toLocaleString trick은 부정확하므로 직접 KST(UTC+9) 계산
+  const now = new Date();
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  return {
+    y: kst.getUTCFullYear(),
+    m: kst.getUTCMonth() + 1,
+    d: kst.getUTCDate(),
+    dow: kst.getUTCDay(), // 0=Sun
+    hour: kst.getUTCHours(),
+    minute: kst.getUTCMinutes(),
+  };
+}
+
+function isAssignmentDoneSrv(asn, attempts) {
+  if (asn.manualDone) return true;
+  const matched = attempts.filter(
+    (a) => a.type === asn.type && a.refId === asn.refId && !a.practice,
+  );
+  if (matched.length === 0) return false;
+  if (asn.minCorrect && asn.minCorrect > 0) {
+    return matched.some((a) => (a.correct || 0) >= asn.minCorrect);
+  }
+  return true;
+}
+
+async function runAssignmentStatusBlast(schedule) {
+  const db = admin.firestore();
+  const studentsSnap = await db
+    .collection("users")
+    .where("role", "==", "student")
+    .where("status", "==", "active")
+    .get();
+  const students = studentsSnap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .filter((s) => (s.phone || "").trim());
+
+  const recipients = [];
+  for (const s of students) {
+    const [asnSnap, attSnap] = await Promise.all([
+      db.collection("assignments").where("studentUid", "==", s.id).get(),
+      db.collection("attempts").where("studentUid", "==", s.id).get(),
+    ]);
+    const assignments = asnSnap.docs.map((x) => ({ id: x.id, ...x.data() }));
+    const attempts = attSnap.docs.map((x) => ({ id: x.id, ...x.data() }));
+    const done = assignments
+      .filter((a) => isAssignmentDoneSrv(a, attempts))
+      .map((a) => `▶ ${a.refTitle}`);
+    const incomplete = assignments
+      .filter((a) => !isAssignmentDoneSrv(a, attempts))
+      .map((a) => `▶ ${a.refTitle}`);
+
+    if (schedule.onlyIncomplete && incomplete.length === 0) continue;
+
+    recipients.push({
+      label: s.displayName,
+      phone: s.phone,
+      name: s.displayName,
+      changeWord: {
+        var1: done.length > 0 ? done.join("\n") : "(완료한 과제가 없습니다)",
+        var2: incomplete.length > 0 ? incomplete.join("\n") : "(미완료 과제가 없습니다)",
+        var3: schedule.notice || "",
+      },
+    });
+  }
+
+  const results = [];
+  for (const r of recipients) {
+    try {
+      await sendOne({
+        phone: r.phone,
+        name: r.name,
+        changeWord: r.changeWord,
+        templateCode: schedule.templateCode,
+        messageType: schedule.messageType,
+      });
+      results.push({ label: r.label, ok: true });
+    } catch (e) {
+      console.error(`[scheduledNotify] ${r.label} 실패:`, e);
+      results.push({ label: r.label, ok: false, error: String(e.message || e) });
+    }
+  }
+  return { sent: results.filter((x) => x.ok).length, failed: results.filter((x) => !x.ok).length, results };
+}
+
+exports.scheduledNotify = onSchedule(
+  { schedule: "every 5 minutes", timeZone: "Asia/Seoul" },
+  async () => {
+    const db = admin.firestore();
+    const snap = await db.doc("settings/notifySchedules").get();
+    if (!snap.exists) return;
+    const d = snap.data() || {};
+    const sched = normalizeSchedule(d.assignmentStatus);
+    if (!sched.enabled) return;
+    if (!sched.templateCode) {
+      console.warn("[scheduledNotify] templateCode 비어있음 — skip");
+      return;
+    }
+
+    const t = nowKstParts();
+    if (sched.cadence === "weekly" && t.dow !== sched.dayOfWeek) return;
+    if (t.hour !== sched.hour) return;
+    if (Math.abs(t.minute - sched.minute) > 4) return;
+
+    // 동일 시각 중복 발송 방지 (분까지 동일 키)
+    const key = `${t.y}${String(t.m).padStart(2, "0")}${String(t.d).padStart(2, "0")}-${String(sched.hour).padStart(2, "0")}${String(sched.minute).padStart(2, "0")}`;
+    if (sched.lastSentKey === key) {
+      console.log("[scheduledNotify] 이미 같은 시각에 발송됨 — skip", key);
+      return;
+    }
+
+    console.log("[scheduledNotify] 발송 시작", key);
+    const result = await runAssignmentStatusBlast(sched);
+    console.log("[scheduledNotify] 발송 완료", key, result);
+
+    await db.doc("settings/notifySchedules").set(
+      {
+        assignmentStatus: { ...sched, lastSentKey: key },
+        lastRun: { key, ...result, at: Date.now() },
+      },
+      { merge: true },
+    );
+  },
+);

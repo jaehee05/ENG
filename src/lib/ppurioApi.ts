@@ -81,3 +81,44 @@ export async function sendBatchAlimtalk(input: {
 }): Promise<{ sent: number; failed: number; results: SendResultItem[] }> {
   return call('sendBatch', input)
 }
+
+export type Cadence = 'daily' | 'weekly'
+
+export interface AssignmentStatusSchedule {
+  enabled: boolean
+  cadence: Cadence
+  /** Sunday=0, Saturday=6. weekly만 사용. */
+  dayOfWeek: number
+  hour: number
+  minute: number
+  templateCode: string
+  messageType: string
+  notice: string
+  /** true면 미완료 과제가 있는 학생에게만 발송. */
+  onlyIncomplete: boolean
+  lastSentKey?: string
+}
+
+export interface ScheduleSettings {
+  assignmentStatus: AssignmentStatusSchedule
+}
+
+export const DEFAULT_ASSIGNMENT_STATUS_SCHEDULE: AssignmentStatusSchedule = {
+  enabled: false,
+  cadence: 'weekly',
+  dayOfWeek: 0,
+  hour: 9,
+  minute: 0,
+  templateCode: '',
+  messageType: 'ALH',
+  notice: '',
+  onlyIncomplete: false,
+}
+
+export async function fetchScheduleSettings(): Promise<ScheduleSettings> {
+  return call<ScheduleSettings>('getSchedule')
+}
+
+export async function saveScheduleSettings(input: ScheduleSettings): Promise<void> {
+  await call<{ ok: true }>('saveSchedule', input)
+}
