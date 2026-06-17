@@ -17,6 +17,10 @@ export interface DraftQuestion {
   partB: string
   partC: string
   partD: string
+  partAKo?: string
+  partBKo?: string
+  partCKo?: string
+  partDKo?: string
 }
 
 export function emptyDraftQuestion(type: ReadingQuestionType = 'standard'): DraftQuestion {

@@ -49,6 +49,7 @@ submit_reading을 호출하지 않고 텍스트만 출력해도 되는 경우는
   - 그 외에 본문에 단순히 밑줄 친 부분이 있고 발문이 그걸 가리키는 경우(예: "밑줄 친 ~가 의미하는 바로 가장 적절한 것은?"), 그 부분을 \`{{...}}\`로 감쌀 것. 예: "He {{kicked the bucket}} last night."
 - intro: order/insert에서 박스로 주어진 글/문장
 - partA, partB, partC, partD: **order 유형 전용**. 본문 순서를 묻는 (A), (B), (C), (D) 단락을 각각 분리해서 채웁니다. body는 사용하지 말 것. (D)가 없으면 partD는 빈 문자열.
+- partAKo, partBKo, partCKo, partDKo: order 유형의 (A)(B)(C)(D) 각 단락에 대한 **한국어 해석**. 입력에 단락별 해석이 있으면 각각 분배. 부분 해석만 있으면 가능한 부분만 채우고 없는 건 빈 문자열. 단락별 해석 없이 통합 한글 해석만 있으면 partAKo~partDKo는 모두 빈 문자열로 두고 passageKo에 통합 한글 해석을 담으세요.
 - summaryBox: summary에서 박스 안 요약문, (A)/(B) 빈칸 그대로
 - choices: 정확히 5개. ①~⑤ 마커는 빼고 텍스트만.
   - summary 유형: "(A) ...... (B) ......" 형태로 한 항목에 함께
@@ -84,6 +85,10 @@ interface ParsedQuestion {
   partB?: string
   partC?: string
   partD?: string
+  partAKo?: string
+  partBKo?: string
+  partCKo?: string
+  partDKo?: string
   explanation?: string
 }
 
@@ -126,6 +131,10 @@ function normalizeQuestion(raw: unknown): ParsedQuestion | null {
     partB: typeof r.partB === 'string' ? r.partB.trim() : '',
     partC: typeof r.partC === 'string' ? r.partC.trim() : '',
     partD: typeof r.partD === 'string' ? r.partD.trim() : '',
+    partAKo: typeof r.partAKo === 'string' ? r.partAKo.trim() : '',
+    partBKo: typeof r.partBKo === 'string' ? r.partBKo.trim() : '',
+    partCKo: typeof r.partCKo === 'string' ? r.partCKo.trim() : '',
+    partDKo: typeof r.partDKo === 'string' ? r.partDKo.trim() : '',
     explanation: typeof r.explanation === 'string' ? r.explanation.trim() : '',
   }
 }
@@ -239,6 +248,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     partB: { type: 'string' },
                     partC: { type: 'string' },
                     partD: { type: 'string' },
+                    partAKo: { type: 'string' },
+                    partBKo: { type: 'string' },
+                    partCKo: { type: 'string' },
+                    partDKo: { type: 'string' },
                     explanation: { type: 'string' },
                   },
                 },

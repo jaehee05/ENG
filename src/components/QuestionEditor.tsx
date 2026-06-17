@@ -149,13 +149,21 @@ export function QuestionEditor({ index, question, canRemove, onChange, onRemove 
       )}
 
       {isOrder ? (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {(['A', 'B', 'C', 'D'] as const).map((tag) => {
             const key = (`part${tag}` as const) as 'partA' | 'partB' | 'partC' | 'partD'
+            const koKey = (`part${tag}Ko` as const) as
+              | 'partAKo'
+              | 'partBKo'
+              | 'partCKo'
+              | 'partDKo'
             const optional = tag === 'D'
             return (
-              <div key={tag}>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
+              <div
+                key={tag}
+                className="rounded-md border border-slate-200 bg-slate-50/40 p-3 space-y-2"
+              >
+                <label className="block text-xs font-medium text-slate-700">
                   ({tag}) 단락{' '}
                   {optional && (
                     <span className="text-slate-400 font-normal">(선택)</span>
@@ -169,6 +177,18 @@ export function QuestionEditor({ index, question, canRemove, onChange, onRemove 
                   }
                   rows={4}
                   className={inputCls}
+                  placeholder={`(${tag}) 단락 영어 본문`}
+                />
+                <label className="block text-[11px] font-medium text-slate-500">
+                  ({tag}) 한글 해석{' '}
+                  <span className="font-normal text-slate-400">(선택)</span>
+                </label>
+                <textarea
+                  value={question[koKey] ?? ''}
+                  onChange={(e) => patch({ [koKey]: e.target.value })}
+                  rows={3}
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  placeholder={`(${tag}) 단락 한국어 해석. 자동 분류 시 단락별 해석이 있으면 자동 채워집니다.`}
                 />
               </div>
             )

@@ -61,6 +61,10 @@ function trimDraft(q: DraftQuestion) {
     partB?: string
     partC?: string
     partD?: string
+    partAKo?: string
+    partBKo?: string
+    partCKo?: string
+    partDKo?: string
   } = {
     type: q.type,
     q: q.q.trim(),
@@ -79,6 +83,10 @@ function trimDraft(q: DraftQuestion) {
   if (q.partB.trim()) out.partB = q.partB.trim()
   if (q.partC.trim()) out.partC = q.partC.trim()
   if (q.partD.trim()) out.partD = q.partD.trim()
+  if (q.partAKo && q.partAKo.trim()) out.partAKo = q.partAKo.trim()
+  if (q.partBKo && q.partBKo.trim()) out.partBKo = q.partBKo.trim()
+  if (q.partCKo && q.partCKo.trim()) out.partCKo = q.partCKo.trim()
+  if (q.partDKo && q.partDKo.trim()) out.partDKo = q.partDKo.trim()
   return out
 }
 
@@ -284,6 +292,10 @@ export function ReadingNew() {
           partB: q.partB ?? '',
           partC: q.partC ?? '',
           partD: q.partD ?? '',
+          partAKo: q.partAKo ?? '',
+          partBKo: q.partBKo ?? '',
+          partCKo: q.partCKo ?? '',
+          partDKo: q.partDKo ?? '',
         }
       })
       setQuestions(drafts)

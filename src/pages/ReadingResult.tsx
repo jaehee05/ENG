@@ -59,6 +59,33 @@ export function ReadingResult() {
   const ratio = attempt.total > 0 ? Math.round((attempt.correct / attempt.total) * 100) : 0
   const hasWrong = wrongIndices.length > 0
   const passageKo = reading?.passageKo?.trim() ?? ''
+  const firstQ = reading?.questions?.[0]
+  const orderKoParts =
+    firstQ?.type === 'order'
+      ? (['A', 'B', 'C', 'D'] as const)
+          .map((tag) => ({
+            tag,
+            en:
+              tag === 'A'
+                ? firstQ.partA?.trim() ?? ''
+                : tag === 'B'
+                  ? firstQ.partB?.trim() ?? ''
+                  : tag === 'C'
+                    ? firstQ.partC?.trim() ?? ''
+                    : firstQ.partD?.trim() ?? '',
+            ko:
+              tag === 'A'
+                ? firstQ.partAKo?.trim() ?? ''
+                : tag === 'B'
+                  ? firstQ.partBKo?.trim() ?? ''
+                  : tag === 'C'
+                    ? firstQ.partCKo?.trim() ?? ''
+                    : firstQ.partDKo?.trim() ?? '',
+          }))
+          .filter((p) => p.en || p.ko)
+      : []
+  const hasOrderKo = orderKoParts.some((p) => p.ko)
+  const hasAnyKo = hasOrderKo || !!passageKo
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -80,13 +107,43 @@ export function ReadingResult() {
           <p className="text-sm font-semibold text-slate-900">
             틀린 문제가 {wrongIndices.length}개 있어요. 한글 해석을 참고해서 다시 풀어보세요.
           </p>
-          {passageKo ? (
+          {hasAnyKo ? (
             <details className="rounded-md border border-amber-200 bg-white">
               <summary className="cursor-pointer text-sm font-medium text-slate-800 px-4 py-2 hover:bg-amber-50">
                 지문 한글 해석 보기
               </summary>
-              <div className="px-4 py-3 text-sm text-slate-800 whitespace-pre-wrap leading-relaxed border-t border-amber-100 font-myeongjo">
-                {passageKo}
+              <div className="px-4 py-3 border-t border-amber-100 space-y-4">
+                {hasOrderKo &&
+                  orderKoParts.map((p) => (
+                    <div key={p.tag}>
+                      <p className="text-center text-sm font-semibold text-slate-800 mb-1.5 font-myeongjo">
+                        ({p.tag})
+                      </p>
+                      <div className="border border-slate-700 px-3 py-2 text-sm text-slate-900 whitespace-pre-wrap leading-relaxed font-myeongjo">
+                        {p.ko || (
+                          <span className="text-slate-400 text-xs">
+                            (이 단락 해석 미등록)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                {passageKo && (
+                  <div
+                    className={
+                      hasOrderKo ? 'border-t border-amber-100 pt-3' : ''
+                    }
+                  >
+                    {hasOrderKo && (
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                        통합 해석
+                      </p>
+                    )}
+                    <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-myeongjo">
+                      {passageKo}
+                    </div>
+                  </div>
+                )}
               </div>
             </details>
           ) : (

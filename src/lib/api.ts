@@ -188,6 +188,10 @@ export interface ParsedReadingQuestion {
   partB?: string
   partC?: string
   partD?: string
+  partAKo?: string
+  partBKo?: string
+  partCKo?: string
+  partDKo?: string
   explanation?: string
 }
 

@@ -109,6 +109,11 @@ export interface ReadingQuestion {
   partB?: string
   partC?: string
   partD?: string
+  /** 단락별 한글 해석 (order 첫 문항의 partA~D 각각 대응). */
+  partAKo?: string
+  partBKo?: string
+  partCKo?: string
+  partDKo?: string
 }
 
 export const READING_TYPE_LABEL: Record<ReadingQuestionType, string> = {
