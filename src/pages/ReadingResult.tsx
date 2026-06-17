@@ -6,6 +6,80 @@ import type { Attempt, Reading } from '../lib/types'
 
 const CHOICE_MARKS = ['①', '②', '③', '④', '⑤']
 
+const SECTION_HEADERS = ['지문', '주어진 글', '본문', '요약문', '안내문']
+const HEADER_RE = new RegExp(`^\\[(${SECTION_HEADERS.join('|')})\\]\\s*$`, 'm')
+
+interface Section {
+  header: string | null
+  content: string
+}
+
+function splitSections(text: string): Section[] {
+  const lines = text.split(/\n/)
+  const sections: Section[] = []
+  let current: Section = { header: null, content: '' }
+  for (const line of lines) {
+    const m = line.match(HEADER_RE)
+    if (m) {
+      if (current.content.trim() || current.header) {
+        sections.push({
+          header: current.header,
+          content: current.content.replace(/\n+$/, ''),
+        })
+      }
+      current = { header: m[1], content: '' }
+    } else {
+      current.content += line + '\n'
+    }
+  }
+  if (current.content.trim() || current.header) {
+    sections.push({
+      header: current.header,
+      content: current.content.replace(/\n+$/, ''),
+    })
+  }
+  return sections
+}
+
+const BOXED_HEADERS = new Set(['주어진 글', '요약문', '안내문'])
+
+function PassageKoSections({ text }: { text: string }) {
+  const sections = splitSections(text)
+  return (
+    <div className="space-y-3">
+      {sections.map((s, i) => {
+        const body = s.content.trim()
+        if (!body) return null
+        if (s.header && BOXED_HEADERS.has(s.header)) {
+          return (
+            <div key={i}>
+              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                {s.header}
+              </p>
+              <div className="border border-slate-700 px-3 py-2 text-sm text-slate-900 whitespace-pre-wrap leading-relaxed font-myeongjo">
+                {renderUnderlines(body)}
+              </div>
+            </div>
+          )
+        }
+        // [지문] / [본문] / 헤더 없음: 평텍스트
+        return (
+          <div key={i}>
+            {s.header && (
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                {s.header}
+              </p>
+            )}
+            <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-myeongjo">
+              {renderUnderlines(body)}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export function ReadingResult() {
   const { attemptId } = useParams<{ id: string; attemptId: string }>()
   const [attempt, setAttempt] = useState<Attempt | null>(null)
@@ -141,9 +215,7 @@ export function ReadingResult() {
                         통합 해석
                       </p>
                     )}
-                    <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-myeongjo">
-                      {renderUnderlines(passageKo)}
-                    </div>
+                    <PassageKoSections text={passageKo} />
                   </div>
                 )}
               </div>

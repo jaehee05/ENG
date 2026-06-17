@@ -224,13 +224,15 @@ export function ReadingEdit() {
       .map((q) => (q.imageHtml ? extractTextFromHtml(q.imageHtml) : ''))
       .filter((t) => t.trim())
     const parts: string[] = []
-    if (passage.trim()) parts.push(passage.trim())
+    if (passage.trim()) parts.push(`[지문]\n${passage.trim()}`)
     for (const q of questions) {
-      if (q.body && q.body.trim()) parts.push(q.body.trim())
-      if (q.intro && q.intro.trim()) parts.push(q.intro.trim())
-      if (q.summaryBox && q.summaryBox.trim()) parts.push(q.summaryBox.trim())
+      if (q.intro && q.intro.trim())
+        parts.push(`[주어진 글]\n${q.intro.trim()}`)
+      if (q.body && q.body.trim()) parts.push(`[본문]\n${q.body.trim()}`)
+      if (q.summaryBox && q.summaryBox.trim())
+        parts.push(`[요약문]\n${q.summaryBox.trim()}`)
     }
-    for (const t of htmlTexts) parts.push(t)
+    for (const t of htmlTexts) parts.push(`[안내문]\n${t}`)
 
     if (!isOrderSet && parts.length === 0) {
       setError('번역할 영어 텍스트가 없습니다.')
