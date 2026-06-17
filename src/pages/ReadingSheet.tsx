@@ -212,16 +212,20 @@ export function ReadingSheet() {
                 )}
 
                 {hasParts && (
-                  <div className="grid grid-cols-3 gap-6 space-y-0">
-                    <div className="col-span-2 space-y-3 font-myeongjo text-[11.5pt] leading-[1.85] text-slate-900">
+                  <div className="grid grid-cols-3 gap-6">
+                    <div className="col-span-2 space-y-3 font-myeongjo text-slate-900">
                       {orderParts.map((p) => (
-                        <p
-                          key={p.tag}
-                          className="whitespace-pre-wrap"
-                          style={{ paddingLeft: '2.4em', textIndent: '-2.4em' }}
-                        >
-                          ({p.tag}) {renderWithUnderlines(p.text ?? '')}
-                        </p>
+                        <div key={p.tag}>
+                          <p className="text-center text-[11pt] font-bold mb-1">
+                            ({p.tag})
+                          </p>
+                          <div
+                            className="border border-slate-700 p-3 text-[11.5pt] leading-[1.85] whitespace-pre-wrap text-justify"
+                            style={{ textIndent: '1.25em' }}
+                          >
+                            {renderWithUnderlines(p.text ?? '')}
+                          </div>
+                        </div>
                       ))}
                     </div>
                     <GlossaryColumn items={r.glossary} label="지문 단어" />

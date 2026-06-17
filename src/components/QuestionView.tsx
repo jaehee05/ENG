@@ -135,17 +135,23 @@ export function QuestionView({
       )}
 
       {orderParts.length > 0 && (
-        <div className="space-y-4">
+        <div className="space-y-5">
           {orderParts.map((p) => (
-            <GlossedPassage
-              key={p.tag}
-              passage={`(${p.tag}) ${p.text!}`}
-              glossary={passageGlossary}
-              viewedWords={viewedWords}
-              onWordLookup={onWordLookup}
-              onSelectWord={onSelectPassageWord}
-              className={`${bodyTextCls.replace('text-justify', '').trim()} pl-9 [text-indent:-2.25rem]`}
-            />
+            <div key={p.tag}>
+              <p className="text-center text-base font-semibold text-slate-800 mb-1.5 font-myeongjo">
+                ({p.tag})
+              </p>
+              <div className="border border-slate-700 px-4 sm:px-5 py-3 sm:py-4 bg-white">
+                <GlossedPassage
+                  passage={p.text!}
+                  glossary={passageGlossary}
+                  viewedWords={viewedWords}
+                  onWordLookup={onWordLookup}
+                  onSelectWord={onSelectPassageWord}
+                  className={`${bodyTextCls} [text-indent:1.25em]`}
+                />
+              </div>
+            </div>
           ))}
         </div>
       )}
