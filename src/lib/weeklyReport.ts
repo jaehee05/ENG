@@ -56,21 +56,20 @@ export function buildWeeklyReportVars(
 
   const var1 = [
     '📊 지난주 과제 성취도',
-    `▫️ 단어 암기: [ ${vocabPct}% 완료 ]`,
-    `▫️ 문제 풀이: [ ${readingPct}% 완료 ]`,
+    `▫️ 단어 암기: ${vocabPct}% 완료`,
+    `▫️ 문제 풀이: ${readingPct}% 완료`,
   ].join('\n')
 
   const var2 = [
-    '🔤 단어 시험 Report',
-    `▫️ 학습 범위: 총 ${vocabAsn.length}회분 (단어 ${totalWords}개)`,
-    `▫️ 암기 현황: 총 ${totalCorrectV}개 완료`,
-    `▫️ 최종 결과: 🎯 총 ${sessionCount}회 중 [ ${passCount}회 ] 통과`,
+    '🔤 단어 시험',
+    `▫️ 학습 ${vocabAsn.length}회분 · 단어 ${totalWords}개`,
+    `▫️ 통과 ${passCount}/${sessionCount}회 (암기 ${totalCorrectV}개)`,
   ].join('\n')
 
   const var3 = [
-    '📝 문제 풀이 Report',
-    `▫️ 독해 지문: 총 ${readingDone}개 완수`,
-    `▫️ 학습 결과: 📈 정답률 ${ratio}% (${totalCorrectR}/${totalR}문항)`,
+    '📝 문제 풀이',
+    `▫️ 지문 ${readingDone}개 완수`,
+    `▫️ 📈 정답률 ${ratio}% (${totalCorrectR}/${totalR}문항)`,
   ].join('\n')
 
   return { var1, var2, var3 }
