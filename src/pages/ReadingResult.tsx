@@ -128,21 +128,24 @@ export function ReadingResult() {
                 {r.choices.map((c, ci) => {
                   const isUser = ci === r.userAnswer
                   const isAnswer = ci === r.correctAnswer
+                  // 정답은 (a) 처음부터 맞혔거나 (b) 재도전에서 맞힌 경우에만 공개
+                  const revealAnswer = r.correct || retryCorrect
+                  const showAsAnswer = isAnswer && revealAnswer
                   return (
                     <div
                       key={ci}
                       className={`flex items-start gap-2 rounded px-2 py-1 ${
-                        isAnswer
+                        showAsAnswer
                           ? 'bg-brand-100/70'
-                          : isUser
+                          : isUser && !showAsAnswer
                             ? 'bg-red-100/70'
                             : ''
                       }`}
                     >
                       <span className="text-slate-500 w-5">{CHOICE_MARKS[ci]}</span>
                       <span className="flex-1 text-slate-700">{renderUnderlines(c)}</span>
-                      {isAnswer && <span className="text-xs text-brand-700 font-medium">정답</span>}
-                      {isUser && !isAnswer && (
+                      {showAsAnswer && <span className="text-xs text-brand-700 font-medium">정답</span>}
+                      {isUser && !showAsAnswer && (
                         <span className="text-xs text-red-800 font-medium">선택</span>
                       )}
                     </div>
