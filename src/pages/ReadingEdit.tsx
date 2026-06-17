@@ -225,10 +225,15 @@ export function ReadingEdit() {
       .filter((t) => t.trim())
     const parts: string[] = []
     if (passage.trim()) parts.push(passage.trim())
+    for (const q of questions) {
+      if (q.body && q.body.trim()) parts.push(q.body.trim())
+      if (q.intro && q.intro.trim()) parts.push(q.intro.trim())
+      if (q.summaryBox && q.summaryBox.trim()) parts.push(q.summaryBox.trim())
+    }
     for (const t of htmlTexts) parts.push(t)
 
     if (!isOrderSet && parts.length === 0) {
-      setError('번역할 지문이나 안내문 HTML이 없습니다.')
+      setError('번역할 영어 텍스트가 없습니다.')
       return
     }
     setError(null)
