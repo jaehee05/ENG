@@ -7,6 +7,7 @@ import {
   setAccountPassword,
   setAccountStatus,
 } from '../lib/account'
+import { regradeAllReadings } from '../lib/firestore'
 import type { UserAccount, UserStatus } from '../lib/types'
 
 const STATUS_LABEL: Record<UserStatus, string> = {
@@ -86,6 +87,30 @@ export function AdminStudents() {
     load()
   }
 
+  const [regrading, setRegrading] = useState(false)
+  const [regradeNote, setRegradeNote] = useState<string | null>(null)
+  async function handleRegradeAll() {
+    if (
+      !window.confirm(
+        '모든 지문 시험 기록을 현재 정답 기준으로 다시 채점합니다. 진행할까요?',
+      )
+    ) {
+      return
+    }
+    setRegrading(true)
+    setRegradeNote(null)
+    try {
+      const r = await regradeAllReadings()
+      setRegradeNote(
+        `지문 ${r.readings}건 검토 · 변경된 응시 기록 ${r.updated}건 재채점 완료`,
+      )
+    } catch (e) {
+      setRegradeNote(e instanceof Error ? e.message : '재채점에 실패했습니다.')
+    } finally {
+      setRegrading(false)
+    }
+  }
+
   const others = accounts.filter((a) => a.id !== profile?.id)
   const me = accounts.find((a) => a.id === profile?.id)
   const pending = others.filter((a) => a.status === 'pending').length
@@ -111,6 +136,26 @@ export function AdminStudents() {
           </span>
         </div>
       )}
+
+      <div className="rounded-lg border border-slate-200 bg-white p-4 flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <p className="text-sm font-semibold text-slate-900">지문 일괄 재채점</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            모든 학생의 지문 시험 기록을 각 지문의 현재 정답 기준으로 다시 채점합니다.
+          </p>
+          {regradeNote && (
+            <p className="text-xs text-brand-700 mt-1">{regradeNote}</p>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={handleRegradeAll}
+          disabled={regrading}
+          className="rounded-md border border-slate-300 text-slate-700 text-sm font-medium px-4 py-2 hover:bg-slate-100 disabled:opacity-50"
+        >
+          {regrading ? '재채점 중...' : '전체 재채점 실행'}
+        </button>
+      </div>
 
       <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
         <table className="min-w-full text-sm">

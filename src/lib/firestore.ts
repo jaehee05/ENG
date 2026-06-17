@@ -191,6 +191,59 @@ export async function updateReadingQuestions(
   await updateDoc(doc(db, 'readings', id), { questions })
 }
 
+/** 한 지문의 attempt 전부를 그 지문 questions[].answer 기준으로 재채점. */
+export async function regradeAllAttemptsForReading(
+  readingId: string,
+  questions: ReadingQuestion[],
+): Promise<number> {
+  const snap = await getDocs(
+    query(
+      collection(db, 'attempts'),
+      where('type', '==', 'reading'),
+      where('refId', '==', readingId),
+    ),
+  )
+  let touched = 0
+  for (const d of snap.docs) {
+    const data = d.data() as Omit<Attempt, 'id'>
+    const results = (data.readingResults ?? []) as ReadingResult[]
+    if (results.length === 0) continue
+    const updated = results.map((r, i) => {
+      const q = questions[i]
+      if (!q) return r
+      const correct = r.userAnswer === q.answer
+      return { ...r, correctAnswer: q.answer, correct }
+    })
+    const totalCorrect = updated.reduce(
+      (s, r) => s + (r.correct ? 1 : 0),
+      0,
+    )
+    const sameAnswers = results.every(
+      (r, i) => r.correctAnswer === updated[i].correctAnswer,
+    )
+    if (sameAnswers && totalCorrect === data.correct) continue
+    await updateDoc(doc(db, 'attempts', d.id), {
+      readingResults: updated,
+      correct: totalCorrect,
+    })
+    touched++
+  }
+  return touched
+}
+
+/** 모든 지문에 대해 일괄 재채점. */
+export async function regradeAllReadings(): Promise<{
+  readings: number
+  updated: number
+}> {
+  const readings = await listReadings()
+  let updated = 0
+  for (const r of readings) {
+    updated += await regradeAllAttemptsForReading(r.id, r.questions)
+  }
+  return { readings: readings.length, updated }
+}
+
 /**
  * 지문의 정답을 바꾼 뒤, 이미 응시한 학생들의 attempt 기록도 재채점.
  * 각 attempt.readingResults[qi]의 correctAnswer/correct를 갱신하고
