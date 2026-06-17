@@ -184,6 +184,13 @@ export async function updateReadingContent(
   await updateDoc(doc(db, 'readings', id), input)
 }
 
+export async function updateReadingQuestions(
+  id: string,
+  questions: ReadingQuestion[],
+): Promise<void> {
+  await updateDoc(doc(db, 'readings', id), { questions })
+}
+
 export async function deleteReading(id: string): Promise<void> {
   await deleteDoc(doc(db, 'readings', id))
 }

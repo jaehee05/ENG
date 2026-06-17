@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { getReading, listAttemptsForUser, updateReadingGlossaries } from '../lib/firestore'
+import {
+  getReading,
+  listAttemptsForUser,
+  updateReadingGlossaries,
+  updateReadingQuestions,
+} from '../lib/firestore'
 import { useAuth } from '../contexts/useAuth'
 import { GlossaryEditor } from '../components/GlossaryEditor'
 import { MyAttemptsBox } from '../components/MyAttemptsBox'
@@ -81,6 +86,21 @@ export function ReadingDetail() {
     setR({ ...r, choicesGlossary: next })
   }
 
+  async function handleSetAnswer(qi: number, ci: number) {
+    if (!r || !isAdmin) return
+    const nextQuestions = r.questions.map((q, idx) =>
+      idx === qi ? { ...q, answer: ci } : q,
+    )
+    setR({ ...r, questions: nextQuestions })
+    try {
+      await updateReadingQuestions(r.id, nextQuestions)
+      setSavedNote(`${qi + 1}번 정답을 ${'①②③④⑤'[ci]}로 저장했어요.`)
+      window.setTimeout(() => setSavedNote(null), 2000)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '정답 저장 실패')
+    }
+  }
+
   if (loading) return <p className="text-slate-500 text-sm">불러오는 중...</p>
   if (error) return <p className="text-red-600 text-sm">{error}</p>
   if (!r) return null
@@ -133,8 +153,8 @@ export function ReadingDetail() {
 
       {isAdmin && (
         <p className="text-xs text-slate-500">
-          학생이 보는 화면 그대로의 미리보기입니다. 본문이나 선지에서 단어를 드래그하면
-          단어장에 자동으로 추가됩니다.
+          학생이 보는 화면 그대로의 미리보기입니다. 본문/선지에서 단어를 드래그하면
+          단어장에 추가되고, 선지를 누르면 그 선지가 정답으로 저장됩니다.
         </p>
       )}
 
@@ -147,8 +167,8 @@ export function ReadingDetail() {
             fallbackPassage={r.passage}
             passageGlossary={r.glossary}
             choicesGlossary={choicesGlossary}
-            selected={-1}
-            onSelect={() => {}}
+            selected={isAdmin ? q.answer : -1}
+            onSelect={isAdmin ? (ci) => handleSetAnswer(qi, ci) : () => {}}
             onSelectPassageWord={
               isAdmin ? (w) => addWord(w, 'glossary') : undefined
             }
