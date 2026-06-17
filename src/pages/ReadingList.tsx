@@ -69,7 +69,7 @@ export function ReadingList() {
   const [error, setError] = useState<string | null>(null)
   const [reorderMode, setReorderMode] = useState(false)
   const [savingOrder, setSavingOrder] = useState(false)
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     Promise.all([listReadings(), getReadingOrder()])
@@ -115,7 +115,7 @@ export function ReadingList() {
   }
 
   function toggle(category: string) {
-    setCollapsed((prev) => {
+    setExpanded((prev) => {
       const next = new Set(prev)
       if (next.has(category)) next.delete(category)
       else next.add(category)
@@ -327,7 +327,7 @@ export function ReadingList() {
       ) : (
         <div className="space-y-4">
           {groups.map((g) => {
-            const isOpen = !collapsed.has(g.category)
+            const isOpen = expanded.has(g.category)
             return (
               <section
                 key={g.category}
