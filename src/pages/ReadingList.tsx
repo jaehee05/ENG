@@ -9,6 +9,8 @@ import {
   setReadingOrder,
 } from '../lib/firestore'
 import type { Reading } from '../lib/types'
+import { translatePassage } from '../lib/api'
+import { updateReadingPassageKo } from '../lib/firestore'
 
 const TITLE_RE = /^(.+?)\s+(\d+)(?:-(\d+))?\s*(?:번|문제)?\s*$/
 
@@ -120,6 +122,67 @@ export function ReadingList() {
     })
   }
 
+  const [bulkTranslating, setBulkTranslating] = useState(false)
+  const [bulkProgress, setBulkProgress] = useState<{
+    done: number
+    total: number
+    failed: number
+    note: string
+  } | null>(null)
+
+  async function handleBulkTranslate() {
+    const pending = items.filter(
+      (r) => (r.passage ?? '').trim() && !(r.passageKo ?? '').trim(),
+    )
+    if (pending.length === 0) {
+      setBulkProgress({
+        done: 0,
+        total: 0,
+        failed: 0,
+        note: '한글 해석이 없는 지문이 없습니다.',
+      })
+      return
+    }
+    if (
+      !window.confirm(
+        `한글 해석이 없는 지문 ${pending.length}개를 AI로 번역해 채웁니다. 진행할까요?`,
+      )
+    )
+      return
+    setBulkTranslating(true)
+    let done = 0
+    let failed = 0
+    setBulkProgress({ done, total: pending.length, failed, note: '' })
+    for (const r of pending) {
+      setBulkProgress({
+        done,
+        total: pending.length,
+        failed,
+        note: `처리 중: ${r.title}`,
+      })
+      try {
+        const ko = await translatePassage(r.passage)
+        if (ko) {
+          await updateReadingPassageKo(r.id, ko)
+          setItems((prev) =>
+            prev.map((x) => (x.id === r.id ? { ...x, passageKo: ko } : x)),
+          )
+        }
+        done++
+      } catch (e) {
+        console.error(`[bulk translate] ${r.title} 실패`, e)
+        failed++
+      }
+    }
+    setBulkProgress({
+      done,
+      total: pending.length,
+      failed,
+      note: `완료: 성공 ${done} · 실패 ${failed}`,
+    })
+    setBulkTranslating(false)
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -158,6 +221,35 @@ export function ReadingList() {
           위/아래 버튼으로 순서를 바꾸면 자동 저장됩니다.
           {savingOrder && <span className="ml-2 text-brand-700">저장 중...</span>}
         </p>
+      )}
+
+      {isAdmin && items.length > 0 && !reorderMode && (
+        <div className="rounded-lg border border-slate-200 bg-white p-4 flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <p className="text-sm font-semibold text-slate-900">한글 해석 일괄 생성</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              passageKo가 비어 있는 지문만 AI로 번역해 저장합니다 (기존 해석은 유지).
+            </p>
+            {bulkProgress && (
+              <p className="text-xs text-brand-700 mt-1">
+                {bulkProgress.note}
+                {bulkProgress.total > 0 && (
+                  <span className="ml-2 text-slate-500">
+                    ({bulkProgress.done + bulkProgress.failed}/{bulkProgress.total})
+                  </span>
+                )}
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleBulkTranslate}
+            disabled={bulkTranslating}
+            className="rounded-md border border-slate-300 text-slate-700 text-sm font-medium px-4 py-2 hover:bg-slate-100 disabled:opacity-50"
+          >
+            {bulkTranslating ? '번역 중...' : '비어있는 지문 일괄 번역'}
+          </button>
+        </div>
       )}
 
       {loading && <p className="text-slate-500 text-sm">불러오는 중...</p>}
