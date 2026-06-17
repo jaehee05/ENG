@@ -540,23 +540,30 @@ export function AdminStudentDetail() {
                       {a.note && <span className="text-slate-600">· {a.note}</span>}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => handleToggleAssignmentDone(a)}
-                      className={`text-xs rounded-md px-2.5 py-1 border transition ${
-                        a.manualDone
-                          ? 'border-brand-300 bg-brand-50 text-brand-700 hover:bg-brand-100'
-                          : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-                      }`}
-                      title={a.manualDone ? '수동 완료 처리 해제' : '수동으로 완료 처리'}
-                    >
-                      {a.manualDone ? '완료 해제' : '완료 처리'}
-                    </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {a.manualDone ? (
+                      <button
+                        type="button"
+                        onClick={() => handleToggleAssignmentDone(a)}
+                        className="rounded-full border border-brand-300 bg-brand-50 text-brand-700 text-xs font-medium px-3 py-1 hover:bg-brand-100 transition"
+                        title="수동 완료 처리 해제"
+                      >
+                        완료 해제
+                      </button>
+                    ) : !done ? (
+                      <button
+                        type="button"
+                        onClick={() => handleToggleAssignmentDone(a)}
+                        className="rounded-full border border-slate-300 bg-white text-slate-700 text-xs font-medium px-3 py-1 hover:bg-slate-100 transition"
+                        title="수동으로 완료 처리"
+                      >
+                        완료 처리
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       onClick={() => handleDeleteAssignment(a)}
-                      className="text-xs text-slate-400 hover:text-red-600"
+                      className="text-xs text-slate-400 hover:text-red-600 px-1"
                     >
                       삭제
                     </button>
@@ -629,8 +636,8 @@ export function AdminStudentDetail() {
                           >
                             {a.refTitle}
                           </Link>
-                          {a.practice && (
-                            <span className="inline-block rounded bg-amber-50 text-amber-700 text-[10px] font-medium px-1.5 py-0.5">
+                          {a.type === 'vocab' && a.practice && (
+                            <span className="inline-block rounded-full bg-amber-50 text-amber-700 text-[10px] font-medium px-2 py-0.5 border border-amber-200">
                               연습
                             </span>
                           )}
@@ -656,21 +663,29 @@ export function AdminStudentDetail() {
                         {fmtDate(a.createdAt)}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleToggleAttemptPractice(a)}
-                            className="text-xs text-slate-500 hover:text-slate-900 underline decoration-dotted"
-                            title={
-                              a.practice ? '시험 응시로 변경' : '연습 응시로 변경'
-                            }
-                          >
-                            {a.practice ? '시험으로' : '연습으로'}
-                          </button>
+                        <div className="flex items-center gap-2 justify-end">
+                          {a.type === 'vocab' && (
+                            <button
+                              type="button"
+                              onClick={() => handleToggleAttemptPractice(a)}
+                              className={`rounded-full text-[11px] font-medium px-2.5 py-1 border transition ${
+                                a.practice
+                                  ? 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'
+                                  : 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                              }`}
+                              title={
+                                a.practice
+                                  ? '시험 응시로 변경 (평균 정답률에 반영)'
+                                  : '연습 응시로 변경 (평균 정답률에서 제외)'
+                              }
+                            >
+                              {a.practice ? '시험으로' : '연습으로'}
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => handleDeleteAttempt(a)}
-                            className="text-xs text-slate-400 hover:text-red-600"
+                            className="text-xs text-slate-400 hover:text-red-600 px-1"
                             aria-label="삭제"
                           >
                             삭제

@@ -7,11 +7,6 @@
 html, body, #root {
   min-height: 100%;
   max-width: 100vw;
-  overflow-x: hidden;
-}
-
-html, body {
-  overscroll-behavior-x: contain;
 }
 
 body {
