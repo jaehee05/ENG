@@ -179,6 +179,65 @@ export function passageFallbackPerQuestion(
   })
 }
 
+/** 다중 문항 세트에서 위에 한 번만 표시할 공유 지문 블록. */
+export type SharedPassageBlock =
+  | { kind: 'passage'; text: string }
+  | { kind: 'order'; parts: { tag: string; text: string }[] }
+  | null
+
+/**
+ * 다중 문항 reading에서 공유 지문을 결정.
+ * - 첫 문항이 order이고 partA/B/C/D 중 하나라도 채워져 있으면 그 단락 블록을 공유 지문으로 (43~45 형식)
+ * - 그 외 reading.passage가 있으면 그것을 공유 지문으로 (41~42 형식)
+ * - 단일 문항이면 분리 안 함 (null) — 기존 카드 안에 본문 표시 그대로
+ */
+export function getSharedPassageBlock(reading: {
+  passage: string
+  questions: ReadingQuestion[]
+}): SharedPassageBlock {
+  if (reading.questions.length < 2) return null
+  const first = reading.questions[0]
+  if (first && first.type === 'order') {
+    const parts = (['A', 'B', 'C', 'D'] as const)
+      .map((tag) => ({
+        tag,
+        text:
+          tag === 'A'
+            ? first.partA?.trim() ?? ''
+            : tag === 'B'
+              ? first.partB?.trim() ?? ''
+              : tag === 'C'
+                ? first.partC?.trim() ?? ''
+                : first.partD?.trim() ?? '',
+      }))
+      .filter((p) => p.text)
+    if (parts.length > 0) return { kind: 'order', parts }
+  }
+  if (reading.passage && reading.passage.trim()) {
+    return { kind: 'passage', text: reading.passage }
+  }
+  return null
+}
+
+/** SharedPassageBlock을 분리해 표시할 때, 각 문항에서 그 본문은 비워야 한다.
+ *  - kind=order: 첫 문항의 partA/B/C/D 제거
+ *  - kind=passage: 변경 없음 (각 문항 fallbackPassage를 undefined로 따로 처리하면 됨)
+ */
+export function questionsWithoutShared(
+  questions: ReadingQuestion[],
+  block: SharedPassageBlock,
+): ReadingQuestion[] {
+  if (!block) return questions
+  if (block.kind === 'order') {
+    return questions.map((q, i) =>
+      i === 0
+        ? { ...q, partA: '', partB: '', partC: '', partD: '' }
+        : q,
+    )
+  }
+  return questions
+}
+
 export interface VocabResult {
   en: string
   ko: string

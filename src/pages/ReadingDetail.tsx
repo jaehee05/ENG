@@ -12,8 +12,11 @@ import { GlossaryEditor } from '../components/GlossaryEditor'
 import { MyAttemptsBox } from '../components/MyAttemptsBox'
 import { QuestionView } from '../components/QuestionView'
 import { useGlossQueue, type GlossEntry } from '../components/useGlossQueue'
+import { SharedPassageBlock } from '../components/SharedPassageBlock'
 import {
+  getSharedPassageBlock,
   passageFallbackPerQuestion,
+  questionsWithoutShared,
   type Attempt,
   type Reading,
   type WordEntry,
@@ -175,25 +178,42 @@ export function ReadingDetail() {
 
       <div className="space-y-4">
         {(() => {
-          const fbList = passageFallbackPerQuestion(r.passage, r.questions)
-          return r.questions.map((q, qi) => (
-            <QuestionView
-              key={qi}
-              index={qi}
-              question={q}
-              fallbackPassage={fbList[qi]}
-              passageGlossary={r.glossary}
-              choicesGlossary={choicesGlossary}
-              selected={isAdmin ? q.answer : -1}
-              onSelect={isAdmin ? (ci) => handleSetAnswer(qi, ci) : () => {}}
-              onSelectPassageWord={
-                isAdmin ? (w) => addWord(w, 'glossary') : undefined
-              }
-              onSelectChoiceWord={
-                isAdmin ? (w) => addWord(w, 'choices') : undefined
-              }
-            />
-          ))
+          const shared = getSharedPassageBlock(r)
+          const questions = questionsWithoutShared(r.questions, shared)
+          const fbList = shared
+            ? questions.map(() => undefined)
+            : passageFallbackPerQuestion(r.passage, questions)
+          return (
+            <>
+              {shared && (
+                <SharedPassageBlock
+                  block={shared}
+                  passageGlossary={r.glossary}
+                  onSelectPassageWord={
+                    isAdmin ? (w) => addWord(w, 'glossary') : undefined
+                  }
+                />
+              )}
+              {questions.map((q, qi) => (
+                <QuestionView
+                  key={qi}
+                  index={qi}
+                  question={q}
+                  fallbackPassage={fbList[qi]}
+                  passageGlossary={r.glossary}
+                  choicesGlossary={choicesGlossary}
+                  selected={isAdmin ? q.answer : -1}
+                  onSelect={isAdmin ? (ci) => handleSetAnswer(qi, ci) : () => {}}
+                  onSelectPassageWord={
+                    isAdmin ? (w) => addWord(w, 'glossary') : undefined
+                  }
+                  onSelectChoiceWord={
+                    isAdmin ? (w) => addWord(w, 'choices') : undefined
+                  }
+                />
+              ))}
+            </>
+          )
         })()}
       </div>
 

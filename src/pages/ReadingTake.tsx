@@ -4,7 +4,13 @@ import { useAuth } from '../contexts/useAuth'
 import { createReadingAttempt, getReading } from '../lib/firestore'
 import { listMyWordbookKeys, lookupWord } from '../lib/wordbook'
 import { QuestionView } from '../components/QuestionView'
-import { passageFallbackPerQuestion, type Reading } from '../lib/types'
+import { SharedPassageBlock } from '../components/SharedPassageBlock'
+import {
+  getSharedPassageBlock,
+  passageFallbackPerQuestion,
+  questionsWithoutShared,
+  type Reading,
+} from '../lib/types'
 
 export function ReadingTake() {
   const { id } = useParams<{ id: string }>()
@@ -154,25 +160,41 @@ export function ReadingTake() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {(() => {
-          const fbList = passageFallbackPerQuestion(r.passage, r.questions)
-          return r.questions.map((q, i) => (
-            <QuestionView
-              key={i}
-              index={i}
-              question={q}
-              fallbackPassage={fbList[i]}
-              passageGlossary={r.glossary}
-              choicesGlossary={choicesGlossary}
-              viewedWords={viewedWords}
-              onWordLookup={handleWordLookup}
-              selected={answers[i]}
-              onSelect={(v) => {
-                const next = [...answers]
-                next[i] = v
-                setAnswers(next)
-              }}
-            />
-          ))
+          const shared = getSharedPassageBlock(r)
+          const questions = questionsWithoutShared(r.questions, shared)
+          const fbList = shared
+            ? questions.map(() => undefined)
+            : passageFallbackPerQuestion(r.passage, questions)
+          return (
+            <>
+              {shared && (
+                <SharedPassageBlock
+                  block={shared}
+                  passageGlossary={r.glossary}
+                  viewedWords={viewedWords}
+                  onWordLookup={handleWordLookup}
+                />
+              )}
+              {questions.map((q, i) => (
+                <QuestionView
+                  key={i}
+                  index={i}
+                  question={q}
+                  fallbackPassage={fbList[i]}
+                  passageGlossary={r.glossary}
+                  choicesGlossary={choicesGlossary}
+                  viewedWords={viewedWords}
+                  onWordLookup={handleWordLookup}
+                  selected={answers[i]}
+                  onSelect={(v) => {
+                    const next = [...answers]
+                    next[i] = v
+                    setAnswers(next)
+                  }}
+                />
+              ))}
+            </>
+          )
         })()}
 
         {error && <p className="text-sm text-red-600">{error}</p>}

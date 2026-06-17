@@ -163,16 +163,7 @@ export function ReadingEdit() {
       if (q.answer < 0 || q.answer > 4)
         return setError(`${i + 1}번 문제의 정답을 선택하세요.`)
     }
-    if (
-      !passage.trim() &&
-      questions.some(
-        (q) => !q.body.trim() && !q.image && q.type === 'standard',
-      )
-    ) {
-      return setError(
-        '일반 유형 문제가 있으면 지문/문제 본문/도표 중 하나는 채워야 합니다.',
-      )
-    }
+    // 본문 검증 완화: 43~45 세트처럼 다른 문항이 공유 지문을 쓰는 경우도 허용
 
     setSubmitting(true)
     try {

@@ -25,7 +25,8 @@ submit_reading을 호출하지 않고 텍스트만 출력해도 되는 경우는
 
 규칙:
 - title: 출처 정보가 명확하면 그대로(예: "2024학년도 6월 모평 31번"). 모르면 빈 문자열.
-- passage: 본문 영어 텍스트는 **항상 여기에 넣으세요**. 단일 문항이라도 본문은 passage에. 절대 questions[].body에 본문 텍스트를 넣지 마세요.
+- passageKo: 입력에 한국어로 작성된 **지문 해석/번역 문단**이 영어 본문과 같이 들어 있으면, 그 한국어 줄글을 모아 여기에 담으세요. 영어 문장 사이사이에 한국어 해석이 줄별로 끼어 있으면 한국어 부분만 모아서 자연스러운 문단으로 정리해 담으세요. 해석/번역이 없으면 빈 문자열.
+- passage: 본문 영어 텍스트는 **항상 여기에 넣으세요**. 단일 문항이라도 본문은 passage에. 절대 questions[].body에 본문 텍스트를 넣지 마세요. passage에는 한국어 해석을 섞지 말 것 (영어만).
   - **세트(43~45) 처리**: 본문이 (A)(B)(C)(D) 단락으로 명시적으로 분리된 장문 독해(보통 43~45번)는 passage를 비우고, **첫 문항(보통 43번 글 순서 배열)을 type='order'로 분류 + partA/partB/partC/partD에 단락 텍스트를 그대로 넣으세요**. 셔플된 원본 순서 유지(글 흐름대로 재정렬 X). 두 번째·세 번째 문항(44번 지칭 추론, 45번 일치/불일치 등)은 body도 비우고 passage도 비웁니다 — 학생 화면에서 첫 문항의 (A)(B)(C)(D) 박스가 공용 지문 역할을 합니다.
   - **세트(41~42)** 같은 2문항 평지문은 기존대로 passage에 한 덩어리.
 - type 분류:
@@ -87,6 +88,7 @@ interface ParsedQuestion {
 interface ParseResult {
   title: string
   passage: string
+  passageKo: string
   questions: ParsedQuestion[]
 }
 
@@ -129,13 +131,14 @@ function normalizeResult(obj: unknown): ParseResult {
   const r = (obj ?? {}) as Record<string, unknown>
   const title = typeof r.title === 'string' ? r.title.trim() : ''
   const passage = typeof r.passage === 'string' ? r.passage.trim() : ''
+  const passageKo = typeof r.passageKo === 'string' ? r.passageKo.trim() : ''
   const arr = Array.isArray(r.questions) ? r.questions : []
   const questions: ParsedQuestion[] = []
   for (const item of arr) {
     const norm = normalizeQuestion(item)
     if (norm) questions.push(norm)
   }
-  return { title, passage, questions }
+  return { title, passage, passageKo, questions }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -208,6 +211,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             properties: {
               title: { type: 'string' },
               passage: { type: 'string' },
+              passageKo: { type: 'string' },
               questions: {
                 type: 'array',
                 items: {

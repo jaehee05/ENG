@@ -193,6 +193,7 @@ export interface ParsedReadingQuestion {
 export interface ParsedReadingResult {
   title: string
   passage: string
+  passageKo: string
   questions: ParsedReadingQuestion[]
 }
 
@@ -219,6 +220,7 @@ export async function parseReadingText(input: {
   return {
     title: data.title ?? '',
     passage: data.passage ?? '',
+    passageKo: data.passageKo ?? '',
     questions: data.questions ?? [],
   }
 }

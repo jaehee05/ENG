@@ -122,6 +122,7 @@ export function ReadingNew() {
   }, [activeCategory, questionNumber])
 
   const [passage, setPassage] = useState('')
+  const [passageKo, setPassageKo] = useState('')
   const [glossaryRaw, setGlossaryRaw] = useState('')
   const [choicesGlossaryRaw, setChoicesGlossaryRaw] = useState('')
   const [questions, setQuestions] = useState<DraftQuestion[]>([emptyDraftQuestion()])
@@ -214,6 +215,7 @@ export function ReadingNew() {
       }
       if (result.title && !title.trim()) setTitle(result.title)
       if (result.passage) setPassage(result.passage)
+      if (result.passageKo) setPassageKo(result.passageKo)
       const chartImages = images.length > 0 ? images.map((i) => i.previewUrl) : []
       let chartCursor = 0
       const drafts: DraftQuestion[] = result.questions.map((q) => {
@@ -295,22 +297,14 @@ export function ReadingNew() {
       if (q.answer < 0 || q.answer > 4)
         return setError(`${i + 1}번 문제의 정답을 선택하세요.`)
     }
-    if (
-      !passage.trim() &&
-      questions.some(
-        (q) => !q.body.trim() && !q.image && q.type === 'standard',
-      )
-    ) {
-      return setError(
-        '일반 유형 문제가 있으면 지문/문제 본문/도표 중 하나는 채워야 합니다.',
-      )
-    }
+    // 본문 검증 완화: 43~45 세트처럼 다른 문항이 공유 지문을 쓰는 경우도 허용
 
     setSubmitting(true)
     try {
       const id = await createReading({
         title: title.trim(),
         passage: passage.trim(),
+        passageKo: passageKo.trim(),
         glossary,
         choicesGlossary,
         questions: questions.map(trimDraft),
@@ -513,6 +507,22 @@ export function ReadingNew() {
           <p className="text-xs text-slate-400 mt-1">
             본문에서 단어/구를 드래그한 뒤 ⌘U(Ctrl+U)로 밑줄 표시
           </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            지문 한글 해석{' '}
+            <span className="font-normal text-slate-500">
+              (학생이 틀린 문제에서 표시. 자동 분류 시 한글 해설도 같이 붙여넣으면 자동 인식)
+            </span>
+          </label>
+          <textarea
+            value={passageKo}
+            onChange={(e) => setPassageKo(e.target.value)}
+            rows={8}
+            placeholder="한국어 해석. 비워두면 학생에게 '아직 등록되지 않았습니다'로 안내됩니다."
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          />
         </div>
 
         <div className="space-y-3">

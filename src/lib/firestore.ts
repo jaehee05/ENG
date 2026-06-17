@@ -157,16 +157,27 @@ export async function getReading(id: string): Promise<Reading | null> {
 export async function createReading(input: {
   title: string
   passage: string
+  passageKo?: string
   glossary: WordEntry[]
   choicesGlossary: WordEntry[]
   questions: ReadingQuestion[]
   createdBy: string
   createdByName: string
 }): Promise<string> {
-  const ref = await addDoc(collection(db, 'readings'), {
-    ...input,
+  const payload: Record<string, unknown> = {
+    title: input.title,
+    passage: input.passage,
+    glossary: input.glossary,
+    choicesGlossary: input.choicesGlossary,
+    questions: input.questions,
+    createdBy: input.createdBy,
+    createdByName: input.createdByName,
     createdAt: serverTimestamp(),
-  })
+  }
+  if (input.passageKo && input.passageKo.trim()) {
+    payload.passageKo = input.passageKo.trim()
+  }
+  const ref = await addDoc(collection(db, 'readings'), payload)
   return ref.id
 }
 
