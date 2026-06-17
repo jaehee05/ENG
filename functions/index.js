@@ -223,7 +223,7 @@ function buildWeeklyReportVarsSrv(assignments, attempts) {
       "🔤 단어 시험 Report",
       `▫️ 학습 범위: 총 ${vocabAsn.length}회분 (단어 ${totalWords}개)`,
       `▫️ 암기 현황: 총 ${totalCorrectV}개 완료`,
-      `▫️ 최종 결과: 🎯 총 ${sessionCount}회 중 [ ${passCount}회 ] 통과 (기준: 회당 30개 중 ${VOCAB_PASS_THRESHOLD}개 이상)`,
+      `▫️ 최종 결과: 🎯 총 ${sessionCount}회 중 [ ${passCount}회 ] 통과`,
     ].join("\n"),
     var3: [
       "📝 문제 풀이 Report",
@@ -242,7 +242,7 @@ async function runWeeklyReportBlast(schedule) {
     .get();
   const students = studentsSnap.docs
     .map((d) => ({ id: d.id, ...d.data() }))
-    .filter((s) => (s.phone || "").trim());
+    .filter((s) => (s.phone || "").trim() || (s.parentPhone || "").trim());
 
   const results = [];
   for (const s of students) {
@@ -253,24 +253,35 @@ async function runWeeklyReportBlast(schedule) {
     const assignments = asnSnap.docs.map((x) => ({ id: x.id, ...x.data() }));
     const attempts = attSnap.docs.map((x) => ({ id: x.id, ...x.data() }));
     const vars = buildWeeklyReportVarsSrv(assignments, attempts);
+    const changeWord = {
+      var1: vars.var1,
+      var2: vars.var2,
+      var3: vars.var3,
+      var4: schedule.closing,
+    };
 
-    try {
-      await sendOne({
-        phone: s.phone,
-        name: s.displayName,
-        changeWord: {
-          var1: vars.var1,
-          var2: vars.var2,
-          var3: vars.var3,
-          var4: schedule.closing,
-        },
-        templateCode: schedule.templateCode,
-        messageType: schedule.messageType,
-      });
-      results.push({ label: s.displayName, ok: true });
-    } catch (e) {
-      console.error(`[weeklyReport] ${s.displayName} 실패:`, e);
-      results.push({ label: s.displayName, ok: false, error: String(e.message || e) });
+    const recipients = [];
+    if ((s.phone || "").trim()) {
+      recipients.push({ phone: s.phone, label: `${s.displayName}(학생)` });
+    }
+    if ((s.parentPhone || "").trim()) {
+      recipients.push({ phone: s.parentPhone, label: `${s.displayName}(학부모)` });
+    }
+
+    for (const r of recipients) {
+      try {
+        await sendOne({
+          phone: r.phone,
+          name: s.displayName,
+          changeWord,
+          templateCode: schedule.templateCode,
+          messageType: schedule.messageType,
+        });
+        results.push({ label: r.label, ok: true });
+      } catch (e) {
+        console.error(`[weeklyReport] ${r.label} 실패:`, e);
+        results.push({ label: r.label, ok: false, error: String(e.message || e) });
+      }
     }
   }
   return {

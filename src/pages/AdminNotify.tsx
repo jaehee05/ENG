@@ -244,34 +244,55 @@ export function AdminNotify() {
       setWeeklyNotice('주간 리포트 템플릿 코드를 입력하세요.')
       return
     }
-    const targets = bundles.filter((b) => (b.account.phone ?? '').trim())
+    const targets = bundles.filter(
+      (b) =>
+        (b.account.phone ?? '').trim() || (b.account.parentPhone ?? '').trim(),
+    )
     if (targets.length === 0) {
       setWeeklyNotice('연락처가 있는 학생이 없습니다.')
       return
     }
+    const recipients = targets.flatMap((b) => {
+      const v = buildWeeklyReportVars(b.assignments, b.attempts)
+      const changeWord = {
+        var1: v.var1,
+        var2: v.var2,
+        var3: v.var3,
+        var4: weekly.closing,
+      }
+      const out: {
+        label: string
+        phone: string
+        name: string
+        changeWord: Record<string, string>
+      }[] = []
+      if ((b.account.phone ?? '').trim()) {
+        out.push({
+          label: `${b.account.displayName}(학생)`,
+          phone: b.account.phone ?? '',
+          name: b.account.displayName,
+          changeWord,
+        })
+      }
+      if ((b.account.parentPhone ?? '').trim()) {
+        out.push({
+          label: `${b.account.displayName}(학부모)`,
+          phone: b.account.parentPhone ?? '',
+          name: b.account.displayName,
+          changeWord,
+        })
+      }
+      return out
+    })
     if (
       !window.confirm(
-        `${targets.length}명에게 주간 리포트를 발송합니다. 계속할까요?`,
+        `학생 ${targets.length}명 · 총 ${recipients.length}건(학생+학부모)에게 주간 리포트를 발송합니다. 계속할까요?`,
       )
     )
       return
     setWeeklySending(true)
     setWeeklySendResults(null)
     try {
-      const recipients = targets.map((b) => {
-        const v = buildWeeklyReportVars(b.assignments, b.attempts)
-        return {
-          label: b.account.displayName,
-          phone: b.account.phone ?? '',
-          name: b.account.displayName,
-          changeWord: {
-            var1: v.var1,
-            var2: v.var2,
-            var3: v.var3,
-            var4: weekly.closing,
-          },
-        }
-      })
       const out = await sendBatchAlimtalk({
         templateCode: weekly.templateCode.trim(),
         messageType: weekly.messageType,
@@ -1136,14 +1157,27 @@ export function AdminNotify() {
             </button>
           </div>
           <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={handleWeeklySendAll}
-              disabled={bundles.length === 0 || weeklySending}
-              className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700 disabled:opacity-50"
-            >
-              {weeklySending ? '발송 중...' : `전체 즉시 발송 (${bundles.length}명)`}
-            </button>
+            {(() => {
+              const recipientCount = bundles.reduce(
+                (sum, b) =>
+                  sum +
+                  ((b.account.phone ?? '').trim() ? 1 : 0) +
+                  ((b.account.parentPhone ?? '').trim() ? 1 : 0),
+                0,
+              )
+              return (
+                <button
+                  type="button"
+                  onClick={handleWeeklySendAll}
+                  disabled={recipientCount === 0 || weeklySending}
+                  className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700 disabled:opacity-50"
+                >
+                  {weeklySending
+                    ? '발송 중...'
+                    : `전체 즉시 발송 (학생+학부모 ${recipientCount}건)`}
+                </button>
+              )
+            })()}
           </div>
         </div>
 
@@ -1176,11 +1210,23 @@ export function AdminNotify() {
                   bundles[0].assignments,
                   bundles[0].attempts,
                 )
+                const enc = new TextEncoder()
+                const labelFor = (s: string) => {
+                  const len = enc.encode(s).length
+                  const over = len > 100
+                  return (
+                    <span
+                      className={`ml-2 text-[10px] font-medium ${over ? 'text-red-600' : 'text-slate-400'}`}
+                    >
+                      {len}/100 bytes{over ? ' · 초과' : ''}
+                    </span>
+                  )
+                }
                 return (
                   <>
                     <div>
                       <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
-                        [*1*] 과제 성취도
+                        [*1*] 과제 성취도{labelFor(v.var1)}
                       </p>
                       <pre className="rounded-md bg-slate-50 border border-slate-200 p-3 text-xs leading-relaxed text-slate-800 whitespace-pre-wrap font-sans">
                         {v.var1}
@@ -1188,7 +1234,7 @@ export function AdminNotify() {
                     </div>
                     <div>
                       <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
-                        [*2*] 단어 시험 Report
+                        [*2*] 단어 시험 Report{labelFor(v.var2)}
                       </p>
                       <pre className="rounded-md bg-slate-50 border border-slate-200 p-3 text-xs leading-relaxed text-slate-800 whitespace-pre-wrap font-sans">
                         {v.var2}
@@ -1196,7 +1242,7 @@ export function AdminNotify() {
                     </div>
                     <div>
                       <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
-                        [*3*] 문제 풀이 Report
+                        [*3*] 문제 풀이 Report{labelFor(v.var3)}
                       </p>
                       <pre className="rounded-md bg-slate-50 border border-slate-200 p-3 text-xs leading-relaxed text-slate-800 whitespace-pre-wrap font-sans">
                         {v.var3}
@@ -1204,7 +1250,7 @@ export function AdminNotify() {
                     </div>
                     <div>
                       <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
-                        [*4*] 닫는 멘트
+                        [*4*] 닫는 멘트{labelFor(weekly.closing)}
                       </p>
                       <pre className="rounded-md bg-slate-50 border border-slate-200 p-3 text-xs leading-relaxed text-slate-800 whitespace-pre-wrap font-sans">
                         {weekly.closing}

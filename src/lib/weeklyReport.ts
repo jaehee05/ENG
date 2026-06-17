@@ -64,7 +64,7 @@ export function buildWeeklyReportVars(
     '🔤 단어 시험 Report',
     `▫️ 학습 범위: 총 ${vocabAsn.length}회분 (단어 ${totalWords}개)`,
     `▫️ 암기 현황: 총 ${totalCorrectV}개 완료`,
-    `▫️ 최종 결과: 🎯 총 ${sessionCount}회 중 [ ${passCount}회 ] 통과 (기준: 회당 30개 중 ${VOCAB_PASS_THRESHOLD}개 이상)`,
+    `▫️ 최종 결과: 🎯 총 ${sessionCount}회 중 [ ${passCount}회 ] 통과`,
   ].join('\n')
 
   const var3 = [
