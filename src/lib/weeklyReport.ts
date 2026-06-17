@@ -68,7 +68,7 @@ export function buildWeeklyReportVars(
 
   const var3 = [
     '📝 문제 풀이',
-    `▫️ 지문 ${readingDone}개 완수`,
+    `▫️ 지문 ${readingDone}개 완료`,
     `▫️ 📈 정답률 ${ratio}% (${totalCorrectR}/${totalR}문항)`,
   ].join('\n')
 
