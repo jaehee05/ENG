@@ -158,35 +158,37 @@ export function GlossedPassage({
               const open = activeKey === key
               const lower = tok.text.toLowerCase()
               const viewed = viewedWords?.has(lower) ?? false
-              return (
-                <span key={ti} className="relative inline-block">
-                  <span
-                    data-gloss-word
-                    title={tok.ko}
-                    onClick={() => {
-                      const willOpen = !open
-                      setActiveKey(willOpen ? key : null)
-                      if (willOpen && tok.ko && onWordLookup) {
-                        onWordLookup(tok.text, tok.ko)
-                      }
-                    }}
-                    className={
-                      viewed
-                        ? 'bg-brand-100 rounded-sm cursor-pointer touch-manipulation transition-colors hover:bg-brand-200'
-                        : 'bg-slate-100 rounded-sm cursor-pointer touch-manipulation transition-colors hover:bg-brand-50'
+              const wordSpan = (
+                <span
+                  data-gloss-word
+                  title={tok.ko}
+                  onClick={() => {
+                    const willOpen = !open
+                    setActiveKey(willOpen ? key : null)
+                    if (willOpen && tok.ko && onWordLookup) {
+                      onWordLookup(tok.text, tok.ko)
                     }
+                  }}
+                  className={
+                    viewed
+                      ? 'bg-brand-100 rounded-sm cursor-pointer touch-manipulation transition-colors hover:bg-brand-200'
+                      : 'bg-slate-100 rounded-sm cursor-pointer touch-manipulation transition-colors hover:bg-brand-50'
+                  }
+                >
+                  {tok.text}
+                </span>
+              )
+              if (!open) return <span key={ti}>{wordSpan}</span>
+              return (
+                <span key={ti} style={{ position: 'relative' }}>
+                  {wordSpan}
+                  <span
+                    role="tooltip"
+                    className="absolute left-1/2 bottom-full z-20 mb-1 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2.5 py-1.5 text-sm font-medium text-white shadow-lg"
                   >
-                    {tok.text}
+                    {tok.ko || '뜻 없음'}
+                    <span className="absolute left-1/2 top-full -translate-x-1/2 -mt-px border-4 border-transparent border-t-slate-900" />
                   </span>
-                  {open && (
-                    <span
-                      role="tooltip"
-                      className="absolute left-1/2 bottom-full z-20 mb-1 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2.5 py-1.5 text-sm font-medium text-white shadow-lg"
-                    >
-                      {tok.ko || '뜻 없음'}
-                      <span className="absolute left-1/2 top-full -translate-x-1/2 -mt-px border-4 border-transparent border-t-slate-900" />
-                    </span>
-                  )}
                 </span>
               )
             })

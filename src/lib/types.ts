@@ -191,6 +191,8 @@ export interface Assignment {
   note?: string
   /** For vocab: minimum correct count required to consider done. */
   minCorrect?: number
+  /** Admin-toggled completion. When true, considered done regardless of attempts. */
+  manualDone?: boolean
   dueAt: Timestamp | null
   createdAt: Timestamp | null
 }
