@@ -136,6 +136,46 @@ export function ReadingNew() {
   const [parseNotice, setParseNotice] = useState<string | null>(null)
   const [images, setImages] = useState<AttachedImage[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const pdfInputRef = useRef<HTMLInputElement>(null)
+  const [pdfExtracting, setPdfExtracting] = useState(false)
+  const [pdfNote, setPdfNote] = useState<string | null>(null)
+
+  async function onPdfPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? [])
+    e.target.value = ''
+    if (files.length === 0) return
+    setPdfExtracting(true)
+    setPdfNote(null)
+    try {
+      const { extractTextFromPdfFile } = await import('../lib/pdfText')
+      const parts: string[] = []
+      for (const f of files) {
+        if (f.size > 30 * 1024 * 1024) {
+          setPdfNote(`${f.name}: 30MB 초과 — 건너뜀`)
+          continue
+        }
+        const text = await extractTextFromPdfFile(f)
+        if (text.trim()) {
+          parts.push(`[${f.name}]\n${text.trim()}`)
+        }
+      }
+      if (parts.length === 0) {
+        setPdfNote('추출된 텍스트가 없습니다 (스캔 이미지 PDF는 이미지 첨부로 시도하세요).')
+        return
+      }
+      setRawText((prev) => {
+        const next = prev.trim() ? prev + '\n\n' + parts.join('\n\n') : parts.join('\n\n')
+        return next
+      })
+      setPdfNote(
+        `${parts.length}개 PDF에서 텍스트 추출 완료 · 위 입력란에 추가됨`,
+      )
+    } catch (err) {
+      setPdfNote(err instanceof Error ? err.message : 'PDF 추출 실패')
+    } finally {
+      setPdfExtracting(false)
+    }
+  }
 
   async function addFiles(files: File[]) {
     const accepted = files.filter((f) => f.type.startsWith('image/') || /\.(png|jpe?g|gif|webp)$/i.test(f.name))
@@ -376,6 +416,25 @@ export function ReadingNew() {
             <span className="text-xs text-slate-500">
               {images.length} / {MAX_IMAGES}장
             </span>
+          )}
+          <input
+            ref={pdfInputRef}
+            type="file"
+            accept="application/pdf"
+            multiple
+            onChange={onPdfPick}
+            className="hidden"
+          />
+          <button
+            type="button"
+            onClick={() => pdfInputRef.current?.click()}
+            disabled={pdfExtracting}
+            className="rounded-md border border-brand-300 bg-white text-brand-700 text-xs font-medium px-3 py-1.5 hover:bg-brand-50 disabled:opacity-50"
+          >
+            {pdfExtracting ? 'PDF 추출 중...' : '+ PDF 첨부 (텍스트 추출)'}
+          </button>
+          {pdfNote && (
+            <span className="text-xs text-slate-500">{pdfNote}</span>
           )}
         </div>
 
