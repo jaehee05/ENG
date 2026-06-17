@@ -10,7 +10,7 @@ import {
 } from '../lib/firestore'
 import type { Reading } from '../lib/types'
 
-const TITLE_RE = /^(.+?)\s+(\d+)\s*(?:번|문제)?\s*$/
+const TITLE_RE = /^(.+?)\s+(\d+)(?:-(\d+))?\s*(?:번|문제)?\s*$/
 
 interface GroupedItem {
   reading: Reading
