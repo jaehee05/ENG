@@ -517,13 +517,38 @@ export function AdminStudentDetail() {
                 <li key={a.id} className="px-4 py-3 flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span
-                        className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${
-                          done ? 'bg-brand-100 text-brand-700' : 'bg-slate-100 text-slate-600'
-                        }`}
-                      >
-                        {done ? '완료' : '미완료'}
-                      </span>
+                      {(() => {
+                        const autoDone = done && !a.manualDone
+                        return (
+                          <button
+                            type="button"
+                            onClick={
+                              autoDone
+                                ? undefined
+                                : () => handleToggleAssignmentDone(a)
+                            }
+                            disabled={autoDone}
+                            title={
+                              autoDone
+                                ? '학생 응시 기록으로 완료 — 응시 기록을 삭제해야 변경 가능'
+                                : '클릭으로 완료 ↔ 미완료 전환'
+                            }
+                            className={`rounded-full px-2.5 py-0.5 text-xs font-medium border transition ${
+                              done
+                                ? 'bg-brand-100 text-brand-700 border-brand-200'
+                                : 'bg-slate-100 text-slate-600 border-slate-200'
+                            } ${
+                              autoDone
+                                ? 'cursor-default opacity-90'
+                                : done
+                                  ? 'hover:bg-brand-200 cursor-pointer'
+                                  : 'hover:bg-slate-200 cursor-pointer'
+                            }`}
+                          >
+                            {done ? '완료' : '미완료'}
+                          </button>
+                        )
+                      })()}
                       <span className="text-xs text-slate-500">
                         {a.type === 'vocab' ? '단어 시험지' : '지문'}
                       </span>
@@ -540,34 +565,13 @@ export function AdminStudentDetail() {
                       {a.note && <span className="text-slate-600">· {a.note}</span>}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {a.manualDone ? (
-                      <button
-                        type="button"
-                        onClick={() => handleToggleAssignmentDone(a)}
-                        className="rounded-full border border-brand-300 bg-brand-50 text-brand-700 text-xs font-medium px-3 py-1 hover:bg-brand-100 transition"
-                        title="수동 완료 처리 해제"
-                      >
-                        완료 해제
-                      </button>
-                    ) : !done ? (
-                      <button
-                        type="button"
-                        onClick={() => handleToggleAssignmentDone(a)}
-                        className="rounded-full border border-slate-300 bg-white text-slate-700 text-xs font-medium px-3 py-1 hover:bg-slate-100 transition"
-                        title="수동으로 완료 처리"
-                      >
-                        완료 처리
-                      </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteAssignment(a)}
-                      className="text-xs text-slate-400 hover:text-red-600 px-1"
-                    >
-                      삭제
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteAssignment(a)}
+                    className="text-xs text-slate-400 hover:text-red-600 px-1 shrink-0"
+                  >
+                    삭제
+                  </button>
                 </li>
               )
             })}
