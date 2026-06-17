@@ -1,4 +1,4 @@
-import { useRef, type ChangeEvent } from 'react'
+import { useRef, useState, type ChangeEvent } from 'react'
 import {
   READING_TYPE_LABEL,
   READING_TYPE_PROMPT,
@@ -6,6 +6,8 @@ import {
 } from '../lib/types'
 import { handleUnderlineHotkey } from '../lib/textareaHotkeys'
 import { resizeImageForUpload } from '../lib/imageResize'
+import { imageToHtml } from '../lib/api'
+import { HtmlPanel } from './HtmlPanel'
 import type { DraftQuestion } from './draftQuestion'
 
 const CHOICE_MARKS = ['①', '②', '③', '④', '⑤']
@@ -33,6 +35,9 @@ export function QuestionEditor({ index, question, canRemove, onChange, onRemove 
   const needSummary = question.type === 'summary'
   const isOrder = question.type === 'order'
   const imageFileRef = useRef<HTMLInputElement>(null)
+  const [converting, setConverting] = useState(false)
+  const [convertError, setConvertError] = useState<string | null>(null)
+  const [htmlOpen, setHtmlOpen] = useState(false)
 
   function patch(p: Partial<DraftQuestion>) {
     onChange({ ...question, ...p })
@@ -51,6 +56,21 @@ export function QuestionEditor({ index, question, canRemove, onChange, onRemove 
       patch({ image: `data:${r.mediaType};base64,${r.base64}` })
     } catch (err) {
       window.alert(err instanceof Error ? err.message : '이미지를 처리하지 못했습니다.')
+    }
+  }
+
+  async function handleConvertHtml() {
+    if (!question.image) return
+    setConvertError(null)
+    setConverting(true)
+    try {
+      const html = await imageToHtml(question.image)
+      patch({ imageHtml: html })
+      setHtmlOpen(true)
+    } catch (err) {
+      setConvertError(err instanceof Error ? err.message : 'HTML 변환 실패')
+    } finally {
+      setConverting(false)
     }
   }
 
@@ -205,28 +225,86 @@ export function QuestionEditor({ index, question, canRemove, onChange, onRemove 
           className="hidden"
         />
         {question.image ? (
-          <div className="flex items-start gap-3">
-            <img
-              src={question.image}
-              alt="도표"
-              className="max-h-48 rounded border border-slate-300 bg-white"
-            />
-            <div className="flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={() => imageFileRef.current?.click()}
-                className="rounded-md border border-slate-300 text-slate-700 text-xs font-medium px-3 py-1.5 hover:bg-slate-100"
-              >
-                교체
-              </button>
-              <button
-                type="button"
-                onClick={() => patch({ image: undefined })}
-                className="rounded-md text-red-600 text-xs font-medium px-3 py-1.5 hover:bg-red-50"
-              >
-                제거
-              </button>
+          <div className="space-y-2">
+            <div className="flex items-start gap-3">
+              <img
+                src={question.image}
+                alt="도표"
+                className="max-h-48 rounded border border-slate-300 bg-white"
+              />
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => imageFileRef.current?.click()}
+                  className="rounded-md border border-slate-300 text-slate-700 text-xs font-medium px-3 py-1.5 hover:bg-slate-100"
+                >
+                  교체
+                </button>
+                <button
+                  type="button"
+                  onClick={() => patch({ image: undefined, imageHtml: undefined })}
+                  className="rounded-md text-red-600 text-xs font-medium px-3 py-1.5 hover:bg-red-50"
+                >
+                  제거
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConvertHtml}
+                  disabled={converting}
+                  className="rounded-md bg-brand-600 text-white text-xs font-medium px-3 py-1.5 hover:bg-brand-700 disabled:opacity-50"
+                  title="이미지를 AI가 HTML로 옮겨 학생 화면에 텍스트로 렌더"
+                >
+                  {converting ? '변환 중...' : 'AI로 HTML 변환'}
+                </button>
+              </div>
             </div>
+            {convertError && (
+              <p className="text-xs text-red-600">{convertError}</p>
+            )}
+            {question.imageHtml && (
+              <div className="rounded-md border border-slate-200 bg-slate-50">
+                <button
+                  type="button"
+                  onClick={() => setHtmlOpen((v) => !v)}
+                  className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                >
+                  <span>
+                    HTML 코드{' '}
+                    <span className="text-brand-700">
+                      · 학생 화면에 이 HTML이 표시됩니다
+                    </span>
+                  </span>
+                  <span className="text-slate-400">{htmlOpen ? '접기 −' : '펼치기 +'}</span>
+                </button>
+                {htmlOpen && (
+                  <div className="border-t border-slate-200 p-3 space-y-2">
+                    <textarea
+                      value={question.imageHtml}
+                      onChange={(e) => patch({ imageHtml: e.target.value })}
+                      rows={8}
+                      className="w-full rounded-md border border-slate-300 px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    />
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => patch({ imageHtml: undefined })}
+                        className="text-xs text-red-600 hover:text-red-700 underline"
+                      >
+                        HTML 제거 (이미지로 되돌리기)
+                      </button>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                        미리보기
+                      </p>
+                      <div className="rounded border border-slate-200 bg-white overflow-hidden">
+                        <HtmlPanel html={question.imageHtml} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         ) : (
           <button

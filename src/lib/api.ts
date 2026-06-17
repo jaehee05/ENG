@@ -35,6 +35,26 @@ export function wordsToText(words: WordEntry[]): string {
   return words.map((w) => `${w.en} : ${w.ko}`).join('\n')
 }
 
+export async function imageToHtml(image: string): Promise<string> {
+  const res = await fetch('/api/image-to-html', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ image }),
+  })
+  if (!res.ok) {
+    let message = `요청 실패 (HTTP ${res.status})`
+    try {
+      const body = (await res.json()) as { error?: string }
+      if (body.error) message = body.error
+    } catch {
+      // ignore
+    }
+    throw new Error(message)
+  }
+  const data = (await res.json()) as { html?: string }
+  return data.html ?? ''
+}
+
 export async function translatePassage(passage: string): Promise<string> {
   const res = await fetch('/api/translate-passage', {
     method: 'POST',

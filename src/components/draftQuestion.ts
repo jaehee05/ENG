@@ -11,6 +11,7 @@ export interface DraftQuestion {
   answer: number
   points?: number
   image?: string
+  imageHtml?: string
   partA: string
   partB: string
   partC: string

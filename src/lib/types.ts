@@ -100,6 +100,8 @@ export interface ReadingQuestion {
   points?: number
   /** Inline image/chart (full data URL, e.g. "data:image/jpeg;base64,..."). */
   image?: string
+  /** Inline image를 HTML 문서로 재현한 버전 (있으면 image 대신 이걸로 표시). */
+  imageHtml?: string
   /** For 'order' type: paragraphs labelled (A), (B), (C), optionally (D). */
   partA?: string
   partB?: string
@@ -143,10 +145,11 @@ export interface Reading {
   createdAt: Timestamp | null
 }
 
-/** 문항이 자체 본문(body/image/order parts)을 갖고 있는지 — 공용 지문이 필요 없음을 의미. */
+/** 문항이 자체 본문(body/image/imageHtml/order parts)을 갖고 있는지 — 공용 지문이 필요 없음을 의미. */
 export function questionHasOwnBody(q: ReadingQuestion): boolean {
   if (q.body && q.body.trim()) return true
   if (q.image) return true
+  if (q.imageHtml && q.imageHtml.trim()) return true
   if (
     q.type === 'order' &&
     (q.partA?.trim() ||

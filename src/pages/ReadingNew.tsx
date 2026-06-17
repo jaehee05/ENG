@@ -55,6 +55,7 @@ function trimDraft(q: DraftQuestion) {
     points?: number
     number?: number
     image?: string
+    imageHtml?: string
     partA?: string
     partB?: string
     partC?: string
@@ -71,6 +72,7 @@ function trimDraft(q: DraftQuestion) {
   if (q.points && q.points !== 2) out.points = q.points
   if (q.number && q.number > 0) out.number = q.number
   if (q.image) out.image = q.image
+  if (q.imageHtml && q.imageHtml.trim()) out.imageHtml = q.imageHtml.trim()
   if (q.partA.trim()) out.partA = q.partA.trim()
   if (q.partB.trim()) out.partB = q.partB.trim()
   if (q.partC.trim()) out.partC = q.partC.trim()

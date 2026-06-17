@@ -1,4 +1,5 @@
 import { GlossedPassage } from './GlossedPassage'
+import { HtmlPanel } from './HtmlPanel'
 import { renderUnderlines } from '../lib/renderUnderlines'
 import type { ReadingQuestion, WordEntry } from '../lib/types'
 
@@ -43,7 +44,8 @@ export function QuestionView({
       !!question.partC?.trim())
   const body = hasParts
     ? null
-    : explicitBody ?? (question.image ? null : fallbackPassage)
+    : explicitBody ??
+      (question.image || question.imageHtml ? null : fallbackPassage)
   const showBody = !!body && body.trim().length > 0
   const orderParts: { tag: string; text?: string }[] = isOrder
     ? [
@@ -83,12 +85,16 @@ export function QuestionView({
         </div>
       )}
 
-      {question.image && (
-        <img
-          src={question.image}
-          alt="도표"
-          className="w-full max-h-[600px] object-contain"
-        />
+      {question.imageHtml ? (
+        <HtmlPanel html={question.imageHtml} />
+      ) : (
+        question.image && (
+          <img
+            src={question.image}
+            alt="도표"
+            className="w-full max-h-[600px] object-contain"
+          />
+        )
       )}
 
       {showBody &&

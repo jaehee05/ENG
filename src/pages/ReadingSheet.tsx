@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getReading } from '../lib/firestore'
 import { renderUnderlines as renderWithUnderlines } from '../lib/renderUnderlines'
+import { HtmlPanel } from '../components/HtmlPanel'
 import {
   passageFallbackPerQuestion,
   type Reading,
@@ -35,7 +36,7 @@ function GlossaryColumn({ items, label }: { items: { en: string; ko: string }[];
 
 function bodyFor(q: ReadingQuestion, fallbackPassage: string | undefined): string {
   if (q.body?.trim()) return q.body
-  if (q.image) return ''
+  if (q.image || q.imageHtml) return ''
   return fallbackPassage ?? ''
 }
 
@@ -154,17 +155,26 @@ export function ReadingSheet() {
                   </div>
                 )}
 
-                {q.image && (
+                {q.imageHtml ? (
                   <div className="grid grid-cols-3 gap-6 mb-3">
                     <div className="col-span-2">
-                      <img
-                        src={q.image}
-                        alt="도표"
-                        className="w-full max-h-[14cm] object-contain border border-slate-300"
-                      />
+                      <HtmlPanel html={q.imageHtml} />
                     </div>
                     <div />
                   </div>
+                ) : (
+                  q.image && (
+                    <div className="grid grid-cols-3 gap-6 mb-3">
+                      <div className="col-span-2">
+                        <img
+                          src={q.image}
+                          alt="도표"
+                          className="w-full max-h-[14cm] object-contain border border-slate-300"
+                        />
+                      </div>
+                      <div />
+                    </div>
+                  )
                 )}
 
                 {body && body.trim() &&
