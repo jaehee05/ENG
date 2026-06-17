@@ -15,6 +15,8 @@ const TITLE_RE = /^(.+?)\s+(\d+)(?:-(\d+))?\s*(?:번|문제)?\s*$/
 interface GroupedItem {
   reading: Reading
   number: number | null
+  /** 칩에 표시할 라벨: "8" 또는 "41-42". 카테고리에 못 끼면 null. */
+  label: string | null
 }
 
 interface Group {
@@ -28,8 +30,9 @@ function buildGroups(readings: Reading[]): Group[] {
     const m = TITLE_RE.exec(r.title.trim())
     const category = m ? m[1].trim() : '기타'
     const number = m ? Number.parseInt(m[2], 10) : null
+    const label = m ? (m[3] ? `${m[2]}-${m[3]}` : m[2]) : null
     if (!map.has(category)) map.set(category, [])
-    map.get(category)!.push({ reading: r, number })
+    map.get(category)!.push({ reading: r, number, label })
   }
   const groups: Group[] = []
   for (const [category, items] of map) {
@@ -242,20 +245,20 @@ export function ReadingList() {
                 </button>
                 {isOpen && (
                   <ul className="divide-y divide-slate-100 border-t border-slate-100">
-                    {g.items.map(({ reading: r, number }) => (
+                    {g.items.map(({ reading: r, label }) => (
                       <li key={r.id}>
                         <Link
                           to={isAdmin ? `/reading/${r.id}` : `/reading/${r.id}/take`}
                           className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50"
                         >
                           <div className="flex items-baseline gap-3 min-w-0">
-                            {number !== null && (
+                            {label !== null && (
                               <span className="inline-flex items-center justify-center min-w-[2.25rem] px-2 py-0.5 rounded bg-brand-100 text-brand-700 text-sm font-semibold">
-                                {number}번
+                                {label}
                               </span>
                             )}
                             <span className="text-sm text-slate-700 truncate">
-                              {number !== null
+                              {label !== null
                                 ? `${r.questions.length}문항 · 단어 ${r.glossary.length}개`
                                 : r.title}
                             </span>
