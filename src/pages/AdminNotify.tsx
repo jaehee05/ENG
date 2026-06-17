@@ -7,6 +7,7 @@ import {
 } from '../lib/firestore'
 import {
   DEFAULT_ASSIGNMENT_STATUS_SCHEDULE,
+  DEFAULT_WEEKLY_REPORT_SCHEDULE,
   fetchPpurioSettings,
   fetchScheduleSettings,
   getAdminSecret,
@@ -17,7 +18,9 @@ import {
   type AssignmentStatusSchedule,
   type PpurioSettingsView,
   type SendResultItem,
+  type WeeklyReportSchedule,
 } from '../lib/ppurioApi'
+import { buildWeeklyReportVars } from '../lib/weeklyReport'
 import type { Assignment, Attempt, UserAccount } from '../lib/types'
 
 interface StudentBundle {
@@ -96,6 +99,18 @@ export function AdminNotify() {
   const [scheduleSaving, setScheduleSaving] = useState(false)
   const [scheduleNotice, setScheduleNotice] = useState<string | null>(null)
 
+  const [weekly, setWeekly] = useState<WeeklyReportSchedule>(
+    DEFAULT_WEEKLY_REPORT_SCHEDULE,
+  )
+  const [weeklySaving, setWeeklySaving] = useState(false)
+  const [weeklyNotice, setWeeklyNotice] = useState<string | null>(null)
+  const [weeklyTestPhone, setWeeklyTestPhone] = useState('')
+  const [weeklyTestName, setWeeklyTestName] = useState('테스트')
+  const [weeklySendResults, setWeeklySendResults] = useState<
+    SendResultItem[] | null
+  >(null)
+  const [weeklySending, setWeeklySending] = useState(false)
+
   const [adminSecret, setAdminSecretState] = useState(() => getAdminSecret())
   const [ppurioAccount, setPpurioAccount] = useState('')
   const [senderProfile, setSenderProfile] = useState('')
@@ -141,10 +156,133 @@ export function AdminNotify() {
           ...sc.assignmentStatus,
         })
       }
+      if (sc.weeklyReport) {
+        setWeekly({
+          ...DEFAULT_WEEKLY_REPORT_SCHEDULE,
+          ...sc.weeklyReport,
+        })
+      }
       setScheduleLoaded(true)
     } catch {
-      // schedule 처음 저장 전엔 정상
       setScheduleLoaded(true)
+    }
+  }
+
+  async function handleSaveWeekly() {
+    setWeeklySaving(true)
+    setWeeklyNotice(null)
+    try {
+      await saveScheduleSettings({ weeklyReport: weekly })
+      setWeeklyNotice('주간 리포트 설정 저장됨')
+      setTimeout(
+        () => setWeeklyNotice((cur) => (cur === '주간 리포트 설정 저장됨' ? null : cur)),
+        2000,
+      )
+    } catch (e) {
+      setWeeklyNotice(e instanceof Error ? e.message : '저장 실패')
+    } finally {
+      setWeeklySaving(false)
+    }
+  }
+
+  async function handleWeeklyTest() {
+    if (!adminSecret) {
+      setWeeklyNotice('관리자 비밀키를 먼저 입력하세요.')
+      return
+    }
+    if (!weekly.templateCode.trim()) {
+      setWeeklyNotice('주간 리포트 템플릿 코드를 입력하세요.')
+      return
+    }
+    const phone = (weeklyTestPhone || '').replace(/\D/g, '')
+    if (phone.length < 9) {
+      setWeeklyNotice('테스트 수신번호를 올바르게 입력하세요.')
+      return
+    }
+    const sample = bundles[0]
+      ? buildWeeklyReportVars(bundles[0].assignments, bundles[0].attempts)
+      : {
+          var1: '📊 지난주 과제 성취도\n▫️ 단어 암기: [ 0% 완료 ]\n▫️ 문제 풀이: [ 0% 완료 ]',
+          var2: '🔤 단어 시험 Report\n▫️ 학습 범위: 총 0회분 (단어 0개)\n▫️ 암기 현황: 총 0개 완료\n▫️ 최종 결과: 🎯 총 0회 중 [ 0회 ] 통과',
+          var3: '📝 문제 풀이 Report\n▫️ 독해 지문: 총 0개 완수\n▫️ 학습 결과: 📈 정답률 0% (0/0문항)',
+        }
+    setWeeklySending(true)
+    setWeeklySendResults(null)
+    try {
+      const out = await sendBatchAlimtalk({
+        templateCode: weekly.templateCode.trim(),
+        messageType: weekly.messageType,
+        recipients: [
+          {
+            label: '테스트',
+            phone,
+            name: weeklyTestName.trim() || '테스트',
+            changeWord: {
+              var1: sample.var1,
+              var2: sample.var2,
+              var3: sample.var3,
+              var4: weekly.closing,
+            },
+          },
+        ],
+      })
+      setWeeklySendResults(out.results)
+      setWeeklyNotice(out.sent > 0 ? '테스트 발송 완료.' : '테스트 발송 실패.')
+    } catch (e) {
+      setWeeklyNotice(e instanceof Error ? e.message : '테스트 발송 실패')
+    } finally {
+      setWeeklySending(false)
+    }
+  }
+
+  async function handleWeeklySendAll() {
+    if (!adminSecret) {
+      setWeeklyNotice('관리자 비밀키를 먼저 입력하세요.')
+      return
+    }
+    if (!weekly.templateCode.trim()) {
+      setWeeklyNotice('주간 리포트 템플릿 코드를 입력하세요.')
+      return
+    }
+    const targets = bundles.filter((b) => (b.account.phone ?? '').trim())
+    if (targets.length === 0) {
+      setWeeklyNotice('연락처가 있는 학생이 없습니다.')
+      return
+    }
+    if (
+      !window.confirm(
+        `${targets.length}명에게 주간 리포트를 발송합니다. 계속할까요?`,
+      )
+    )
+      return
+    setWeeklySending(true)
+    setWeeklySendResults(null)
+    try {
+      const recipients = targets.map((b) => {
+        const v = buildWeeklyReportVars(b.assignments, b.attempts)
+        return {
+          label: b.account.displayName,
+          phone: b.account.phone ?? '',
+          name: b.account.displayName,
+          changeWord: {
+            var1: v.var1,
+            var2: v.var2,
+            var3: v.var3,
+            var4: weekly.closing,
+          },
+        }
+      })
+      const out = await sendBatchAlimtalk({
+        templateCode: weekly.templateCode.trim(),
+        messageType: weekly.messageType,
+        recipients,
+      })
+      setWeeklySendResults(out.results)
+      setWeeklyNotice(`발송 완료: 성공 ${out.sent} / 실패 ${out.failed}`)
+    } catch (e) {
+      setWeeklyNotice(e instanceof Error ? e.message : '발송 실패')
+    } finally {
+      setWeeklySending(false)
     }
   }
 
@@ -815,6 +953,270 @@ export function AdminNotify() {
           표시할 학생이 없습니다.
         </div>
       )}
+
+      <div className="rounded-lg border border-slate-300 bg-white p-4 space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <p className="text-sm font-semibold text-slate-900">📈 주간 리포트 알림톡</p>
+          {weeklyNotice && (
+            <span className="text-xs text-brand-700">{weeklyNotice}</span>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">
+              템플릿 코드
+            </label>
+            <input
+              type="text"
+              value={weekly.templateCode}
+              onChange={(e) =>
+                setWeekly((w) => ({ ...w, templateCode: e.target.value }))
+              }
+              placeholder="주간 리포트 템플릿 코드"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">
+              발송 유형
+            </label>
+            <select
+              value={weekly.messageType}
+              onChange={(e) =>
+                setWeekly((w) => ({ ...w, messageType: e.target.value }))
+              }
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              <option value="AT">기본형</option>
+              <option value="AI">이미지형</option>
+              <option value="ALH">강조표기형</option>
+              <option value="ALI">아이템리스트형</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1">
+            닫는 멘트 (var4)
+          </label>
+          <textarea
+            value={weekly.closing}
+            onChange={(e) =>
+              setWeekly((w) => ({ ...w, closing: e.target.value }))
+            }
+            rows={3}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          />
+        </div>
+
+        <div className="rounded-md border border-slate-200 bg-slate-50 p-3 space-y-3">
+          <p className="text-xs font-semibold text-slate-700">자동 발송 스케줄 (매주)</p>
+          <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={weekly.enabled}
+              onChange={(e) =>
+                setWeekly((w) => ({ ...w, enabled: e.target.checked }))
+              }
+              className="accent-brand-600"
+            />
+            자동 발송 사용
+          </label>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                요일
+              </label>
+              <select
+                value={weekly.dayOfWeek}
+                onChange={(e) =>
+                  setWeekly((w) => ({
+                    ...w,
+                    dayOfWeek: Number.parseInt(e.target.value, 10),
+                  }))
+                }
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                {['일', '월', '화', '수', '목', '금', '토'].map((d, i) => (
+                  <option key={d} value={i}>
+                    {d}요일
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                시
+              </label>
+              <select
+                value={weekly.hour}
+                onChange={(e) =>
+                  setWeekly((w) => ({
+                    ...w,
+                    hour: Number.parseInt(e.target.value, 10),
+                  }))
+                }
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                {Array.from({ length: 24 }, (_, h) => (
+                  <option key={h} value={h}>
+                    {String(h).padStart(2, '0')}시
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                분
+              </label>
+              <select
+                value={weekly.minute}
+                onChange={(e) =>
+                  setWeekly((w) => ({
+                    ...w,
+                    minute: Number.parseInt(e.target.value, 10),
+                  }))
+                }
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map((m) => (
+                  <option key={m} value={m}>
+                    {String(m).padStart(2, '0')}분
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={handleSaveWeekly}
+              disabled={weeklySaving || !adminSecret || !scheduleLoaded}
+              className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700 disabled:opacity-50"
+            >
+              {weeklySaving ? '저장 중...' : '주간 스케줄 저장'}
+            </button>
+          </div>
+        </div>
+
+        <div className="rounded-md border border-amber-200 bg-amber-50/40 p-3 space-y-2">
+          <p className="text-sm font-semibold text-slate-700">테스트 발송 / 즉시 발송</p>
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 items-end">
+            <div>
+              <label className="block text-xs text-slate-600 mb-1">
+                테스트 수신번호
+              </label>
+              <input
+                type="tel"
+                value={weeklyTestPhone}
+                onChange={(e) => setWeeklyTestPhone(e.target.value)}
+                placeholder="010-1234-5678"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-600 mb-1">
+                테스트 이름
+              </label>
+              <input
+                type="text"
+                value={weeklyTestName}
+                onChange={(e) => setWeeklyTestName(e.target.value)}
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleWeeklyTest}
+              disabled={weeklySending || !weeklyTestPhone}
+              className="rounded-md bg-amber-600 text-white text-sm font-medium px-4 py-2 hover:bg-amber-700 disabled:opacity-50"
+            >
+              {weeklySending ? '발송 중...' : '테스트 1건'}
+            </button>
+          </div>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={handleWeeklySendAll}
+              disabled={bundles.length === 0 || weeklySending}
+              className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700 disabled:opacity-50"
+            >
+              {weeklySending ? '발송 중...' : `전체 즉시 발송 (${bundles.length}명)`}
+            </button>
+          </div>
+        </div>
+
+        {weeklySendResults && (
+          <ul className="divide-y divide-slate-100 text-sm">
+            {weeklySendResults.map((r, i) => (
+              <li key={i} className="py-1.5 flex items-center justify-between gap-3">
+                <span className="text-slate-700">
+                  {r.label || r.phone}{' '}
+                  <span className="text-xs text-slate-400">{r.phone}</span>
+                </span>
+                {r.ok ? (
+                  <span className="text-xs text-brand-700 font-medium">성공</span>
+                ) : (
+                  <span className="text-xs text-red-600">{r.error || '실패'}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {bundles[0] && (
+          <details className="rounded-md border border-slate-200 bg-white">
+            <summary className="cursor-pointer text-xs font-medium text-slate-700 px-3 py-2 hover:bg-slate-50">
+              미리보기 — {bundles[0].account.displayName}
+            </summary>
+            <div className="px-3 py-3 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-3">
+              {(() => {
+                const v = buildWeeklyReportVars(
+                  bundles[0].assignments,
+                  bundles[0].attempts,
+                )
+                return (
+                  <>
+                    <div>
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                        [*1*] 과제 성취도
+                      </p>
+                      <pre className="rounded-md bg-slate-50 border border-slate-200 p-3 text-xs leading-relaxed text-slate-800 whitespace-pre-wrap font-sans">
+                        {v.var1}
+                      </pre>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                        [*2*] 단어 시험 Report
+                      </p>
+                      <pre className="rounded-md bg-slate-50 border border-slate-200 p-3 text-xs leading-relaxed text-slate-800 whitespace-pre-wrap font-sans">
+                        {v.var2}
+                      </pre>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                        [*3*] 문제 풀이 Report
+                      </p>
+                      <pre className="rounded-md bg-slate-50 border border-slate-200 p-3 text-xs leading-relaxed text-slate-800 whitespace-pre-wrap font-sans">
+                        {v.var3}
+                      </pre>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                        [*4*] 닫는 멘트
+                      </p>
+                      <pre className="rounded-md bg-slate-50 border border-slate-200 p-3 text-xs leading-relaxed text-slate-800 whitespace-pre-wrap font-sans">
+                        {weekly.closing}
+                      </pre>
+                    </div>
+                  </>
+                )
+              })()}
+            </div>
+          </details>
+        )}
+      </div>
 
       <ul className="space-y-3">
         {visible.map((b) => {

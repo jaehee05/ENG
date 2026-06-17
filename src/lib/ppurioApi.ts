@@ -99,8 +99,22 @@ export interface AssignmentStatusSchedule {
   lastSentKey?: string
 }
 
+export interface WeeklyReportSchedule {
+  enabled: boolean
+  /** Sunday=0, Saturday=6. */
+  dayOfWeek: number
+  hour: number
+  minute: number
+  templateCode: string
+  messageType: string
+  /** var4 — 마지막 격려 멘트. */
+  closing: string
+  lastSentKey?: string
+}
+
 export interface ScheduleSettings {
   assignmentStatus: AssignmentStatusSchedule
+  weeklyReport: WeeklyReportSchedule
 }
 
 export const DEFAULT_ASSIGNMENT_STATUS_SCHEDULE: AssignmentStatusSchedule = {
@@ -115,10 +129,23 @@ export const DEFAULT_ASSIGNMENT_STATUS_SCHEDULE: AssignmentStatusSchedule = {
   onlyIncomplete: false,
 }
 
+export const DEFAULT_WEEKLY_REPORT_SCHEDULE: WeeklyReportSchedule = {
+  enabled: false,
+  dayOfWeek: 1, // 월요일
+  hour: 9,
+  minute: 0,
+  templateCode: '',
+  messageType: 'ALH',
+  closing:
+    '이번 주에도 목표를 달성할 수 있도록 가정에서도 많은 칭찬과 격려 부탁드립니다!',
+}
+
 export async function fetchScheduleSettings(): Promise<ScheduleSettings> {
   return call<ScheduleSettings>('getSchedule')
 }
 
-export async function saveScheduleSettings(input: ScheduleSettings): Promise<void> {
+export async function saveScheduleSettings(
+  input: Partial<ScheduleSettings>,
+): Promise<void> {
   await call<{ ok: true }>('saveSchedule', input)
 }

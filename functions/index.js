@@ -8,18 +8,7 @@ const { sendOne } = require("./ppurio");
 
 setGlobalOptions({ region: "asia-northeast3", retry: false, maxInstances: 10 });
 
-const DEFAULT_SCHEDULE = {
-  enabled: false,
-  cadence: "weekly",
-  dayOfWeek: 0,
-  hour: 9,
-  minute: 0,
-  templateCode: "",
-  messageType: "ALH",
-  notice: "",
-  onlyIncomplete: false,
-  lastSentKey: "",
-};
+const VOCAB_PASS_THRESHOLD = 25;
 
 function normalizeSchedule(raw) {
   const r = raw || {};
@@ -33,6 +22,23 @@ function normalizeSchedule(raw) {
     messageType: String(r.messageType || "ALH"),
     notice: String(r.notice || ""),
     onlyIncomplete: !!r.onlyIncomplete,
+    lastSentKey: String(r.lastSentKey || ""),
+  };
+}
+
+function normalizeWeeklySchedule(raw) {
+  const r = raw || {};
+  return {
+    enabled: !!r.enabled,
+    dayOfWeek: Number.isInteger(r.dayOfWeek) ? r.dayOfWeek : 1,
+    hour: Number.isInteger(r.hour) ? Math.min(23, Math.max(0, r.hour)) : 9,
+    minute: Number.isInteger(r.minute) ? Math.min(59, Math.max(0, r.minute)) : 0,
+    templateCode: String(r.templateCode || ""),
+    messageType: String(r.messageType || "ALH"),
+    closing: String(
+      r.closing ||
+        "이번 주에도 목표를 달성할 수 있도록 가정에서도 많은 칭찬과 격려 부탁드립니다!",
+    ),
     lastSentKey: String(r.lastSentKey || ""),
   };
 }
@@ -101,14 +107,21 @@ exports.ppurioAdmin = onRequest({ invoker: "public" }, async (req, res) => {
       const d = snap.exists ? snap.data() : {};
       return res.json({
         assignmentStatus: normalizeSchedule(d.assignmentStatus),
+        weeklyReport: normalizeWeeklySchedule(d.weeklyReport),
       });
     }
 
     if (action === "saveSchedule") {
       const p = payload || {};
-      const sched = normalizeSchedule(p.assignmentStatus);
+      const update = { updatedAt: Date.now() };
+      if (p.assignmentStatus) {
+        update.assignmentStatus = normalizeSchedule(p.assignmentStatus);
+      }
+      if (p.weeklyReport) {
+        update.weeklyReport = normalizeWeeklySchedule(p.weeklyReport);
+      }
       await admin.firestore().doc("settings/notifySchedules").set(
-        { assignmentStatus: sched, updatedAt: Date.now() },
+        update,
         { merge: true },
       );
       return res.json({ ok: true });
@@ -181,6 +194,92 @@ function isAssignmentDoneSrv(asn, attempts) {
   return true;
 }
 
+function buildWeeklyReportVarsSrv(assignments, attempts) {
+  const vocabAsn = assignments.filter((a) => a.type === "vocab");
+  const readingAsn = assignments.filter((a) => a.type === "reading");
+  const vocabDone = vocabAsn.filter((a) => isAssignmentDoneSrv(a, attempts)).length;
+  const readingDone = readingAsn.filter((a) => isAssignmentDoneSrv(a, attempts)).length;
+  const vocabPct = vocabAsn.length > 0 ? Math.round((vocabDone / vocabAsn.length) * 100) : 0;
+  const readingPct = readingAsn.length > 0 ? Math.round((readingDone / readingAsn.length) * 100) : 0;
+
+  const vocabAttempts = attempts.filter((a) => a.type === "vocab" && !a.practice);
+  const totalWords = vocabAttempts.reduce((s, a) => s + (a.total || 0), 0);
+  const totalCorrectV = vocabAttempts.reduce((s, a) => s + (a.correct || 0), 0);
+  const passCount = vocabAttempts.filter((a) => (a.correct || 0) >= VOCAB_PASS_THRESHOLD).length;
+  const sessionCount = vocabAttempts.length;
+
+  const readingAttempts = attempts.filter((a) => a.type === "reading" && !a.practice);
+  const totalR = readingAttempts.reduce((s, a) => s + (a.total || 0), 0);
+  const totalCorrectR = readingAttempts.reduce((s, a) => s + (a.correct || 0), 0);
+  const ratio = totalR > 0 ? Math.round((totalCorrectR / totalR) * 100) : 0;
+
+  return {
+    var1: [
+      "📊 지난주 과제 성취도",
+      `▫️ 단어 암기: [ ${vocabPct}% 완료 ]`,
+      `▫️ 문제 풀이: [ ${readingPct}% 완료 ]`,
+    ].join("\n"),
+    var2: [
+      "🔤 단어 시험 Report",
+      `▫️ 학습 범위: 총 ${vocabAsn.length}회분 (단어 ${totalWords}개)`,
+      `▫️ 암기 현황: 총 ${totalCorrectV}개 완료`,
+      `▫️ 최종 결과: 🎯 총 ${sessionCount}회 중 [ ${passCount}회 ] 통과 (기준: 회당 30개 중 ${VOCAB_PASS_THRESHOLD}개 이상)`,
+    ].join("\n"),
+    var3: [
+      "📝 문제 풀이 Report",
+      `▫️ 독해 지문: 총 ${readingDone}개 완수`,
+      `▫️ 학습 결과: 📈 정답률 ${ratio}% (${totalCorrectR}/${totalR}문항)`,
+    ].join("\n"),
+  };
+}
+
+async function runWeeklyReportBlast(schedule) {
+  const db = admin.firestore();
+  const studentsSnap = await db
+    .collection("users")
+    .where("role", "==", "student")
+    .where("status", "==", "active")
+    .get();
+  const students = studentsSnap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .filter((s) => (s.phone || "").trim());
+
+  const results = [];
+  for (const s of students) {
+    const [asnSnap, attSnap] = await Promise.all([
+      db.collection("assignments").where("studentUid", "==", s.id).get(),
+      db.collection("attempts").where("studentUid", "==", s.id).get(),
+    ]);
+    const assignments = asnSnap.docs.map((x) => ({ id: x.id, ...x.data() }));
+    const attempts = attSnap.docs.map((x) => ({ id: x.id, ...x.data() }));
+    const vars = buildWeeklyReportVarsSrv(assignments, attempts);
+
+    try {
+      await sendOne({
+        phone: s.phone,
+        name: s.displayName,
+        changeWord: {
+          var1: vars.var1,
+          var2: vars.var2,
+          var3: vars.var3,
+          var4: schedule.closing,
+        },
+        templateCode: schedule.templateCode,
+        messageType: schedule.messageType,
+      });
+      results.push({ label: s.displayName, ok: true });
+    } catch (e) {
+      console.error(`[weeklyReport] ${s.displayName} 실패:`, e);
+      results.push({ label: s.displayName, ok: false, error: String(e.message || e) });
+    }
+  }
+  return {
+    sent: results.filter((x) => x.ok).length,
+    failed: results.filter((x) => !x.ok).length,
+    results,
+  };
+}
+
 async function runAssignmentStatusBlast(schedule) {
   const db = admin.firestore();
   const studentsSnap = await db
@@ -240,6 +339,16 @@ async function runAssignmentStatusBlast(schedule) {
   return { sent: results.filter((x) => x.ok).length, failed: results.filter((x) => !x.ok).length, results };
 }
 
+function timeMatch(t, sched) {
+  if (t.hour !== sched.hour) return false;
+  if (Math.abs(t.minute - sched.minute) > 4) return false;
+  return true;
+}
+
+function buildSentKey(t, sched) {
+  return `${t.y}${String(t.m).padStart(2, "0")}${String(t.d).padStart(2, "0")}-${String(sched.hour).padStart(2, "0")}${String(sched.minute).padStart(2, "0")}`;
+}
+
 exports.scheduledNotify = onSchedule(
   { schedule: "every 5 minutes", timeZone: "Asia/Seoul" },
   async () => {
@@ -247,35 +356,49 @@ exports.scheduledNotify = onSchedule(
     const snap = await db.doc("settings/notifySchedules").get();
     if (!snap.exists) return;
     const d = snap.data() || {};
-    const sched = normalizeSchedule(d.assignmentStatus);
-    if (!sched.enabled) return;
-    if (!sched.templateCode) {
-      console.warn("[scheduledNotify] templateCode 비어있음 — skip");
-      return;
-    }
-
     const t = nowKstParts();
-    if (sched.cadence === "weekly" && t.dow !== sched.dayOfWeek) return;
-    if (t.hour !== sched.hour) return;
-    if (Math.abs(t.minute - sched.minute) > 4) return;
+    const update = { updatedAt: Date.now() };
+    let touched = false;
 
-    // 동일 시각 중복 발송 방지 (분까지 동일 키)
-    const key = `${t.y}${String(t.m).padStart(2, "0")}${String(t.d).padStart(2, "0")}-${String(sched.hour).padStart(2, "0")}${String(sched.minute).padStart(2, "0")}`;
-    if (sched.lastSentKey === key) {
-      console.log("[scheduledNotify] 이미 같은 시각에 발송됨 — skip", key);
-      return;
+    // 1) 과제 현황 알림톡
+    {
+      const sched = normalizeSchedule(d.assignmentStatus);
+      if (sched.enabled && sched.templateCode) {
+        const dowOk = sched.cadence === "daily" || t.dow === sched.dayOfWeek;
+        if (dowOk && timeMatch(t, sched)) {
+          const key = buildSentKey(t, sched);
+          if (sched.lastSentKey !== key) {
+            console.log("[scheduledNotify] 과제현황 발송 시작", key);
+            const result = await runAssignmentStatusBlast(sched);
+            console.log("[scheduledNotify] 과제현황 발송 완료", key, result);
+            update.assignmentStatus = { ...sched, lastSentKey: key };
+            update.lastRunAssignmentStatus = { key, ...result, at: Date.now() };
+            touched = true;
+          }
+        }
+      }
     }
 
-    console.log("[scheduledNotify] 발송 시작", key);
-    const result = await runAssignmentStatusBlast(sched);
-    console.log("[scheduledNotify] 발송 완료", key, result);
+    // 2) 주간 리포트
+    {
+      const sched = normalizeWeeklySchedule(d.weeklyReport);
+      if (sched.enabled && sched.templateCode) {
+        if (t.dow === sched.dayOfWeek && timeMatch(t, sched)) {
+          const key = buildSentKey(t, sched);
+          if (sched.lastSentKey !== key) {
+            console.log("[scheduledNotify] 주간리포트 발송 시작", key);
+            const result = await runWeeklyReportBlast(sched);
+            console.log("[scheduledNotify] 주간리포트 발송 완료", key, result);
+            update.weeklyReport = { ...sched, lastSentKey: key };
+            update.lastRunWeeklyReport = { key, ...result, at: Date.now() };
+            touched = true;
+          }
+        }
+      }
+    }
 
-    await db.doc("settings/notifySchedules").set(
-      {
-        assignmentStatus: { ...sched, lastSentKey: key },
-        lastRun: { key, ...result, at: Date.now() },
-      },
-      { merge: true },
-    );
+    if (touched) {
+      await db.doc("settings/notifySchedules").set(update, { merge: true });
+    }
   },
 );
