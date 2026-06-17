@@ -10,6 +10,7 @@ import {
 } from '../lib/firestore'
 import { parseWordList, type Reading, type ReadingQuestion } from '../lib/types'
 import { extractGlossary, translatePassage, wordsToText } from '../lib/api'
+import { extractTextFromHtml } from '../lib/htmlText'
 import { handleUnderlineHotkey } from '../lib/textareaHotkeys'
 import { QuestionEditor } from '../components/QuestionEditor'
 import { emptyDraftQuestion, type DraftQuestion } from '../components/draftQuestion'
@@ -200,14 +201,21 @@ export function ReadingEdit() {
   }
 
   async function handleTranslate() {
-    if (!passage.trim()) {
-      setError('번역할 지문이 비어 있습니다.')
+    const htmlTexts = questions
+      .map((q) => (q.imageHtml ? extractTextFromHtml(q.imageHtml) : ''))
+      .filter((t) => t.trim())
+    const parts: string[] = []
+    if (passage.trim()) parts.push(passage.trim())
+    for (const t of htmlTexts) parts.push(t)
+    if (parts.length === 0) {
+      setError('번역할 지문이나 안내문 HTML이 없습니다.')
       return
     }
     setError(null)
     setTranslating(true)
     try {
-      const ko = await translatePassage(passage.trim())
+      const combined = parts.join('\n\n---\n\n')
+      const ko = await translatePassage(combined)
       setPassageKo(ko)
     } catch (err) {
       setError(err instanceof Error ? err.message : '번역에 실패했습니다.')

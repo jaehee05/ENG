@@ -11,6 +11,7 @@ import {
 import type { Reading } from '../lib/types'
 import { translatePassage } from '../lib/api'
 import { updateReadingPassageKo } from '../lib/firestore'
+import { extractTextFromHtml } from '../lib/htmlText'
 
 const TITLE_RE = /^(.+?)\s+(\d+)(?:-(\d+))?\s*(?:번|문제)?\s*$/
 
@@ -130,10 +131,21 @@ export function ReadingList() {
     note: string
   } | null>(null)
 
+  function buildTranslationSource(r: Reading): string {
+    const htmlTexts = (r.questions ?? [])
+      .map((q) => (q.imageHtml ? extractTextFromHtml(q.imageHtml) : ''))
+      .filter((t) => t.trim())
+    const parts: string[] = []
+    if ((r.passage ?? '').trim()) parts.push(r.passage.trim())
+    for (const t of htmlTexts) parts.push(t)
+    return parts.join('\n\n---\n\n')
+  }
+
   async function handleBulkTranslate() {
-    const pending = items.filter(
-      (r) => (r.passage ?? '').trim() && !(r.passageKo ?? '').trim(),
-    )
+    const pending = items.filter((r) => {
+      if ((r.passageKo ?? '').trim()) return false
+      return buildTranslationSource(r).trim().length > 0
+    })
     if (pending.length === 0) {
       setBulkProgress({
         done: 0,
@@ -145,7 +157,7 @@ export function ReadingList() {
     }
     if (
       !window.confirm(
-        `한글 해석이 없는 지문 ${pending.length}개를 AI로 번역해 채웁니다. 진행할까요?`,
+        `한글 해석이 없는 지문 ${pending.length}개를 AI로 번역해 채웁니다 (지문 + 안내문 HTML 텍스트 포함). 진행할까요?`,
       )
     )
       return
@@ -161,7 +173,8 @@ export function ReadingList() {
         note: `처리 중: ${r.title}`,
       })
       try {
-        const ko = await translatePassage(r.passage)
+        const source = buildTranslationSource(r)
+        const ko = await translatePassage(source)
         if (ko) {
           await updateReadingPassageKo(r.id, ko)
           setItems((prev) =>
