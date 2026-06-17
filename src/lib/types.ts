@@ -88,6 +88,8 @@ export interface ReadingQuestion {
   q: string
   /** Original question number in the source exam (e.g., 41, 42). Falls back to position+1 if missing. */
   number?: number
+  /** 문항별 해설/풀이 (한국어). 학생이 틀린 문제에서 표시. */
+  explanation?: string
   /** Question-specific body text. Falls back to reading.passage if omitted. */
   body?: string
   /** Boxed "given" content shown above the body (order/insert types). */

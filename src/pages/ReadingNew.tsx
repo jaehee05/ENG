@@ -56,6 +56,7 @@ function trimDraft(q: DraftQuestion) {
     number?: number
     image?: string
     imageHtml?: string
+    explanation?: string
     partA?: string
     partB?: string
     partC?: string
@@ -73,6 +74,7 @@ function trimDraft(q: DraftQuestion) {
   if (q.number && q.number > 0) out.number = q.number
   if (q.image) out.image = q.image
   if (q.imageHtml && q.imageHtml.trim()) out.imageHtml = q.imageHtml.trim()
+  if (q.explanation && q.explanation.trim()) out.explanation = q.explanation.trim()
   if (q.partA.trim()) out.partA = q.partA.trim()
   if (q.partB.trim()) out.partB = q.partB.trim()
   if (q.partC.trim()) out.partC = q.partC.trim()
@@ -237,6 +239,7 @@ export function ReadingNew() {
           points: q.points && q.points >= 1 && q.points <= 5 ? q.points : undefined,
           number: q.number && q.number > 0 ? q.number : undefined,
           image,
+          explanation: q.explanation && q.explanation.trim() ? q.explanation.trim() : undefined,
           partA: q.partA ?? '',
           partB: q.partB ?? '',
           partC: q.partC ?? '',
@@ -513,7 +516,7 @@ export function ReadingNew() {
           <label className="block text-sm font-medium text-slate-700 mb-1">
             지문 한글 해석{' '}
             <span className="font-normal text-slate-500">
-              (학생이 틀린 문제에서 표시. 자동 분류 시 한글 해설도 같이 붙여넣으면 자동 인식)
+              (학생이 틀린 문제에서 표시. 자동 분류 시 한글 해석/문제 해설을 같이 붙여넣으면 한글 해석은 여기에, 문제 해설은 각 문항에 자동 분배)
             </span>
           </label>
           <textarea

@@ -319,6 +319,19 @@ export function QuestionEditor({ index, question, canRemove, onChange, onRemove 
 
       <div>
         <label className="block text-xs font-medium text-slate-600 mb-1">
+          문제 해설 <span className="text-slate-400 font-normal">(학생이 틀리면 표시)</span>
+        </label>
+        <textarea
+          value={question.explanation ?? ''}
+          onChange={(e) => patch({ explanation: e.target.value })}
+          rows={3}
+          placeholder="정답 근거, 오답 분석, 추론 단서 등. 자동 분류 시 해설 텍스트가 같이 있으면 자동 채워집니다."
+          className={inputCls}
+        />
+      </div>
+
+      <div>
+        <label className="block text-xs font-medium text-slate-600 mb-1">
           선지 <span className="text-slate-400 font-normal">(왼쪽 동그라미를 눌러 정답 선택)</span>
         </label>
         <div className="space-y-2">

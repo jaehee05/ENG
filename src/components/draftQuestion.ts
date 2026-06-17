@@ -12,6 +12,7 @@ export interface DraftQuestion {
   points?: number
   image?: string
   imageHtml?: string
+  explanation?: string
   partA: string
   partB: string
   partC: string

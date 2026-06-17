@@ -153,6 +153,21 @@ export function ReadingResult() {
                 })}
               </div>
 
+              {!r.correct && retryCorrect && (() => {
+                const exp = reading?.questions[i]?.explanation?.trim()
+                if (!exp) return null
+                return (
+                  <details className="mt-3 rounded-md border border-amber-200 bg-amber-50/40">
+                    <summary className="cursor-pointer text-xs font-medium text-slate-700 px-3 py-2 hover:bg-amber-50">
+                      📖 문제 해설 보기
+                    </summary>
+                    <div className="px-3 py-2 text-sm text-slate-800 whitespace-pre-wrap leading-relaxed border-t border-amber-100 font-myeongjo">
+                      {exp}
+                    </div>
+                  </details>
+                )
+              })()}
+
               {!r.correct && (
                 <div className="mt-3 pt-3 border-t border-red-200/70 space-y-2">
                   <p className="text-xs font-medium text-slate-700">다시 풀어보기</p>

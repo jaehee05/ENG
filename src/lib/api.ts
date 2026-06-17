@@ -188,6 +188,7 @@ export interface ParsedReadingQuestion {
   partB?: string
   partC?: string
   partD?: string
+  explanation?: string
 }
 
 export interface ParsedReadingResult {

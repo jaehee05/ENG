@@ -30,6 +30,7 @@ function fromQuestion(q: ReadingQuestion): DraftQuestion {
     number: q.number,
     image: q.image,
     imageHtml: q.imageHtml,
+    explanation: q.explanation,
     partA: q.partA ?? '',
     partB: q.partB ?? '',
     partC: q.partC ?? '',
@@ -50,6 +51,7 @@ function trimDraft(q: DraftQuestion) {
     number?: number
     image?: string
     imageHtml?: string
+    explanation?: string
     partA?: string
     partB?: string
     partC?: string
@@ -67,6 +69,7 @@ function trimDraft(q: DraftQuestion) {
   if (q.number && q.number > 0) out.number = q.number
   if (q.image) out.image = q.image
   if (q.imageHtml && q.imageHtml.trim()) out.imageHtml = q.imageHtml.trim()
+  if (q.explanation && q.explanation.trim()) out.explanation = q.explanation.trim()
   if (q.partA.trim()) out.partA = q.partA.trim()
   if (q.partB.trim()) out.partB = q.partB.trim()
   if (q.partC.trim()) out.partC = q.partC.trim()

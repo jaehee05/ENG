@@ -26,6 +26,7 @@ submit_reading을 호출하지 않고 텍스트만 출력해도 되는 경우는
 규칙:
 - title: 출처 정보가 명확하면 그대로(예: "2024학년도 6월 모평 31번"). 모르면 빈 문자열.
 - passageKo: 입력에 한국어로 작성된 **지문 해석/번역 문단**이 영어 본문과 같이 들어 있으면, 그 한국어 줄글을 모아 여기에 담으세요. 영어 문장 사이사이에 한국어 해석이 줄별로 끼어 있으면 한국어 부분만 모아서 자연스러운 문단으로 정리해 담으세요. 해석/번역이 없으면 빈 문자열.
+- explanation (문항별): 입력에 각 문항의 **해설/풀이**(정답 근거, 오답 분석, 추론 단서 등)가 한국어로 들어 있으면, 그 문항의 explanation 필드에 담으세요. "해설", "풀이", "정답: ③", "왜냐하면..." 같은 표지로 시작하는 줄글이 포함됩니다. 단순 한 줄 정답 표시("정답: ③")만 있으면 explanation은 빈 문자열로 두고 answer만 채우세요. 해설 본문이 있으면 정답 표시는 빼고 풀이 줄글만 정리해서 담으세요.
 - passage: 본문 영어 텍스트는 **항상 여기에 넣으세요**. 단일 문항이라도 본문은 passage에. 절대 questions[].body에 본문 텍스트를 넣지 마세요. passage에는 한국어 해석을 섞지 말 것 (영어만).
   - **세트(43~45) 처리**: 본문이 (A)(B)(C)(D) 단락으로 명시적으로 분리된 장문 독해(보통 43~45번)는 passage를 비우고, **첫 문항(보통 43번 글 순서 배열)을 type='order'로 분류 + partA/partB/partC/partD에 단락 텍스트를 그대로 넣으세요**. 셔플된 원본 순서 유지(글 흐름대로 재정렬 X). 두 번째·세 번째 문항(44번 지칭 추론, 45번 일치/불일치 등)은 body도 비우고 passage도 비웁니다 — 학생 화면에서 첫 문항의 (A)(B)(C)(D) 박스가 공용 지문 역할을 합니다.
   - **세트(41~42)** 같은 2문항 평지문은 기존대로 passage에 한 덩어리.
@@ -83,6 +84,7 @@ interface ParsedQuestion {
   partB?: string
   partC?: string
   partD?: string
+  explanation?: string
 }
 
 interface ParseResult {
@@ -124,6 +126,7 @@ function normalizeQuestion(raw: unknown): ParsedQuestion | null {
     partB: typeof r.partB === 'string' ? r.partB.trim() : '',
     partC: typeof r.partC === 'string' ? r.partC.trim() : '',
     partD: typeof r.partD === 'string' ? r.partD.trim() : '',
+    explanation: typeof r.explanation === 'string' ? r.explanation.trim() : '',
   }
 }
 
@@ -236,6 +239,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     partB: { type: 'string' },
                     partC: { type: 'string' },
                     partD: { type: 'string' },
+                    explanation: { type: 'string' },
                   },
                 },
               },
