@@ -229,7 +229,7 @@ export function ReadingNew() {
           intro: q.intro,
           summaryBox: q.summaryBox,
           choices,
-          answer: Math.min(4, Math.max(0, q.answer ?? 0)),
+          answer: -1,
           points: q.points && q.points >= 1 && q.points <= 5 ? q.points : undefined,
           number: q.number && q.number > 0 ? q.number : undefined,
           image,
@@ -249,7 +249,7 @@ export function ReadingNew() {
         setQuestionNumber(lo === hi ? String(lo) : `${lo}-${hi}`)
       }
       setParseNotice(
-        `${drafts.length}개 문항을 자동 입력했습니다. 정답·본문을 확인 후 저장하세요.`,
+        `${drafts.length}개 문항을 자동 입력했습니다. 정답은 직접 선택하세요.`,
       )
     } catch (err) {
       setError(err instanceof Error ? err.message : '자동 분류에 실패했습니다.')
@@ -290,6 +290,8 @@ export function ReadingNew() {
     if (questions.length === 0) return setError('문제를 1개 이상 입력하세요.')
     for (const [i, q] of questions.entries()) {
       if (!q.q.trim()) return setError(`${i + 1}번 문제의 발문을 입력하세요.`)
+      if (q.answer < 0 || q.answer > 4)
+        return setError(`${i + 1}번 문제의 정답을 선택하세요.`)
     }
     if (
       !passage.trim() &&

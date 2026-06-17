@@ -240,7 +240,9 @@ export function QuestionEditor({ index, question, canRemove, onChange, onRemove 
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">선지 (정답을 선택하세요)</label>
+        <label className="block text-xs font-medium text-slate-600 mb-1">
+          선지 <span className="text-slate-400 font-normal">(왼쪽 동그라미를 눌러 정답 선택)</span>
+        </label>
         <div className="space-y-2">
           {question.choices.map((c, ci) => (
             <label key={ci} className="flex items-start gap-2">
@@ -262,8 +264,16 @@ export function QuestionEditor({ index, question, canRemove, onChange, onRemove 
             </label>
           ))}
         </div>
-        <p className="text-xs text-slate-500 mt-1">
-          정답: {CHOICE_MARKS[question.answer]} · ⌘U(Ctrl+U)로 발문/선지/본문에 밑줄
+        <p className="text-xs mt-1">
+          {question.answer >= 0 && question.answer <= 4 ? (
+            <span className="text-slate-500">
+              정답: <span className="font-semibold text-slate-800">{CHOICE_MARKS[question.answer]}</span> · ⌘U(Ctrl+U)로 발문/선지/본문에 밑줄
+            </span>
+          ) : (
+            <span className="text-amber-700 font-medium">
+              정답 미선택 — 저장 전 반드시 선택하세요
+            </span>
+          )}
         </p>
       </div>
     </div>

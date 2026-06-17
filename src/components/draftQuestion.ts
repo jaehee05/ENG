@@ -25,7 +25,7 @@ export function emptyDraftQuestion(type: ReadingQuestionType = 'standard'): Draf
     intro: '',
     summaryBox: '',
     choices: ['', '', '', '', ''],
-    answer: 0,
+    answer: -1,
     partA: '',
     partB: '',
     partC: '',
