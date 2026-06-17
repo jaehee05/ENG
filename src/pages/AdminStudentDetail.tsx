@@ -11,6 +11,8 @@ import {
   listAttemptsForUser,
   listReadings,
   listVocabSets,
+  setAssignmentManualDone,
+  setAttemptPractice,
 } from '../lib/firestore'
 import { listMyWordbook } from '../lib/wordbook'
 import type {
@@ -156,7 +158,7 @@ export function AdminStudentDetail() {
   const [bundleCategory, setBundleCategory] = useState('')
 
   const readingCategories = useMemo(() => {
-    const TITLE_RE = /^(.+?)\s+(\d+)\s*(?:번|문제)?\s*$/
+    const TITLE_RE = /^(.+?)\s+(\d+(?:-\d+)?)\s*(?:번|문제)?\s*$/
     const map = new Map<string, Reading[]>()
     for (const r of readings) {
       const m = TITLE_RE.exec(r.title.trim())
@@ -262,6 +264,30 @@ export function AdminStudentDetail() {
     if (!window.confirm(`"${asn.refTitle}" 과제를 삭제하시겠습니까?`)) return
     await deleteAssignment(asn.id)
     await reloadAssignments()
+  }
+
+  async function handleToggleAssignmentDone(asn: Assignment) {
+    const next = !asn.manualDone
+    try {
+      await setAssignmentManualDone(asn.id, next)
+      setAssignments((prev) =>
+        prev.map((x) => (x.id === asn.id ? { ...x, manualDone: next } : x)),
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '상태 변경 실패')
+    }
+  }
+
+  async function handleToggleAttemptPractice(att: Attempt) {
+    const next = !att.practice
+    try {
+      await setAttemptPractice(att.id, next)
+      setAttempts((prev) =>
+        prev.map((x) => (x.id === att.id ? { ...x, practice: next } : x)),
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '상태 변경 실패')
+    }
   }
 
   async function handleDeleteAttempt(att: Attempt) {
@@ -514,13 +540,27 @@ export function AdminStudentDetail() {
                       {a.note && <span className="text-slate-600">· {a.note}</span>}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteAssignment(a)}
-                    className="text-xs text-slate-400 hover:text-red-600 shrink-0"
-                  >
-                    삭제
-                  </button>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleAssignmentDone(a)}
+                      className={`text-xs rounded-md px-2.5 py-1 border transition ${
+                        a.manualDone
+                          ? 'border-brand-300 bg-brand-50 text-brand-700 hover:bg-brand-100'
+                          : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+                      }`}
+                      title={a.manualDone ? '수동 완료 처리 해제' : '수동으로 완료 처리'}
+                    >
+                      {a.manualDone ? '완료 해제' : '완료 처리'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteAssignment(a)}
+                      className="text-xs text-slate-400 hover:text-red-600"
+                    >
+                      삭제
+                    </button>
+                  </div>
                 </li>
               )
             })}
@@ -582,12 +622,19 @@ export function AdminStudentDetail() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-slate-900">
-                        <Link
-                          to={resultPath}
-                          className="text-slate-900 hover:text-brand-700 hover:underline"
-                        >
-                          {a.refTitle}
-                        </Link>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Link
+                            to={resultPath}
+                            className="text-slate-900 hover:text-brand-700 hover:underline"
+                          >
+                            {a.refTitle}
+                          </Link>
+                          {a.practice && (
+                            <span className="inline-block rounded bg-amber-50 text-amber-700 text-[10px] font-medium px-1.5 py-0.5">
+                              연습
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
                         {a.correct} / {a.total}
@@ -609,14 +656,26 @@ export function AdminStudentDetail() {
                         {fmtDate(a.createdAt)}
                       </td>
                       <td className="px-4 py-3">
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteAttempt(a)}
-                          className="text-xs text-slate-400 hover:text-red-600"
-                          aria-label="삭제"
-                        >
-                          삭제
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleAttemptPractice(a)}
+                            className="text-xs text-slate-500 hover:text-slate-900 underline decoration-dotted"
+                            title={
+                              a.practice ? '시험 응시로 변경' : '연습 응시로 변경'
+                            }
+                          >
+                            {a.practice ? '시험으로' : '연습으로'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteAttempt(a)}
+                            className="text-xs text-slate-400 hover:text-red-600"
+                            aria-label="삭제"
+                          >
+                            삭제
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )

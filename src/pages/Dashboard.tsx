@@ -96,6 +96,18 @@ function isOverdue(a: Assignment): boolean {
   return a.dueAt.toMillis() < Date.now()
 }
 
+const TITLE_RE = /^(.+?)\s+(\d+(?:-\d+)?)\s*(?:번|문제)?\s*$/
+
+function parseTitle(title: string): { category: string; tag: string } | null {
+  const m = TITLE_RE.exec(title.trim())
+  if (!m) return null
+  return { category: m[1].trim(), tag: m[2] }
+}
+
+type OpenItem =
+  | { kind: 'single'; a: Assignment; sortKey: number }
+  | { kind: 'group'; category: string; items: Assignment[]; sortKey: number }
+
 export function Dashboard() {
   const { profile } = useAuth()
   const [assignments, setAssignments] = useState<Assignment[]>([])
@@ -116,17 +128,75 @@ export function Dashboard() {
       })
   }, [profile])
 
-  const open = useMemo(
-    () =>
-      assignments
-        .filter((a) => !isAssignmentDone(a, attempts))
-        .sort((a, b) => {
-          const ad = a.dueAt?.toMillis() ?? Infinity
-          const bd = b.dueAt?.toMillis() ?? Infinity
-          return ad - bd
-        }),
+  const openRaw = useMemo(
+    () => assignments.filter((a) => !isAssignmentDone(a, attempts)),
     [assignments, attempts],
   )
+
+  const openItems = useMemo<OpenItem[]>(() => {
+    const items: OpenItem[] = []
+    const groups = new Map<string, Assignment[]>()
+
+    for (const a of openRaw) {
+      if (a.type !== 'reading') {
+        items.push({
+          kind: 'single',
+          a,
+          sortKey: a.dueAt?.toMillis() ?? Infinity,
+        })
+        continue
+      }
+      const parsed = parseTitle(a.refTitle)
+      if (!parsed) {
+        items.push({
+          kind: 'single',
+          a,
+          sortKey: a.dueAt?.toMillis() ?? Infinity,
+        })
+        continue
+      }
+      if (!groups.has(parsed.category)) groups.set(parsed.category, [])
+      groups.get(parsed.category)!.push(a)
+    }
+
+    for (const [category, list] of groups) {
+      if (list.length === 1) {
+        const a = list[0]
+        items.push({
+          kind: 'single',
+          a,
+          sortKey: a.dueAt?.toMillis() ?? Infinity,
+        })
+        continue
+      }
+      const minDue = Math.min(
+        ...list.map((a) => a.dueAt?.toMillis() ?? Infinity),
+      )
+      const sortedItems = [...list].sort((x, y) => {
+        const xn = parseTitle(x.refTitle)?.tag ?? ''
+        const yn = parseTitle(y.refTitle)?.tag ?? ''
+        return xn.localeCompare(yn, 'ko', { numeric: true })
+      })
+      items.push({
+        kind: 'group',
+        category,
+        items: sortedItems,
+        sortKey: minDue,
+      })
+    }
+    return items.sort((a, b) => a.sortKey - b.sortKey)
+  }, [openRaw])
+
+  const totalOpen = openRaw.length
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  function toggleExpanded(category: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(category)) next.delete(category)
+      else next.add(category)
+      return next
+    })
+  }
 
   const greeting = (() => {
     const h = new Date().getHours()
@@ -149,42 +219,130 @@ export function Dashboard() {
         </h1>
       </section>
 
-      {open.length > 0 && (
+      {totalOpen > 0 && (
         <section className="space-y-3">
           <div className="flex items-baseline justify-between">
             <h2 className="text-base font-semibold text-slate-900">내 과제</h2>
-            <span className="text-xs text-slate-500">미완료 {open.length}건</span>
+            <span className="text-xs text-slate-500">미완료 {totalOpen}건</span>
           </div>
           <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white overflow-hidden">
-            {open.map((a) => {
-              const overdue = isOverdue(a)
+            {openItems.map((item) => {
+              if (item.kind === 'single') {
+                const a = item.a
+                const overdue = isOverdue(a)
+                return (
+                  <li key={a.id}>
+                    <Link
+                      to={assignmentPath(a)}
+                      className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="inline-block rounded bg-brand-50 text-brand-700 text-xs font-medium px-2 py-0.5">
+                            {a.type === 'vocab' ? '단어 시험지' : '지문'}
+                          </span>
+                          <span className="text-sm font-semibold text-slate-900 truncate">
+                            {a.refTitle}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500 mt-1">
+                          {a.dueAt && (
+                            <span className={overdue ? 'text-red-600 font-medium' : ''}>
+                              마감: {formatDate(a.dueAt)}
+                              {overdue && ' (지남)'}
+                            </span>
+                          )}
+                          {a.note && <span className="text-slate-600">· {a.note}</span>}
+                        </div>
+                      </div>
+                      <span className="text-slate-300 text-xl shrink-0">→</span>
+                    </Link>
+                  </li>
+                )
+              }
+              // group
+              const isOpen = expanded.has(item.category)
+              const overdueCount = item.items.filter(isOverdue).length
+              const earliest = item.items
+                .filter((a) => a.dueAt)
+                .sort((a, b) => (a.dueAt!.toMillis() - b.dueAt!.toMillis()))[0]
               return (
-                <li key={a.id}>
-                  <Link
-                    to={assignmentPath(a)}
-                    className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50"
+                <li key={`g-${item.category}`}>
+                  <button
+                    type="button"
+                    onClick={() => toggleExpanded(item.category)}
+                    className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50 text-left"
                   >
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="inline-block rounded bg-brand-50 text-brand-700 text-xs font-medium px-2 py-0.5">
-                          {a.type === 'vocab' ? '단어 시험지' : '지문'}
+                          지문 묶음
                         </span>
                         <span className="text-sm font-semibold text-slate-900 truncate">
-                          {a.refTitle}
+                          {item.category}
+                        </span>
+                        <span className="text-xs text-slate-500">
+                          ({item.items.length}개)
                         </span>
                       </div>
                       <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500 mt-1">
-                        {a.dueAt && (
-                          <span className={overdue ? 'text-red-600 font-medium' : ''}>
-                            마감: {formatDate(a.dueAt)}
-                            {overdue && ' (지남)'}
+                        {earliest && (
+                          <span
+                            className={
+                              isOverdue(earliest) ? 'text-red-600 font-medium' : ''
+                            }
+                          >
+                            가장 빠른 마감: {formatDate(earliest.dueAt)}
                           </span>
                         )}
-                        {a.note && <span className="text-slate-600">· {a.note}</span>}
+                        {overdueCount > 0 && (
+                          <span className="text-red-600">
+                            지난 과제 {overdueCount}건
+                          </span>
+                        )}
                       </div>
                     </div>
-                    <span className="text-slate-300 text-xl shrink-0">→</span>
-                  </Link>
+                    <span className="text-slate-400 text-base shrink-0">
+                      {isOpen ? '▴' : '▾'}
+                    </span>
+                  </button>
+                  {isOpen && (
+                    <ul className="divide-y divide-slate-100 bg-slate-50/60 border-t border-slate-100">
+                      {item.items.map((a) => {
+                        const overdue = isOverdue(a)
+                        const parsed = parseTitle(a.refTitle)
+                        const label = parsed ? `${parsed.tag}번` : a.refTitle
+                        return (
+                          <li key={a.id}>
+                            <Link
+                              to={assignmentPath(a)}
+                              className="flex items-center justify-between gap-3 pl-10 pr-4 py-2.5 hover:bg-white"
+                            >
+                              <div className="min-w-0">
+                                <span className="text-sm text-slate-900">
+                                  {label}
+                                </span>
+                                {a.dueAt && (
+                                  <span
+                                    className={`ml-3 text-xs ${overdue ? 'text-red-600' : 'text-slate-500'}`}
+                                  >
+                                    마감: {formatDate(a.dueAt)}
+                                    {overdue && ' (지남)'}
+                                  </span>
+                                )}
+                                {a.note && (
+                                  <span className="ml-3 text-xs text-slate-500">
+                                    · {a.note}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-slate-300 text-base shrink-0">→</span>
+                            </Link>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
                 </li>
               )
             })}

@@ -362,6 +362,7 @@ export async function createAssignment(input: {
 }
 
 export function isAssignmentDone(asn: Assignment, atts: Attempt[]): boolean {
+  if (asn.manualDone) return true
   const matched = atts.filter(
     (a) => a.type === asn.type && a.refId === asn.refId && !a.practice,
   )
@@ -370,6 +371,20 @@ export function isAssignmentDone(asn: Assignment, atts: Attempt[]): boolean {
     return matched.some((a) => (a.correct ?? 0) >= (asn.minCorrect ?? 0))
   }
   return true
+}
+
+export async function setAssignmentManualDone(
+  id: string,
+  value: boolean,
+): Promise<void> {
+  await updateDoc(doc(db, 'assignments', id), { manualDone: value })
+}
+
+export async function setAttemptPractice(
+  id: string,
+  value: boolean,
+): Promise<void> {
+  await updateDoc(doc(db, 'attempts', id), { practice: value })
 }
 
 export async function listAssignmentsForStudent(uid: string): Promise<Assignment[]> {
