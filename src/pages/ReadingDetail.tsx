@@ -47,6 +47,46 @@ export function ReadingDetail() {
   const [error, setError] = useState<string | null>(null)
   const [savedNote, setSavedNote] = useState<string | null>(null)
   const [siblings, setSiblings] = useState<{ id: string; title: string }[]>([])
+  const [explDraft, setExplDraft] = useState<Record<number, string>>({})
+  const [explSavingIdx, setExplSavingIdx] = useState<number | null>(null)
+
+  function explValue(qi: number): string {
+    if (!r) return ''
+    if (explDraft[qi] !== undefined) return explDraft[qi]
+    return r.questions[qi]?.explanation ?? ''
+  }
+  function explDirty(qi: number): boolean {
+    if (!r) return false
+    if (explDraft[qi] === undefined) return false
+    return explDraft[qi] !== (r.questions[qi]?.explanation ?? '')
+  }
+
+  async function saveExplanation(qi: number) {
+    if (!r) return
+    const value = (explDraft[qi] ?? '').trim()
+    setExplSavingIdx(qi)
+    try {
+      const nextQs = r.questions.map((q, i) =>
+        i === qi
+          ? { ...q, explanation: value || undefined }
+          : q,
+      )
+      await updateReadingQuestions(r.id, nextQs)
+      setR({ ...r, questions: nextQs })
+      setExplDraft((prev) => {
+        const copy = { ...prev }
+        delete copy[qi]
+        return copy
+      })
+      const num = r.questions[qi]?.number ?? qi + 1
+      setSavedNote(`${num}번 해설 저장됨`)
+      window.setTimeout(() => setSavedNote(null), 2000)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '해설 저장 실패')
+    } finally {
+      setExplSavingIdx(null)
+    }
+  }
 
   useEffect(() => {
     if (!isAdmin) return
@@ -287,14 +327,37 @@ export function ReadingDetail() {
                       isAdmin ? (w) => addWord(w, 'choices') : undefined
                     }
                   />
-                  {isAdmin && q.explanation && q.explanation.trim() && (
-                    <div className="rounded-md border border-amber-200 bg-amber-50/40 px-4 py-3">
-                      <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                        📖 문제 해설 (관리자 전용)
-                      </p>
-                      <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-myeongjo">
-                        {renderUnderlines(q.explanation)}
+                  {isAdmin && (
+                    <div className="rounded-md border border-amber-200 bg-amber-50/40 px-4 py-3 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                          📖 문제 해설 (관리자 전용)
+                        </p>
+                        {explDirty(qi) && (
+                          <button
+                            type="button"
+                            onClick={() => saveExplanation(qi)}
+                            disabled={explSavingIdx === qi}
+                            className="rounded-md bg-brand-600 text-white text-xs font-medium px-3 py-1 hover:bg-brand-700 disabled:opacity-50"
+                          >
+                            {explSavingIdx === qi ? '저장 중...' : '저장'}
+                          </button>
+                        )}
                       </div>
+                      <textarea
+                        value={explValue(qi)}
+                        onChange={(e) =>
+                          setExplDraft((prev) => ({ ...prev, [qi]: e.target.value }))
+                        }
+                        rows={4}
+                        placeholder="문제 해설 (학생이 틀리고 재도전 정답 후 표시)"
+                        className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 font-myeongjo leading-relaxed"
+                      />
+                      {!explDirty(qi) && explValue(qi).trim() && (
+                        <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-myeongjo border-t border-amber-200/70 pt-2">
+                          {renderUnderlines(explValue(qi))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
