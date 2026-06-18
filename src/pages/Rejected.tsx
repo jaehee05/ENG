@@ -11,21 +11,28 @@ export function Rejected() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-md text-center bg-white rounded-2xl shadow-lg shadow-brand-900/5 border border-slate-200 p-8">
-        <div className="text-center mb-4">
-          <p className="text-3xl font-bold bg-gradient-to-r from-brand-600 to-brand-700 bg-clip-text text-transparent">
+    <div className="min-h-screen flex flex-col items-center justify-center px-5 bg-white">
+      <div className="w-full max-w-sm text-center">
+        <div className="mb-8 flex items-center justify-center gap-2">
+          <span className="inline-block w-2 h-2 rounded-full bg-brand-500" />
+          <span className="text-sm font-semibold tracking-tight text-slate-900">
             KJHEDU
-          </p>
+          </span>
         </div>
-        <h1 className="text-xl font-semibold text-slate-900">접근이 제한되었습니다</h1>
-        <p className="text-slate-600 mt-3 leading-relaxed">
-          현재 계정은 사용이 중지된 상태입니다.<br />
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+          상태
+        </p>
+        <h1 className="text-[24px] font-semibold text-slate-900 tracking-tight">
+          접근이 제한되었습니다
+        </h1>
+        <p className="text-sm text-slate-500 mt-2 leading-relaxed">
+          현재 계정은 사용이 중지된 상태입니다.
+          <br />
           관리자에게 문의해주세요.
         </p>
         <button
           onClick={handleLogout}
-          className="mt-6 rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700 transition"
+          className="mt-7 rounded-lg bg-slate-900 text-white text-sm font-medium px-4 py-2.5 hover:bg-slate-800"
         >
           로그아웃
         </button>

@@ -606,7 +606,10 @@ export function AdminNotify() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">알림톡 발송 도우미 (뿌리오)</h1>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+          관리자
+        </p>
+        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">알림톡 발송 도우미</h1>
         <p className="text-sm text-slate-500 mt-1">
           학생별 과제 현황을 자동으로 채워 뿌리오 알림톡 변수 CSV를 만듭니다. 다운로드 받아
           뿌리오 대량발송에 그대로 업로드하세요.

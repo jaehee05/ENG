@@ -119,11 +119,16 @@ export function VocabDetail() {
   if (!set) return null
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
+    <div className="space-y-5 max-w-3xl">
+      <header className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">{set.title}</h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+            단어 시험지
+          </p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
+            {set.title}
+          </h1>
+          <p className="text-xs text-slate-500 mt-1">
             {set.words.length}단어 · {set.createdByName}
           </p>
         </div>
@@ -132,12 +137,12 @@ export function VocabDetail() {
             type="button"
             onClick={handleDelete}
             disabled={deleting}
-            className="rounded-md border border-red-200 text-red-600 text-sm font-medium px-4 py-2 hover:bg-red-50 disabled:opacity-50"
+            className="text-xs text-slate-400 hover:text-red-600 px-1 disabled:opacity-50"
           >
-            {deleting ? '삭제 중...' : '삭제'}
+            {deleting ? '삭제 중…' : '삭제'}
           </button>
         )}
-      </div>
+      </header>
 
       <StartBox
         total={set.words.length}

@@ -342,7 +342,10 @@ export function AdminStudentDetail() {
         <Link to="/admin/students" className="text-sm text-slate-500 hover:text-slate-900">
           ← 학생 관리
         </Link>
-        <h1 className="text-2xl font-semibold text-slate-900 mt-2">{account.displayName}</h1>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mt-2 mb-1">
+          학생 상세
+        </p>
+        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">{account.displayName}</h1>
         <p className="text-sm text-slate-500 mt-1">
           {account.school || '학교 미입력'} · {account.email}
         </p>
