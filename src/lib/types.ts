@@ -345,6 +345,22 @@ export interface Assignment {
   createdAt: Timestamp | null
 }
 
+export interface PushSchedule {
+  id: string
+  title: string
+  body: string
+  enabled: boolean
+  cadence: 'daily' | 'weekly'
+  /** Sunday=0, Saturday=6. weekly만 사용. */
+  dayOfWeek?: number
+  hour: number
+  minute: number
+  /** "students" — 활성 학생 전체. (현재 그대로). */
+  audience: 'students'
+  lastSentKey?: string
+  createdAt: Timestamp | null
+}
+
 export interface Announcement {
   id: string
   title: string

@@ -20,6 +20,7 @@ import type {
   AssignmentType,
   Attempt,
   NotificationKind,
+  PushSchedule,
   Reading,
   ReadingResult,
   UserNotification,
@@ -575,6 +576,64 @@ export async function deleteAnnouncement(id: string): Promise<void> {
     console.warn('[deleteAnnouncement] 연결된 알림 정리 실패:', e)
   }
   await deleteDoc(doc(db, 'announcements', id))
+}
+
+// ───── 정기 푸시 스케줄 ─────
+export async function listPushSchedules(): Promise<PushSchedule[]> {
+  const snap = await getDocs(collection(db, 'pushSchedules'))
+  const items = snap.docs.map((d) => ({
+    id: d.id,
+    ...(d.data() as Omit<PushSchedule, 'id'>),
+  }))
+  return items.sort(
+    (a, b) =>
+      (a.createdAt?.toMillis() ?? 0) - (b.createdAt?.toMillis() ?? 0),
+  )
+}
+
+export async function createPushSchedule(input: {
+  title: string
+  body: string
+  enabled: boolean
+  cadence: 'daily' | 'weekly'
+  dayOfWeek?: number
+  hour: number
+  minute: number
+}): Promise<string> {
+  const payload: Record<string, unknown> = {
+    title: input.title.trim(),
+    body: input.body.trim(),
+    enabled: !!input.enabled,
+    cadence: input.cadence,
+    hour: input.hour,
+    minute: input.minute,
+    audience: 'students',
+    createdAt: serverTimestamp(),
+  }
+  if (input.cadence === 'weekly') {
+    payload.dayOfWeek = input.dayOfWeek ?? 1
+  }
+  const ref = await addDoc(collection(db, 'pushSchedules'), payload)
+  return ref.id
+}
+
+export async function updatePushSchedule(
+  id: string,
+  patch: Partial<Omit<PushSchedule, 'id' | 'createdAt' | 'audience' | 'lastSentKey'>>,
+): Promise<void> {
+  const update: Record<string, unknown> = {}
+  if (patch.title !== undefined) update.title = patch.title.trim()
+  if (patch.body !== undefined) update.body = patch.body.trim()
+  if (patch.enabled !== undefined) update.enabled = !!patch.enabled
+  if (patch.cadence !== undefined) update.cadence = patch.cadence
+  if (patch.dayOfWeek !== undefined) update.dayOfWeek = patch.dayOfWeek
+  if (patch.hour !== undefined) update.hour = patch.hour
+  if (patch.minute !== undefined) update.minute = patch.minute
+  await updateDoc(doc(db, 'pushSchedules', id), update)
+}
+
+export async function deletePushSchedule(id: string): Promise<void> {
+  await deleteDoc(doc(db, 'pushSchedules', id))
 }
 
 // ───── 알림함 ─────

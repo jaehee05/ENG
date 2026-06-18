@@ -14,6 +14,7 @@ import {
   setAssignmentManualDone,
   setAttemptPractice,
 } from '../lib/firestore'
+import { sendPushNotification } from '../lib/ppurioApi'
 import { listMyWordbook } from '../lib/wordbook'
 import type {
   Assignment,
@@ -176,6 +177,31 @@ export function AdminStudentDetail() {
 
   const assignOptions = assignType === 'vocab' ? vocabSets : readings
   const [customTitle, setCustomTitle] = useState('')
+  const [pushOnAssign, setPushOnAssign] = useState(true)
+
+  async function maybePushAssignment(titles: string[]) {
+    if (!pushOnAssign || !id) return
+    try {
+      let dueText = ''
+      if (assignDue) {
+        const d = new Date(assignDue)
+        if (!Number.isNaN(d.getTime())) {
+          dueText = ` (마감 ${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')})`
+        }
+      }
+      const body =
+        titles.length === 1
+          ? `${titles[0]}${dueText}`
+          : `${titles[0]} 외 ${titles.length - 1}건${dueText}`
+      await sendPushNotification({
+        uids: [id],
+        title: '📝 새 과제가 부여되었어요',
+        body,
+      })
+    } catch {
+      // 실패해도 과제 부여 자체엔 영향 없음
+    }
+  }
 
   async function handleAssign(e: React.FormEvent) {
     e.preventDefault()
@@ -209,6 +235,7 @@ export function AdminStudentDetail() {
         setCustomTitle('')
         setAssignDue('')
         setAssignNote('')
+        await maybePushAssignment([title])
         await reloadAssignments()
       } catch (err) {
         setAssignError(err instanceof Error ? err.message : '과제 부여에 실패했습니다.')
@@ -242,6 +269,7 @@ export function AdminStudentDetail() {
         setBundleCategory('')
         setAssignDue('')
         setAssignNote('')
+        await maybePushAssignment(group.list.map((r) => r.title))
         await reloadAssignments()
       } catch (err) {
         setAssignError(err instanceof Error ? err.message : '과제 부여에 실패했습니다.')
@@ -284,6 +312,7 @@ export function AdminStudentDetail() {
       setAssignDue('')
       setAssignNote('')
       setAssignMinCorrect('')
+      await maybePushAssignment([target.title])
       await reloadAssignments()
     } catch (err) {
       setAssignError(err instanceof Error ? err.message : '과제 부여에 실패했습니다.')
@@ -551,13 +580,22 @@ export function AdminStudentDetail() {
             )}
           </div>
           {assignError && <p className="text-sm text-red-600">{assignError}</p>}
-          <div className="flex justify-end">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={pushOnAssign}
+                onChange={(e) => setPushOnAssign(e.target.checked)}
+                className="accent-brand-600"
+              />
+              학생에게 푸시 알림 발송
+            </label>
             <button
               type="submit"
               disabled={assigning}
-              className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700 disabled:opacity-50"
+              className="rounded-md bg-slate-900 text-white text-sm font-medium px-4 py-2 hover:bg-slate-800 disabled:opacity-50"
             >
-              {assigning ? '부여 중...' : '과제 부여'}
+              {assigning ? '부여 중…' : '과제 부여'}
             </button>
           </div>
         </form>

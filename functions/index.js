@@ -511,6 +511,66 @@ exports.scheduledNotify = onSchedule(
       }
     }
 
+    // 3) 정기 푸시 알림 (pushSchedules 컬렉션)
+    try {
+      const pushSnap = await db.collection("pushSchedules").get();
+      for (const sd of pushSnap.docs) {
+        const data = sd.data() || {};
+        if (!data.enabled || !data.title) continue;
+        const hour = Number.isInteger(data.hour) ? data.hour : -1;
+        const minute = Number.isInteger(data.minute) ? data.minute : -1;
+        if (hour !== t.hour) continue;
+        if (Math.abs(minute - t.minute) > 4) continue;
+        if (data.cadence === "weekly") {
+          const dow = Number.isInteger(data.dayOfWeek) ? data.dayOfWeek : -1;
+          if (t.dow !== dow) continue;
+        }
+        const key = `${t.y}${String(t.m).padStart(2, "0")}${String(t.d).padStart(2, "0")}-${String(hour).padStart(2, "0")}${String(minute).padStart(2, "0")}`;
+        if (data.lastSentKey === key) continue;
+        console.log(`[scheduledNotify] 정기 푸시 발송: ${sd.id} ${key}`);
+        // 활성 학생 전체에게 푸시 + notifications 컬렉션 기록
+        const usersSnap = await db
+          .collection("users")
+          .where("role", "==", "student")
+          .where("status", "==", "active")
+          .get();
+        const tokens = [];
+        const targetIds = [];
+        for (const u of usersSnap.docs) {
+          targetIds.push(u.id);
+          const arr = (u.data().fcmTokens || []);
+          for (const tt of arr) {
+            if (typeof tt === "string" && tt) tokens.push(tt);
+          }
+        }
+        // 알림함 기록
+        for (const uid of targetIds) {
+          await db.collection("notifications").add({
+            recipientUid: uid,
+            title: data.title,
+            body: data.body || "",
+            kind: "push",
+            readAt: null,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        }
+        // FCM
+        if (tokens.length > 0) {
+          try {
+            await admin.messaging().sendEachForMulticast({
+              notification: { title: data.title, body: data.body || "" },
+              tokens,
+            });
+          } catch (e) {
+            console.error("[scheduledNotify] FCM 발송 실패:", e);
+          }
+        }
+        await sd.ref.update({ lastSentKey: key });
+      }
+    } catch (e) {
+      console.error("[scheduledNotify] 정기 푸시 처리 실패:", e);
+    }
+
     // 2) 주간 리포트
     {
       const sched = normalizeWeeklySchedule(d.weeklyReport);

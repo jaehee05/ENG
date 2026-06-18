@@ -8,7 +8,7 @@ import {
   listAnnouncements,
   updateAnnouncement,
 } from '../lib/firestore'
-import { purgeAllNotifications } from '../lib/ppurioApi'
+import { purgeAllNotifications, sendPushNotification } from '../lib/ppurioApi'
 import type { Announcement } from '../lib/types'
 
 function fmtDateTime(ts: { toDate: () => Date } | null | undefined): string {
@@ -28,6 +28,7 @@ export function AdminAnnounce() {
   const [body, setBody] = useState('')
   const [pinned, setPinned] = useState(false)
   const [notifyAllStudents, setNotifyAllStudents] = useState(true)
+  const [pushAllStudents, setPushAllStudents] = useState(true)
   const [submitting, setSubmitting] = useState(false)
 
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -112,6 +113,25 @@ export function AdminAnnounce() {
           setNotice(`공지 등록 + 학생 ${targets.length}명 알림함에 전송.`)
         } else {
           setNotice('공지를 등록했어요. (알림함 전송 안 함)')
+        }
+        if (pushAllStudents) {
+          try {
+            const r = await sendPushNotification({
+              all: true,
+              title: `📢 ${title.trim()}`,
+              body: body.trim(),
+            })
+            setNotice(
+              (prev) =>
+                (prev ? prev + ' · ' : '') + `푸시 ${r.sent}건 발송`,
+            )
+          } catch (e) {
+            setNotice(
+              (prev) =>
+                (prev ? prev + ' · ' : '') +
+                `푸시 발송 실패 (${e instanceof Error ? e.message : '오류'})`,
+            )
+          }
         }
       }
       setTitle('')
@@ -210,15 +230,26 @@ export function AdminAnnounce() {
             상단 고정
           </label>
           {!editingId && (
-            <label className="flex items-center gap-1.5 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={notifyAllStudents}
-                onChange={(e) => setNotifyAllStudents(e.target.checked)}
-                className="accent-brand-600"
-              />
-              모든 학생 알림함에 추가
-            </label>
+            <>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={notifyAllStudents}
+                  onChange={(e) => setNotifyAllStudents(e.target.checked)}
+                  className="accent-brand-600"
+                />
+                알림함에 추가
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={pushAllStudents}
+                  onChange={(e) => setPushAllStudents(e.target.checked)}
+                  className="accent-brand-600"
+                />
+                푸시 알림 발송
+              </label>
+            </>
           )}
         </div>
         {error && <p className="text-xs text-red-600">{error}</p>}

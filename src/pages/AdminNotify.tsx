@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { listAccounts } from '../lib/account'
 import {
+  createPushSchedule,
+  deletePushSchedule,
   isAssignmentDone,
   listAssignmentsForStudent,
   listAttemptsForUser,
+  listPushSchedules,
+  updatePushSchedule,
 } from '../lib/firestore'
+import type { PushSchedule } from '../lib/types'
 import {
   DEFAULT_ASSIGNMENT_STATUS_SCHEDULE,
   DEFAULT_WEEKLY_REPORT_SCHEDULE,
@@ -115,6 +120,92 @@ export function AdminNotify() {
   const [scheduleLoaded, setScheduleLoaded] = useState(false)
   const [scheduleSaving, setScheduleSaving] = useState(false)
   const [scheduleNotice, setScheduleNotice] = useState<string | null>(null)
+
+  const [schedules, setSchedules] = useState<PushSchedule[]>([])
+  const [schedTitle, setSchedTitle] = useState('')
+  const [schedBody, setSchedBody] = useState('')
+  const [schedCadence, setSchedCadence] = useState<'daily' | 'weekly'>('daily')
+  const [schedDow, setSchedDow] = useState(1)
+  const [schedHour, setSchedHour] = useState(8)
+  const [schedMinute, setSchedMinute] = useState(0)
+  const [schedSaving, setSchedSaving] = useState(false)
+  const [schedNote, setSchedNote] = useState<string | null>(null)
+  const [schedEditId, setSchedEditId] = useState<string | null>(null)
+
+  async function loadSchedules() {
+    try {
+      setSchedules(await listPushSchedules())
+    } catch {
+      // 무시
+    }
+  }
+
+  useEffect(() => {
+    void loadSchedules()
+  }, [])
+
+  async function handleSaveSchedule() {
+    if (!schedTitle.trim()) {
+      setSchedNote('제목을 입력하세요.')
+      return
+    }
+    setSchedSaving(true)
+    setSchedNote(null)
+    try {
+      const payload = {
+        title: schedTitle,
+        body: schedBody,
+        enabled: true,
+        cadence: schedCadence,
+        dayOfWeek: schedCadence === 'weekly' ? schedDow : undefined,
+        hour: schedHour,
+        minute: schedMinute,
+      }
+      if (schedEditId) {
+        await updatePushSchedule(schedEditId, payload)
+      } else {
+        await createPushSchedule(payload)
+      }
+      setSchedTitle('')
+      setSchedBody('')
+      setSchedEditId(null)
+      setSchedNote(schedEditId ? '수정 완료' : '추가 완료')
+      await loadSchedules()
+    } catch (e) {
+      setSchedNote(e instanceof Error ? e.message : '저장 실패')
+    } finally {
+      setSchedSaving(false)
+    }
+  }
+
+  async function handleToggleSchedule(s: PushSchedule) {
+    try {
+      await updatePushSchedule(s.id, { enabled: !s.enabled })
+      await loadSchedules()
+    } catch (e) {
+      setSchedNote(e instanceof Error ? e.message : '상태 변경 실패')
+    }
+  }
+
+  async function handleDeleteSchedule(s: PushSchedule) {
+    if (!window.confirm(`"${s.title}" 정기 푸시를 삭제할까요?`)) return
+    try {
+      await deletePushSchedule(s.id)
+      await loadSchedules()
+    } catch (e) {
+      setSchedNote(e instanceof Error ? e.message : '삭제 실패')
+    }
+  }
+
+  function startEditSchedule(s: PushSchedule) {
+    setSchedEditId(s.id)
+    setSchedTitle(s.title)
+    setSchedBody(s.body)
+    setSchedCadence(s.cadence)
+    setSchedDow(s.dayOfWeek ?? 1)
+    setSchedHour(s.hour)
+    setSchedMinute(s.minute)
+  }
 
   const [pushTitle, setPushTitle] = useState('')
   const [pushBody, setPushBody] = useState('')
@@ -693,6 +784,166 @@ export function AdminNotify() {
         <p className="text-[11px] text-slate-500">
           학생이 iOS 앱에서 로그인 + 푸시 권한 허용한 경우만 발송됩니다 (firestore의 fcmTokens가 있는 학생). 알림톡과 별도.
         </p>
+      </div>
+
+      <div className="rounded-lg border border-slate-300 bg-white p-4 space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <p className="text-sm font-semibold text-slate-900">
+            ⏰ 정기 푸시 알림
+          </p>
+          {schedNote && (
+            <span className="text-xs text-brand-700">{schedNote}</span>
+          )}
+        </div>
+        <p className="text-[11px] text-slate-500">
+          매일/매주 정해진 시간에 모든 활성 학생에게 자동 푸시. 수업 시간/장소 안내 등에 활용.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <input
+            type="text"
+            value={schedTitle}
+            onChange={(e) => setSchedTitle(e.target.value)}
+            placeholder="제목 (예: 오늘 수업)"
+            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          />
+          <input
+            type="text"
+            value={schedBody}
+            onChange={(e) => setSchedBody(e.target.value)}
+            placeholder="본문 (예: 18시 학원 2층)"
+            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          />
+        </div>
+        <div className="grid grid-cols-4 gap-2">
+          <select
+            value={schedCadence}
+            onChange={(e) =>
+              setSchedCadence(e.target.value as 'daily' | 'weekly')
+            }
+            className="rounded-md border border-slate-300 bg-white px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          >
+            <option value="daily">매일</option>
+            <option value="weekly">매주</option>
+          </select>
+          {schedCadence === 'weekly' ? (
+            <select
+              value={schedDow}
+              onChange={(e) =>
+                setSchedDow(Number.parseInt(e.target.value, 10))
+              }
+              className="rounded-md border border-slate-300 bg-white px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              {['일', '월', '화', '수', '목', '금', '토'].map((d, i) => (
+                <option key={d} value={i}>
+                  {d}요일
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div />
+          )}
+          <select
+            value={schedHour}
+            onChange={(e) =>
+              setSchedHour(Number.parseInt(e.target.value, 10))
+            }
+            className="rounded-md border border-slate-300 bg-white px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          >
+            {Array.from({ length: 24 }, (_, h) => (
+              <option key={h} value={h}>
+                {String(h).padStart(2, '0')}시
+              </option>
+            ))}
+          </select>
+          <select
+            value={schedMinute}
+            onChange={(e) =>
+              setSchedMinute(Number.parseInt(e.target.value, 10))
+            }
+            className="rounded-md border border-slate-300 bg-white px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          >
+            {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map((m) => (
+              <option key={m} value={m}>
+                {String(m).padStart(2, '0')}분
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex items-center justify-end gap-2">
+          {schedEditId && (
+            <button
+              type="button"
+              onClick={() => {
+                setSchedEditId(null)
+                setSchedTitle('')
+                setSchedBody('')
+              }}
+              className="text-xs text-slate-500 hover:text-slate-900 underline"
+            >
+              취소
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleSaveSchedule}
+            disabled={schedSaving}
+            className="rounded-md bg-slate-900 text-white text-sm font-medium px-4 py-2 hover:bg-slate-800 disabled:opacity-50"
+          >
+            {schedSaving ? '저장 중…' : schedEditId ? '수정 저장' : '추가'}
+          </button>
+        </div>
+
+        {schedules.length > 0 && (
+          <ul className="divide-y divide-slate-100 rounded-md border border-slate-200">
+            {schedules.map((s) => (
+              <li
+                key={s.id}
+                className="px-3 py-2 flex items-center justify-between gap-3 text-xs"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-900 truncate">
+                    {s.title}
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {s.cadence === 'weekly'
+                      ? `매주 ${['일', '월', '화', '수', '목', '금', '토'][s.dayOfWeek ?? 1]}요일`
+                      : '매일'}{' '}
+                    {String(s.hour).padStart(2, '0')}:
+                    {String(s.minute).padStart(2, '0')}
+                    {s.body && ` · ${s.body}`}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleSchedule(s)}
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                      s.enabled
+                        ? 'bg-brand-50 text-brand-700 border border-brand-200'
+                        : 'bg-slate-100 text-slate-500 border border-slate-200'
+                    }`}
+                  >
+                    {s.enabled ? 'ON' : 'OFF'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => startEditSchedule(s)}
+                    className="text-slate-500 hover:text-slate-900 underline-offset-2 hover:underline"
+                  >
+                    수정
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteSchedule(s)}
+                    className="text-slate-400 hover:text-red-600"
+                  >
+                    삭제
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
