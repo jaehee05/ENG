@@ -149,3 +149,20 @@ export async function saveScheduleSettings(
 ): Promise<void> {
   await call<{ ok: true }>('saveSchedule', input)
 }
+
+export interface PushSendResult {
+  ok: true
+  sent: number
+  failed: number
+  invalid: number
+}
+
+export async function sendPushNotification(input: {
+  uids?: string[]
+  all?: boolean
+  title: string
+  body: string
+  data?: Record<string, string>
+}): Promise<PushSendResult> {
+  return call<PushSendResult>('sendPush', input)
+}

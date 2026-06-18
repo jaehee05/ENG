@@ -127,6 +127,75 @@ exports.ppurioAdmin = onRequest({ invoker: "public" }, async (req, res) => {
       return res.json({ ok: true });
     }
 
+    if (action === "sendPush") {
+      const p = payload || {};
+      const title = String(p.title || "").trim();
+      const body = String(p.body || "").trim();
+      if (!title && !body) {
+        return res.status(400).json({ error: "title 또는 body 필요" });
+      }
+      const db = admin.firestore();
+      let targetIds = Array.isArray(p.uids) ? p.uids : [];
+      if (p.all === true) {
+        const snap = await db
+          .collection("users")
+          .where("role", "==", "student")
+          .where("status", "==", "active")
+          .get();
+        targetIds = snap.docs.map((d) => d.id);
+      }
+      if (targetIds.length === 0) {
+        return res.status(400).json({ error: "수신 대상이 없습니다." });
+      }
+      const tokens = [];
+      const ownerByToken = new Map();
+      for (const uid of targetIds) {
+        const u = await db.collection("users").doc(uid).get();
+        const arr = u.exists ? (u.data().fcmTokens || []) : [];
+        for (const t of arr) {
+          if (typeof t === "string" && t) {
+            tokens.push(t);
+            ownerByToken.set(t, uid);
+          }
+        }
+      }
+      if (tokens.length === 0) {
+        return res.json({ ok: true, sent: 0, failed: 0, invalid: 0, results: [] });
+      }
+      const message = {
+        notification: { title, body },
+        data: p.data && typeof p.data === "object" ? p.data : {},
+        tokens,
+      };
+      const result = await admin.messaging().sendEachForMulticast(message);
+      // 만료/invalid 토큰 정리
+      let invalid = 0;
+      for (let i = 0; i < result.responses.length; i++) {
+        const r = result.responses[i];
+        if (r.success) continue;
+        const code = r.error && r.error.code;
+        if (
+          code === "messaging/registration-token-not-registered" ||
+          code === "messaging/invalid-registration-token"
+        ) {
+          const t = tokens[i];
+          const uid = ownerByToken.get(t);
+          if (uid) {
+            await db.collection("users").doc(uid).update({
+              fcmTokens: admin.firestore.FieldValue.arrayRemove(t),
+            }).catch(() => {});
+            invalid++;
+          }
+        }
+      }
+      return res.json({
+        ok: true,
+        sent: result.successCount,
+        failed: result.failureCount,
+        invalid,
+      });
+    }
+
     if (action === "sendBatch") {
       const p = payload || {};
       const templateCode = String(p.templateCode || "").trim();

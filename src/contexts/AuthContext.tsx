@@ -48,8 +48,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     getAccount(id)
       .then((acc) => {
         if (cancelled) return
-        if (acc) setProfile(stripPassword(acc))
-        else clearStoredId()
+        if (acc) {
+          setProfile(stripPassword(acc))
+          void import('../lib/pushSetup').then((m) =>
+            m.registerPushTokenForUser(acc.id),
+          )
+        } else {
+          clearStoredId()
+        }
       })
       .catch(() => {})
       .finally(() => {
@@ -64,6 +70,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (acc) {
       writeStoredId(acc.id, keepSignedIn)
       setProfile(stripPassword(acc))
+      // 네이티브 앱이면 FCM 토큰 등록 (실패해도 로그인엔 영향 없음)
+      void import('../lib/pushSetup').then((m) =>
+        m.registerPushTokenForUser(acc.id),
+      )
     } else {
       clearStoredId()
       setProfile(null)

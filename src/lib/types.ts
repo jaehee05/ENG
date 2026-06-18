@@ -13,6 +13,8 @@ export interface UserAccount {
   school?: string
   phone?: string
   parentPhone?: string
+  /** iOS Capacitor 앱에서 받은 FCM 디바이스 토큰들 (다중 기기 지원). */
+  fcmTokens?: string[]
   createdAt: Timestamp | null
 }
 

@@ -9,10 +9,8 @@ const config: CapacitorConfig = {
   },
   plugins: {
     CapacitorUpdater: {
-      // Capgo 기본 채널: production
-      autoUpdate: true,
-      // 첫 실행 시 번들 검증 후 commit (실패하면 이전 번들로 rollback)
-      directUpdate: false,
+      // Capgo 계정 셋업 전: 자동 업데이트 비활성
+      autoUpdate: false,
     },
   },
 }

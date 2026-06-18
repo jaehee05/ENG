@@ -207,17 +207,49 @@ export function ReadingResult() {
                     ...reading,
                     questions: numbered,
                   })
-                  return shared ? (
+                  if (shared) {
+                    return (
+                      <div>
+                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                          지문 다시 보기
+                        </p>
+                        <SharedPassageBlock
+                          block={shared}
+                          passageGlossary={reading.glossary}
+                        />
+                      </div>
+                    )
+                  }
+                  // shared가 null인 단일 문항 등 — passage / 각 문항 body 직접 표시
+                  const passage = reading.passage?.trim() ?? ''
+                  const bodyChunks = reading.questions
+                    .map((q) =>
+                      q.body && q.body.trim()
+                        ? q.body.trim()
+                        : q.intro && q.intro.trim()
+                          ? q.intro.trim()
+                          : '',
+                    )
+                    .filter((t) => t)
+                  const chunks = passage ? [passage, ...bodyChunks] : bodyChunks
+                  if (chunks.length === 0) return null
+                  return (
                     <div>
                       <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
                         지문 다시 보기
                       </p>
-                      <SharedPassageBlock
-                        block={shared}
-                        passageGlossary={reading.glossary}
-                      />
+                      <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5 space-y-3">
+                        {chunks.map((c, i) => (
+                          <div
+                            key={i}
+                            className="text-base leading-7 text-slate-900 whitespace-pre-wrap text-justify font-myeongjo"
+                          >
+                            {renderUnderlines(c)}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  ) : null
+                  )
                 })()}
                 {hasAnyKo && (
                   <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
