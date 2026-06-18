@@ -567,17 +567,18 @@ export async function deleteAnnouncement(id: string): Promise<void> {
 export async function listNotificationsForUser(
   uid: string,
 ): Promise<UserNotification[]> {
+  // orderBy 빼고 클라에서 정렬 — composite index 불필요
   const snap = await getDocs(
-    query(
-      collection(db, 'notifications'),
-      where('recipientUid', '==', uid),
-      orderBy('createdAt', 'desc'),
-    ),
+    query(collection(db, 'notifications'), where('recipientUid', '==', uid)),
   )
-  return snap.docs.map((d) => ({
+  const items = snap.docs.map((d) => ({
     id: d.id,
     ...(d.data() as Omit<UserNotification, 'id'>),
   }))
+  return items.sort(
+    (a, b) =>
+      (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0),
+  )
 }
 
 export async function unreadNotificationCount(uid: string): Promise<number> {
