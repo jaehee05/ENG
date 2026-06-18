@@ -6,6 +6,7 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   ios: {
     contentInset: 'never',
+    scrollEnabled: false,
   },
   plugins: {
     CapacitorUpdater: {
