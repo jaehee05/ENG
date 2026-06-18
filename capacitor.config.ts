@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'KJHEDU',
   webDir: 'dist',
   ios: {
-    contentInset: 'always',
+    contentInset: 'never',
   },
   plugins: {
     CapacitorUpdater: {
