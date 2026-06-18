@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "capgo:push": "npm run build && npx @capgo/cli bundle upload --apikey $CAPGO_API_KEY --channel production"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
@@ -24,6 +25,7 @@
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.4.0",
+    "@capgo/cli": "^8.9.2",
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.12.3",
     "@types/react": "^19.2.14",

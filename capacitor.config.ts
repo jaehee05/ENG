@@ -9,8 +9,8 @@ const config: CapacitorConfig = {
   },
   plugins: {
     CapacitorUpdater: {
-      // Capgo 계정 셋업 전: 자동 업데이트 비활성
-      autoUpdate: false,
+      autoUpdate: true,
+      directUpdate: false,
     },
   },
 }
