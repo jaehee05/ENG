@@ -265,7 +265,7 @@ export function VocabTake() {
           })}
         </ul>
 
-        <div className="sticky bottom-16 md:bottom-14 z-10 -mx-4 sm:mx-0 px-4 sm:px-0 pb-3">
+        <div className="sticky bottom-0 z-10 -mx-4 sm:mx-0 px-4 sm:px-0 pb-3 pt-2 bg-gradient-to-t from-slate-50 via-slate-50 to-transparent">
           <div className="flex items-center justify-between rounded-lg bg-slate-900 text-white px-4 py-2.5 shadow-lg">
             <span className="text-xs text-slate-300">
               작성 {answered} / {order.length}

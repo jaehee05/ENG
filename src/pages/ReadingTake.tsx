@@ -225,7 +225,7 @@ export function ReadingTake() {
           </p>
         )}
 
-        <div className="sticky bottom-16 md:bottom-14 z-10 -mx-4 sm:mx-0 px-4 sm:px-0 pb-3">
+        <div className="sticky bottom-0 z-10 -mx-4 sm:mx-0 px-4 sm:px-0 pb-3 pt-2 bg-gradient-to-t from-slate-50 via-slate-50 to-transparent">
           <button
             type="submit"
             disabled={submitting}
