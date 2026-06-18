@@ -298,7 +298,7 @@ function fitListToBytes(items, emptyText) {
   if (enc.encode(full).length <= ASN_VAR_BYTE_LIMIT) return full;
   for (let n = items.length - 1; n >= 1; n--) {
     const head = items.slice(0, n - 1);
-    const last = `${items[n - 1]} (외 ${items.length - n}개)`;
+    const last = `${items[n - 1]} 외 ${items.length - n}개`;
     const text = [...head, last].join("\n");
     if (enc.encode(text).length <= ASN_VAR_BYTE_LIMIT) return text;
   }
