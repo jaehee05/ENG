@@ -2,7 +2,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getAttempt, getReading } from '../lib/firestore'
 import { renderUnderlines } from '../lib/renderUnderlines'
-import { inferQuestionNumbers, type Attempt, type Reading } from '../lib/types'
+import {
+  getSharedPassageBlock,
+  inferQuestionNumbers,
+  type Attempt,
+  type Reading,
+} from '../lib/types'
+import { SharedPassageBlock } from '../components/SharedPassageBlock'
 
 const CHOICE_MARKS = ['①', '②', '③', '④', '⑤']
 
@@ -184,14 +190,40 @@ export function ReadingResult() {
       {hasWrong && (
         <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4 space-y-3">
           <p className="text-sm font-semibold text-slate-900">
-            틀린 문제가 {wrongIndices.length}개 있어요. 한글 해석을 참고해서 다시 풀어보세요.
+            틀린 문제가 {wrongIndices.length}개 있어요. 지문과 한글 해석을 참고해서 다시 풀어보세요.
           </p>
-          {hasAnyKo ? (
+          {(hasAnyKo || (reading && reading.questions.length > 0)) && (
             <details className="rounded-md border border-amber-200 bg-white">
               <summary className="cursor-pointer text-sm font-medium text-slate-800 px-4 py-2 hover:bg-amber-50">
-                지문 한글 해석 보기
+                지문 + 한글 해석 보기
               </summary>
               <div className="px-4 py-3 border-t border-amber-100 space-y-4">
+                {reading && (() => {
+                  const numbered = inferQuestionNumbers(
+                    reading.title,
+                    reading.questions,
+                  )
+                  const shared = getSharedPassageBlock({
+                    ...reading,
+                    questions: numbered,
+                  })
+                  return shared ? (
+                    <div>
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                        지문 다시 보기
+                      </p>
+                      <SharedPassageBlock
+                        block={shared}
+                        passageGlossary={reading.glossary}
+                      />
+                    </div>
+                  ) : null
+                })()}
+                {hasAnyKo && (
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+                    한글 해석
+                  </p>
+                )}
                 {hasOrderKo &&
                   orderKoParts.map((p) => (
                     <div key={p.tag}>
@@ -225,9 +257,10 @@ export function ReadingResult() {
                 )}
               </div>
             </details>
-          ) : (
+          )}
+          {!hasAnyKo && (
             <p className="text-xs text-slate-500">
-              아직 이 지문의 한글 해석이 등록되어 있지 않습니다. 관리자에게 요청해 주세요.
+              한글 해석은 등록되지 않았지만 위에서 지문을 다시 확인할 수 있어요.
             </p>
           )}
         </div>
@@ -292,7 +325,7 @@ export function ReadingResult() {
                 })}
               </div>
 
-              {!r.correct && retryCorrect && (() => {
+              {(() => {
                 const exp = reading?.questions[i]?.explanation?.trim()
                 if (!exp) return null
                 return (
