@@ -36,21 +36,33 @@ export function Signup() {
   }
 
   const inputCls =
-    'w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500'
+    'w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-3 text-[16px] text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-slate-400 focus:outline-none transition'
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-10">
-      <div className="w-full max-w-sm bg-white rounded-2xl shadow-lg shadow-brand-900/5 border border-slate-200 p-8">
-        <div className="text-center mb-6">
-          <p className="text-3xl font-bold bg-gradient-to-r from-brand-600 to-brand-700 bg-clip-text text-transparent">
+    <div className="min-h-screen flex flex-col items-center justify-center px-5 py-10 bg-white">
+      <div className="w-full max-w-sm">
+        <div className="mb-8 flex items-center gap-2">
+          <span className="inline-block w-2 h-2 rounded-full bg-brand-500" />
+          <span className="text-sm font-semibold tracking-tight text-slate-900">
             KJHEDU
-          </p>
+          </span>
         </div>
-        <h1 className="text-xl font-semibold text-slate-900 mb-5">회원가입</h1>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">이름</label>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+          계정
+        </p>
+        <h1 className="text-[26px] font-semibold text-slate-900 mb-1.5 tracking-tight">
+          회원가입
+        </h1>
+        <p className="text-sm text-slate-500 mb-7">
+          이용하려면 가입 후 관리자 승인이 필요해요.
+        </p>
+
+        <form onSubmit={handleSubmit} className="space-y-3.5">
+          <div className="space-y-1.5">
+            <label className="block text-xs font-medium text-slate-600">
+              이름
+            </label>
             <input
               type="text"
               required
@@ -59,8 +71,10 @@ export function Signup() {
               className={inputCls}
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">학교</label>
+          <div className="space-y-1.5">
+            <label className="block text-xs font-medium text-slate-600">
+              학교
+            </label>
             <input
               type="text"
               value={school}
@@ -69,9 +83,11 @@ export function Signup() {
               className={inputCls}
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">학생 연락처</label>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-medium text-slate-600">
+                학생 연락처
+              </label>
               <input
                 type="tel"
                 inputMode="tel"
@@ -81,8 +97,10 @@ export function Signup() {
                 className={inputCls}
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">학부모 연락처</label>
+            <div className="space-y-1.5">
+              <label className="block text-xs font-medium text-slate-600">
+                학부모 연락처
+              </label>
               <input
                 type="tel"
                 inputMode="tel"
@@ -93,19 +111,24 @@ export function Signup() {
               />
             </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">이메일</label>
+          <div className="space-y-1.5">
+            <label className="block text-xs font-medium text-slate-600">
+              이메일
+            </label>
             <input
               type="email"
               autoComplete="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
               className={inputCls}
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">비밀번호</label>
+          <div className="space-y-1.5">
+            <label className="block text-xs font-medium text-slate-600">
+              비밀번호
+            </label>
             <input
               type="password"
               autoComplete="new-password"
@@ -117,20 +140,27 @@ export function Signup() {
             />
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-md px-3 py-2">
+              {error}
+            </p>
+          )}
 
           <button
             type="submit"
             disabled={submitting}
-            className="w-full rounded-md bg-brand-600 text-white text-sm font-medium py-2.5 hover:bg-brand-700 transition disabled:opacity-60"
+            className="w-full rounded-lg bg-slate-900 text-white text-[15px] font-medium py-3 hover:bg-slate-800 active:bg-slate-950 disabled:opacity-60 transition mt-2"
           >
-            {submitting ? '가입 중...' : '가입하기'}
+            {submitting ? '가입 중…' : '가입하기'}
           </button>
         </form>
 
-        <p className="mt-4 text-sm text-slate-600 text-center">
+        <p className="mt-6 text-xs text-slate-500 text-center">
           이미 계정이 있으신가요?{' '}
-          <Link to="/login" className="text-brand-600 font-medium hover:underline">
+          <Link
+            to="/login"
+            className="text-slate-900 font-medium hover:underline underline-offset-2"
+          >
             로그인
           </Link>
         </p>

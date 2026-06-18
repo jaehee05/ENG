@@ -85,8 +85,15 @@ export function MyHistory() {
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold text-slate-900">내 기록</h1>
+    <div className="space-y-5">
+      <header>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+          나의 학습
+        </p>
+        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
+          내 기록
+        </h1>
+      </header>
 
       {loading && <p className="text-slate-500 text-sm">불러오는 중...</p>}
       {error && <p className="text-red-600 text-sm">{error}</p>}

@@ -244,7 +244,10 @@ export function ReadingDetail() {
       )}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">{r.title}</h1>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+            지문
+          </p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">{r.title}</h1>
           <p className="text-sm text-slate-500 mt-1">
             {r.questions.length}문항 · 지문 단어 {r.glossary.length}개 · 선지 단어 {choicesGlossary.length}개
           </p>
