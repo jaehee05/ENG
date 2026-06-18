@@ -144,7 +144,7 @@ export function AdminNotify() {
     void loadSchedules()
   }, [])
 
-  async function handleSaveSchedule() {
+  async function handleSavePushSchedule() {
     if (!schedTitle.trim()) {
       setSchedNote('제목을 입력하세요.')
       return
@@ -885,7 +885,7 @@ export function AdminNotify() {
           )}
           <button
             type="button"
-            onClick={handleSaveSchedule}
+            onClick={handleSavePushSchedule}
             disabled={schedSaving}
             className="rounded-md bg-slate-900 text-white text-sm font-medium px-4 py-2 hover:bg-slate-800 disabled:opacity-50"
           >
