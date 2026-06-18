@@ -188,11 +188,21 @@ exports.ppurioAdmin = onRequest({ invoker: "public" }, async (req, res) => {
           }
         }
       }
+      const errors = [];
+      for (const r of result.responses) {
+        if (!r.success && r.error) {
+          errors.push({
+            code: r.error.code || "unknown",
+            message: String(r.error.message || ""),
+          });
+        }
+      }
       return res.json({
         ok: true,
         sent: result.successCount,
         failed: result.failureCount,
         invalid,
+        errors: errors.slice(0, 5),
       });
     }
 

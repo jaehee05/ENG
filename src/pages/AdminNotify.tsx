@@ -152,8 +152,12 @@ export function AdminNotify() {
         title: pushTitle.trim(),
         body: pushBody.trim(),
       })
+      const errPart =
+        result.errors && result.errors.length > 0
+          ? ` · 에러: ${result.errors.map((e) => e.code).join(', ')}`
+          : ''
       setPushNote(
-        `발송 완료: 성공 ${result.sent} · 실패 ${result.failed} · 만료 토큰 정리 ${result.invalid}`,
+        `발송 완료: 성공 ${result.sent} · 실패 ${result.failed} · 만료 토큰 정리 ${result.invalid}${errPart}`,
       )
     } catch (e) {
       setPushNote(e instanceof Error ? e.message : '푸시 발송 실패')

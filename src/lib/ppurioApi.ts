@@ -155,6 +155,7 @@ export interface PushSendResult {
   sent: number
   failed: number
   invalid: number
+  errors?: { code: string; message: string }[]
 }
 
 export async function sendPushNotification(input: {
