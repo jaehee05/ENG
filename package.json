@@ -1,14 +1,14 @@
 {
   "name": "eng",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "capgo:push": "npm run build && npx @capgo/cli bundle upload --apikey $CAPGO_API_KEY --channel production"
+    "capgo:push": "npm version patch --no-git-tag-version && npm run build && npx @capgo/cli bundle upload --apikey $CAPGO_API_KEY --channel production"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
