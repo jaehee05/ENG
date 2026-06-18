@@ -9,17 +9,16 @@ html, body, #root {
   max-width: 100vw;
 }
 
-/* iOS safe area (노치/Dynamic Island/홈 인디케이터) 처리 */
-body {
+/* safe-area는 헤더/탭바 컴포넌트에서 직접 처리 (body padding으로 viewport 넘는 문제 방지) */
+.safe-top {
   padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
 }
-
-/* 하단 탭바 safe-area 보정 */
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom);
+}
+.safe-x {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 /* 네이티브 앱에서만 WKWebView bounce overscroll 제거 — 콘텐츠가 화면보다 작으면 스크롤 안 됨 */

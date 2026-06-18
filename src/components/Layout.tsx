@@ -95,7 +95,7 @@ export function Layout() {
   return (
     <div className="h-dvh flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* 상단 미니멀 헤더 */}
-      <header className="sticky top-0 z-30 bg-white border-b border-slate-200">
+      <header className="bg-white border-b border-slate-200 safe-top safe-x">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
           <Link
             to="/"
@@ -144,8 +144,8 @@ export function Layout() {
       </header>
 
       {/* 본문 */}
-      <main className="flex-1 overflow-y-auto overscroll-contain">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 sm:py-8 pb-24 md:pb-10">
+      <main className="flex-1 overflow-y-auto overscroll-contain safe-x">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 sm:py-8 pb-6">
           <Outlet />
         </div>
       </main>
@@ -174,7 +174,7 @@ export function Layout() {
       </nav>
 
       {/* 모바일 하단 탭바 */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur safe-bottom">
+      <nav className="md:hidden border-t border-slate-200 bg-white safe-bottom safe-x">
         <div className="grid grid-cols-5 px-1">
           {allNav.slice(0, 5).map((i) => (
             <NavLink
