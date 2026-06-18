@@ -337,60 +337,65 @@ export function AdminStudentDetail() {
   if (!account) return null
 
   return (
-    <div className="space-y-6">
-      <div>
-        <Link to="/admin/students" className="text-sm text-slate-500 hover:text-slate-900">
+    <div className="space-y-5">
+      <header>
+        <Link
+          to="/admin/students"
+          className="text-xs text-slate-500 hover:text-slate-900"
+        >
           ← 학생 관리
         </Link>
         <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mt-2 mb-1">
           학생 상세
         </p>
-        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">{account.displayName}</h1>
-        <p className="text-sm text-slate-500 mt-1">
+        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
+          {account.displayName}
+        </h1>
+        <p className="text-xs text-slate-500 mt-1">
           {account.school || '학교 미입력'} · {account.email}
         </p>
-        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-slate-500">
-          <span>학생 연락처: {account.phone || '-'}</span>
-          <span>학부모 연락처: {account.parentPhone || '-'}</span>
-          <span>가입일: {fmtDate(account.createdAt)}</span>
+        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5 text-[11px] text-slate-500">
+          <span>학생 {account.phone || '-'}</span>
+          <span>학부모 {account.parentPhone || '-'}</span>
+          <span>가입 {fmtDate(account.createdAt)}</span>
         </div>
-      </div>
+      </header>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard label="총 시험" value={`${stats.totalAttempts}회`} />
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <StatCard label="총 시험" value={`${stats.totalAttempts}`} />
         <StatCard
-          label="평균 정답률"
-          value={stats.totalAttempts > 0 ? `${stats.avgRatio}%` : '-'}
+          label="평균"
+          value={stats.totalAttempts > 0 ? `${stats.avgRatio}%` : '—'}
         />
         <StatCard
           label="단어장"
-          value={`${stats.wordbookSize}개`}
-          sub={`누적 조회 ${stats.wordbookTotalLookups}회`}
+          value={`${stats.wordbookSize}`}
+          sub={`조회 ${stats.wordbookTotalLookups}`}
         />
         <StatCard
-          label="최근 활동"
-          value={stats.lastActivity ? fmtDate(stats.lastActivity) : '-'}
+          label="최근"
+          value={stats.lastActivity ? fmtDate(stats.lastActivity) : '—'}
         />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <StatCard
           label="단어 시험지 평균"
           value={
             attempts.some((a) => a.type === 'vocab' && a.total > 0)
               ? `${stats.vocabAvg}%`
-              : '-'
+              : '—'
           }
-          sub={`총 ${attempts.filter((a) => a.type === 'vocab').length}회`}
+          sub={`${attempts.filter((a) => a.type === 'vocab').length}회 응시`}
         />
         <StatCard
-          label="지문 문제풀이 평균"
+          label="지문 평균"
           value={
             attempts.some((a) => a.type === 'reading' && a.total > 0)
               ? `${stats.readingAvg}%`
-              : '-'
+              : '—'
           }
-          sub={`총 ${attempts.filter((a) => a.type === 'reading').length}회`}
+          sub={`${attempts.filter((a) => a.type === 'reading').length}회 응시`}
         />
       </div>
 
@@ -791,10 +796,10 @@ export function AdminStudentDetail() {
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4">
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="text-2xl font-semibold text-slate-900 mt-1">{value}</p>
-      {sub && <p className="text-xs text-slate-400 mt-1">{sub}</p>}
+    <div className="rounded-lg border border-slate-200 bg-white p-3">
+      <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">{label}</p>
+      <p className="text-xl font-semibold text-slate-900 mt-0.5 tracking-tight">{value}</p>
+      {sub && <p className="text-[10px] text-slate-400 mt-0.5">{sub}</p>}
     </div>
   )
 }
@@ -802,20 +807,17 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
 function ProgressCard({ label, done, total }: { label: string; done: number; total: number }) {
   const pct = total > 0 ? Math.round((done / total) * 100) : 0
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-2">
+    <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-1.5">
       <div className="flex items-baseline justify-between">
-        <p className="text-xs text-slate-500">{label}</p>
-        <p className="text-xs text-slate-500">{pct}%</p>
+        <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">{label}</p>
+        <p className="text-[10px] text-slate-500">{pct}%</p>
       </div>
-      <p className="text-2xl font-semibold text-slate-900">
+      <p className="text-xl font-semibold text-slate-900 tracking-tight">
         {done}
-        <span className="text-base text-slate-400 font-medium"> / {total}</span>
+        <span className="text-sm text-slate-400 font-medium"> / {total}</span>
       </p>
-      <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
-        <div
-          className="h-full bg-brand-500"
-          style={{ width: `${pct}%` }}
-        />
+      <div className="h-1 w-full rounded-full bg-slate-100 overflow-hidden">
+        <div className="h-full bg-brand-500" style={{ width: `${pct}%` }} />
       </div>
     </div>
   )
