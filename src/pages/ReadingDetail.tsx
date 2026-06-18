@@ -43,6 +43,30 @@ export function ReadingDetail() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [savedNote, setSavedNote] = useState<string | null>(null)
+  const [siblings, setSiblings] = useState<{ id: string; title: string }[]>([])
+
+  useEffect(() => {
+    if (!isAdmin) return
+    Promise.all([listReadings(), getReadingOrder()])
+      .then(([list, order]) => {
+        const ordered = order.length > 0 ? applyReadingOrder(list, order) : list
+        setSiblings(ordered.map((x) => ({ id: x.id, title: x.title })))
+      })
+      .catch(() => {
+        // 형제 목록 실패는 미리보기에 치명적이지 않음
+      })
+  }, [isAdmin])
+
+  const navIndex = useMemo(
+    () => (r ? siblings.findIndex((x) => x.id === r.id) : -1),
+    [siblings, r],
+  )
+  const prevReading =
+    navIndex > 0 ? siblings[navIndex - 1] : null
+  const nextReading =
+    navIndex >= 0 && navIndex < siblings.length - 1
+      ? siblings[navIndex + 1]
+      : null
 
   useEffect(() => {
     if (!id || !profile) return
@@ -128,7 +152,53 @@ export function ReadingDetail() {
   const choicesGlossary = r.choicesGlossary ?? []
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 max-w-3xl relative">
+      {isAdmin && prevReading && (
+        <Link
+          to={`/reading/${prevReading.id}`}
+          title={`이전: ${prevReading.title}`}
+          className="hidden xl:flex fixed left-6 top-1/2 -translate-y-1/2 z-20 h-12 w-12 items-center justify-center rounded-full bg-white border border-slate-300 text-slate-700 shadow-md hover:bg-slate-100 hover:text-slate-900 transition"
+          aria-label="이전 지문"
+        >
+          ◀
+        </Link>
+      )}
+      {isAdmin && nextReading && (
+        <Link
+          to={`/reading/${nextReading.id}`}
+          title={`다음: ${nextReading.title}`}
+          className="hidden xl:flex fixed right-6 top-1/2 -translate-y-1/2 z-20 h-12 w-12 items-center justify-center rounded-full bg-white border border-slate-300 text-slate-700 shadow-md hover:bg-slate-100 hover:text-slate-900 transition"
+          aria-label="다음 지문"
+        >
+          ▶
+        </Link>
+      )}
+      {isAdmin && (prevReading || nextReading) && (
+        <div className="xl:hidden flex items-center justify-between gap-2 text-xs">
+          {prevReading ? (
+            <Link
+              to={`/reading/${prevReading.id}`}
+              className="flex items-center gap-1 rounded-md border border-slate-300 bg-white text-slate-700 px-3 py-1.5 hover:bg-slate-100 max-w-[45%] truncate"
+            >
+              <span>◀</span>
+              <span className="truncate">{prevReading.title}</span>
+            </Link>
+          ) : (
+            <span />
+          )}
+          {nextReading ? (
+            <Link
+              to={`/reading/${nextReading.id}`}
+              className="flex items-center gap-1 rounded-md border border-slate-300 bg-white text-slate-700 px-3 py-1.5 hover:bg-slate-100 max-w-[45%] truncate"
+            >
+              <span className="truncate">{nextReading.title}</span>
+              <span>▶</span>
+            </Link>
+          ) : (
+            <span />
+          )}
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">{r.title}</h1>
