@@ -345,6 +345,35 @@ export interface Assignment {
   createdAt: Timestamp | null
 }
 
+export interface Announcement {
+  id: string
+  title: string
+  body: string
+  pinned?: boolean
+  createdBy: string
+  createdByName: string
+  createdAt: Timestamp | null
+  updatedAt: Timestamp | null
+}
+
+export type NotificationKind =
+  | 'push'
+  | 'announcement'
+  | 'assignment'
+  | 'system'
+
+export interface UserNotification {
+  id: string
+  recipientUid: string
+  title: string
+  body: string
+  kind?: NotificationKind
+  /** 클릭 시 이동할 internal 경로 (예: '/reading/abc'). */
+  link?: string
+  readAt: Timestamp | null
+  createdAt: Timestamp | null
+}
+
 export interface WordLookup {
   en: string
   ko: string

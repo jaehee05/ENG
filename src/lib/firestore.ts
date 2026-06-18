@@ -15,11 +15,14 @@ import {
 } from 'firebase/firestore'
 import { db } from './firebase'
 import type {
+  Announcement,
   Assignment,
   AssignmentType,
   Attempt,
+  NotificationKind,
   Reading,
   ReadingResult,
+  UserNotification,
   VocabResult,
   VocabSeries,
   VocabSet,
@@ -512,6 +515,118 @@ export async function listAssignmentsForStudent(uid: string): Promise<Assignment
 
 export async function deleteAssignment(id: string): Promise<void> {
   await deleteDoc(doc(db, 'assignments', id))
+}
+
+// ───── 공지사항 ─────
+export async function listAnnouncements(): Promise<Announcement[]> {
+  const snap = await getDocs(
+    query(collection(db, 'announcements'), orderBy('createdAt', 'desc')),
+  )
+  return snap.docs.map((d) => ({
+    id: d.id,
+    ...(d.data() as Omit<Announcement, 'id'>),
+  }))
+}
+
+export async function createAnnouncement(input: {
+  title: string
+  body: string
+  pinned?: boolean
+  createdBy: string
+  createdByName: string
+}): Promise<string> {
+  const payload: Record<string, unknown> = {
+    title: input.title.trim(),
+    body: input.body.trim(),
+    pinned: !!input.pinned,
+    createdBy: input.createdBy,
+    createdByName: input.createdByName,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  }
+  const ref = await addDoc(collection(db, 'announcements'), payload)
+  return ref.id
+}
+
+export async function updateAnnouncement(
+  id: string,
+  patch: { title?: string; body?: string; pinned?: boolean },
+): Promise<void> {
+  const update: Record<string, unknown> = { updatedAt: serverTimestamp() }
+  if (patch.title !== undefined) update.title = patch.title.trim()
+  if (patch.body !== undefined) update.body = patch.body.trim()
+  if (patch.pinned !== undefined) update.pinned = patch.pinned
+  await updateDoc(doc(db, 'announcements', id), update)
+}
+
+export async function deleteAnnouncement(id: string): Promise<void> {
+  await deleteDoc(doc(db, 'announcements', id))
+}
+
+// ───── 알림함 ─────
+export async function listNotificationsForUser(
+  uid: string,
+): Promise<UserNotification[]> {
+  const snap = await getDocs(
+    query(
+      collection(db, 'notifications'),
+      where('recipientUid', '==', uid),
+      orderBy('createdAt', 'desc'),
+    ),
+  )
+  return snap.docs.map((d) => ({
+    id: d.id,
+    ...(d.data() as Omit<UserNotification, 'id'>),
+  }))
+}
+
+export async function unreadNotificationCount(uid: string): Promise<number> {
+  const snap = await getDocs(
+    query(
+      collection(db, 'notifications'),
+      where('recipientUid', '==', uid),
+      where('readAt', '==', null),
+    ),
+  )
+  return snap.size
+}
+
+export async function createUserNotification(input: {
+  recipientUid: string
+  title: string
+  body: string
+  kind?: NotificationKind
+  link?: string
+}): Promise<string> {
+  const payload: Record<string, unknown> = {
+    recipientUid: input.recipientUid,
+    title: input.title,
+    body: input.body,
+    kind: input.kind ?? 'system',
+    readAt: null,
+    createdAt: serverTimestamp(),
+  }
+  if (input.link) payload.link = input.link
+  const ref = await addDoc(collection(db, 'notifications'), payload)
+  return ref.id
+}
+
+export async function markNotificationRead(id: string): Promise<void> {
+  await updateDoc(doc(db, 'notifications', id), { readAt: serverTimestamp() })
+}
+
+export async function markAllNotificationsRead(uid: string): Promise<void> {
+  const snap = await getDocs(
+    query(
+      collection(db, 'notifications'),
+      where('recipientUid', '==', uid),
+      where('readAt', '==', null),
+    ),
+  )
+  const now = serverTimestamp()
+  for (const d of snap.docs) {
+    await updateDoc(d.ref, { readAt: now })
+  }
 }
 
 export function formatDate(ts: Timestamp | null | undefined): string {

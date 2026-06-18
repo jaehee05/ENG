@@ -162,6 +162,18 @@ exports.ppurioAdmin = onRequest({ invoker: "public" }, async (req, res) => {
       if (tokens.length === 0) {
         return res.json({ ok: true, sent: 0, failed: 0, invalid: 0, results: [] });
       }
+      // 푸시 발송 전에 각 학생 알림함에도 기록 (앱 안 켜도 알림함에 남음)
+      for (const uid of targetIds) {
+        await db.collection("notifications").add({
+          recipientUid: uid,
+          title,
+          body,
+          kind: "push",
+          readAt: null,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+
       const message = {
         notification: { title, body },
         data: p.data && typeof p.data === "object" ? p.data : {},

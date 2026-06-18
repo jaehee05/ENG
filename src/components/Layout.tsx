@@ -1,6 +1,7 @@
-import { useState, type ReactNode } from 'react'
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { useEffect, useState, type ReactNode } from 'react'
+import { Link, NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
+import { unreadNotificationCount } from '../lib/firestore'
 
 interface NavItem {
   to: string
@@ -81,8 +82,24 @@ const adminExtraNav: NavItem[] = [
 export function Layout() {
   const { profile, logOut } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
   const isAdmin = profile?.role === 'admin'
+  const [unread, setUnread] = useState(0)
+
+  useEffect(() => {
+    if (!profile) return
+    let cancelled = false
+    unreadNotificationCount(profile.id)
+      .then((n) => {
+        if (!cancelled) setUnread(n)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+    // location.pathname 변경 시 다시 카운트 (알림함 페이지 떠난 직후 등 반영)
+  }, [profile, location.pathname])
 
   async function handleLogout() {
     setMenuOpen(false)
@@ -105,7 +122,7 @@ export function Layout() {
             KJHEDU
           </Link>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <span className="hidden sm:inline text-xs text-slate-500">
               {profile?.displayName}
               {isAdmin && (
@@ -114,6 +131,21 @@ export function Layout() {
                 </span>
               )}
             </span>
+            <Link
+              to="/notifications"
+              aria-label="알림함"
+              className="relative h-8 w-8 inline-flex items-center justify-center rounded-md text-slate-600 hover:bg-slate-100"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8" />
+                <path d="M10 21a2 2 0 0 0 4 0" />
+              </svg>
+              {unread > 0 && (
+                <span className="absolute top-1 right-1 min-w-[14px] h-[14px] px-1 rounded-full bg-red-500 text-white text-[9px] font-semibold inline-flex items-center justify-center">
+                  {unread > 9 ? '9+' : unread}
+                </span>
+              )}
+            </Link>
             <button
               type="button"
               onClick={() => setMenuOpen((v) => !v)}
@@ -130,14 +162,32 @@ export function Layout() {
         </div>
         {menuOpen && (
           <div className="border-t border-slate-200 bg-white">
-            <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between text-sm">
+            <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3 text-sm flex-wrap">
               <span className="text-slate-600">{profile?.displayName}</span>
-              <button
-                onClick={handleLogout}
-                className="text-slate-600 hover:text-slate-900 underline-offset-2 hover:underline"
-              >
-                로그아웃
-              </button>
+              <div className="flex items-center gap-3">
+                <Link
+                  to="/notice"
+                  onClick={() => setMenuOpen(false)}
+                  className="text-slate-600 hover:text-slate-900 underline-offset-2 hover:underline"
+                >
+                  공지사항
+                </Link>
+                {isAdmin && (
+                  <Link
+                    to="/admin/announce"
+                    onClick={() => setMenuOpen(false)}
+                    className="text-slate-600 hover:text-slate-900 underline-offset-2 hover:underline"
+                  >
+                    공지 관리
+                  </Link>
+                )}
+                <button
+                  onClick={handleLogout}
+                  className="text-slate-600 hover:text-slate-900 underline-offset-2 hover:underline"
+                >
+                  로그아웃
+                </button>
+              </div>
             </div>
           </div>
         )}

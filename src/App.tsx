@@ -27,7 +27,10 @@ import { Rejected } from './pages/Rejected'
 import { AdminStudents } from './pages/AdminStudents'
 import { AdminStudentDetail } from './pages/AdminStudentDetail'
 import { AdminNotify } from './pages/AdminNotify'
+import { AdminAnnounce } from './pages/AdminAnnounce'
 import { MyHistory } from './pages/MyHistory'
+import { Notifications } from './pages/Notifications'
+import { Notice } from './pages/Notice'
 import { CorporaList } from './pages/CorporaList'
 import { CorpusNew } from './pages/CorpusNew'
 import { CorpusDetail } from './pages/CorpusDetail'
@@ -63,6 +66,8 @@ function App() {
               <Route path="/wordbook/result/:attemptId" element={<WordbookResult />} />
 
               <Route path="/history" element={<MyHistory />} />
+              <Route path="/notifications" element={<Notifications />} />
+              <Route path="/notice" element={<Notice />} />
             </Route>
           </Route>
 
@@ -78,6 +83,7 @@ function App() {
               <Route path="/admin/students" element={<AdminStudents />} />
               <Route path="/admin/students/:id" element={<AdminStudentDetail />} />
               <Route path="/admin/notify" element={<AdminNotify />} />
+              <Route path="/admin/announce" element={<AdminAnnounce />} />
             </Route>
           </Route>
 

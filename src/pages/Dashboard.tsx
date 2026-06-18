@@ -4,10 +4,11 @@ import { useAuth } from '../contexts/useAuth'
 import {
   formatDate,
   isAssignmentDone,
+  listAnnouncements,
   listAssignmentsForStudent,
   listAttemptsForUser,
 } from '../lib/firestore'
-import type { Assignment, Attempt } from '../lib/types'
+import type { Announcement, Assignment, Attempt } from '../lib/types'
 
 interface ShortcutCard {
   to: string
@@ -107,16 +108,27 @@ export function Dashboard() {
   const { profile } = useAuth()
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [attempts, setAttempts] = useState<Attempt[]>([])
+  const [topAnnouncement, setTopAnnouncement] = useState<Announcement | null>(
+    null,
+  )
 
   useEffect(() => {
     if (!profile) return
     Promise.all([
       listAssignmentsForStudent(profile.id),
       listAttemptsForUser(profile.id),
+      listAnnouncements(),
     ])
-      .then(([asn, atts]) => {
+      .then(([asn, atts, ann]) => {
         setAssignments(asn)
         setAttempts(atts)
+        const sorted = [...ann].sort((a, b) => {
+          if (!!b.pinned !== !!a.pinned) return b.pinned ? 1 : -1
+          return (
+            (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0)
+          )
+        })
+        setTopAnnouncement(sorted[0] ?? null)
       })
       .catch(() => {
         // dashboard 보조 정보. 실패해도 카드는 보여야 함
@@ -220,6 +232,32 @@ export function Dashboard() {
           </p>
         )}
       </section>
+
+      {topAnnouncement && (
+        <Link
+          to="/notice"
+          className="block rounded-lg border border-slate-200 bg-white px-4 py-3 hover:border-slate-300 hover:bg-slate-50/60 transition"
+        >
+          <div className="flex items-center gap-2 mb-1">
+            {topAnnouncement.pinned && (
+              <span className="inline-block rounded bg-amber-50 text-amber-700 text-[10px] font-medium px-1.5 py-0.5 border border-amber-200">
+                📌
+              </span>
+            )}
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              공지
+            </span>
+          </div>
+          <p className="text-[15px] font-semibold text-slate-900 truncate">
+            {topAnnouncement.title}
+          </p>
+          {topAnnouncement.body && (
+            <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">
+              {topAnnouncement.body}
+            </p>
+          )}
+        </Link>
+      )}
 
       {totalOpen > 0 && (
         <section className="space-y-2.5">
