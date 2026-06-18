@@ -9,81 +9,68 @@ import {
 } from '../lib/firestore'
 import type { Assignment, Attempt } from '../lib/types'
 
-const iconCls = 'h-6 w-6'
-const iconProps = {
-  fill: 'none' as const,
+interface ShortcutCard {
+  to: string
+  title: string
+  desc: string
+  icon: ReactNode
+}
+
+const sIcon = {
+  width: 18,
+  height: 18,
   viewBox: '0 0 24 24',
-  strokeWidth: 1.8,
+  fill: 'none' as const,
   stroke: 'currentColor',
+  strokeWidth: 1.6,
   strokeLinecap: 'round' as const,
   strokeLinejoin: 'round' as const,
 }
 
-const VocabIcon = (
-  <svg className={iconCls} {...iconProps}>
-    <path d="M9 5h6a2 2 0 0 1 2 2v12l-5-2-5 2V7a2 2 0 0 1 2-2Z" />
-    <path d="M9 9h6M9 12h4" />
-  </svg>
-)
-
-const ReadingIcon = (
-  <svg className={iconCls} {...iconProps}>
-    <path d="M3 5.5A1.5 1.5 0 0 1 4.5 4H10a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H4.5A1.5 1.5 0 0 1 3 16.5v-11Z" />
-    <path d="M21 5.5A1.5 1.5 0 0 0 19.5 4H14a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h5.5a1.5 1.5 0 0 0 1.5-1.5v-11Z" />
-  </svg>
-)
-
-const WordbookIcon = (
-  <svg className={iconCls} {...iconProps}>
-    <path d="M6 4h11a2 2 0 0 1 2 2v14l-3-2-3 2-3-2-3 2V6a2 2 0 0 1 2-2Z" />
-    <path d="M9 9h7" />
-  </svg>
-)
-
-const HistoryIcon = (
-  <svg className={iconCls} {...iconProps}>
-    <path d="M3 12a9 9 0 1 0 3.4-7.04" />
-    <path d="M3 4v5h5" />
-    <path d="M12 8v4l3 2" />
-  </svg>
-)
-
-interface Card {
-  to: string
-  title: string
-  icon: ReactNode
-  gradient: string
-  ring: string
-}
-
-const cards: Card[] = [
-  {
-    to: '/vocab',
-    title: '단어 시험지',
-    icon: VocabIcon,
-    gradient: 'from-brand-500 to-brand-500',
-    ring: 'group-hover:ring-brand-200',
-  },
+const shortcuts: ShortcutCard[] = [
   {
     to: '/reading',
     title: '지문 문제풀이',
-    icon: ReadingIcon,
-    gradient: 'from-brand-500 to-brand-700',
-    ring: 'group-hover:ring-brand-200',
+    desc: '오늘 풀 지문',
+    icon: (
+      <svg {...sIcon}>
+        <path d="M4 5a2 2 0 0 1 2-2h5v18H6a2 2 0 0 1-2-2V5Z" />
+        <path d="M20 5a2 2 0 0 0-2-2h-5v18h5a2 2 0 0 0 2-2V5Z" />
+      </svg>
+    ),
+  },
+  {
+    to: '/vocab',
+    title: '단어 시험지',
+    desc: 'DAY 단위 시험',
+    icon: (
+      <svg {...sIcon}>
+        <path d="M9 4h6a2 2 0 0 1 2 2v14l-5-2-5 2V6a2 2 0 0 1 2-2Z" />
+        <path d="M9 8h6M9 11h4" />
+      </svg>
+    ),
   },
   {
     to: '/wordbook',
     title: '내 단어장',
-    icon: WordbookIcon,
-    gradient: 'from-brand-500 to-brand-500',
-    ring: 'group-hover:ring-brand-200',
+    desc: '모은 단어 복습',
+    icon: (
+      <svg {...sIcon}>
+        <path d="M5 3h11a2 2 0 0 1 2 2v16l-3-2-3 2-3-2-3 2V5a2 2 0 0 1 2-2Z" />
+      </svg>
+    ),
   },
   {
     to: '/history',
     title: '내 기록',
-    icon: HistoryIcon,
-    gradient: 'from-brand-500 to-brand-700',
-    ring: 'group-hover:ring-brand-200',
+    desc: '지난 시험 점수',
+    icon: (
+      <svg {...sIcon}>
+        <path d="M3 12a9 9 0 1 0 3.4-7.04" />
+        <path d="M3 4v5h5" />
+        <path d="M12 8v4l3 2" />
+      </svg>
+    ),
   },
 ]
 
@@ -216,24 +203,33 @@ export function Dashboard() {
 
   return (
     <div className="space-y-8">
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 via-brand-700 to-brand-700 p-8 sm:p-10 text-white shadow-lift">
-        <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/10 blur-2xl" />
-        <div className="absolute -left-10 -bottom-10 h-48 w-48 rounded-full bg-white/10 blur-2xl" />
-        <p className="relative text-xs uppercase tracking-[0.18em] text-white/70">
-          {greeting}
-        </p>
-        <h1 className="relative mt-3 text-3xl sm:text-4xl font-bold leading-tight">
-          {profile?.displayName}님,<br className="sm:hidden" /> 오늘도 한 걸음 더.
+      <section>
+        <p className="text-xs text-slate-500 mb-1">{greeting}</p>
+        <h1 className="text-2xl sm:text-[28px] font-semibold text-slate-900 tracking-tight">
+          {profile?.displayName}님
         </h1>
+        {totalOpen > 0 ? (
+          <p className="text-sm text-slate-500 mt-1.5">
+            오늘 끝낼 과제가{' '}
+            <span className="text-slate-900 font-medium">{totalOpen}건</span>{' '}
+            남았어요.
+          </p>
+        ) : (
+          <p className="text-sm text-slate-500 mt-1.5">
+            오늘 부여된 과제가 없어요. 자유 학습 시간.
+          </p>
+        )}
       </section>
 
       {totalOpen > 0 && (
-        <section className="space-y-3">
+        <section className="space-y-2.5">
           <div className="flex items-baseline justify-between">
-            <h2 className="text-base font-semibold text-slate-900">내 과제</h2>
-            <span className="text-xs text-slate-500">미완료 {totalOpen}건</span>
+            <h2 className="text-[13px] font-semibold text-slate-900 uppercase tracking-wider">
+              내 과제
+            </h2>
+            <span className="text-xs text-slate-500">{totalOpen}건</span>
           </div>
-          <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white overflow-hidden">
+          <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white overflow-hidden">
             {openItems.map((item) => {
               if (item.kind === 'single') {
                 const a = item.a
@@ -372,23 +368,24 @@ export function Dashboard() {
         </section>
       )}
 
-      <section>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {cards.map((c) => (
+      <section className="space-y-2.5">
+        <h2 className="text-[13px] font-semibold text-slate-900 uppercase tracking-wider">
+          학습
+        </h2>
+        <div className="grid grid-cols-2 gap-2">
+          {shortcuts.map((c) => (
             <Link
               key={c.to}
               to={c.to}
-              className="group relative block rounded-2xl border border-slate-200 bg-white p-6 shadow-soft hover:shadow-lift hover:-translate-y-0.5 transition-all"
+              className="block rounded-lg border border-slate-200 bg-white p-4 hover:border-slate-300 hover:bg-slate-50/60 transition"
             >
-              <div
-                className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br ${c.gradient} text-white shadow-md ring-4 ring-white ${c.ring}`}
-              >
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-slate-100 text-slate-700">
                 {c.icon}
-              </div>
-              <h2 className="mt-5 text-lg font-semibold text-slate-900">{c.title}</h2>
-              <span className="absolute bottom-6 right-6 text-slate-300 group-hover:text-slate-900 transition text-xl">
-                →
               </span>
+              <p className="mt-3 text-[15px] font-semibold text-slate-900">
+                {c.title}
+              </p>
+              <p className="text-xs text-slate-500 mt-0.5">{c.desc}</p>
             </Link>
           ))}
         </div>

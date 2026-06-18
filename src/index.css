@@ -17,6 +17,11 @@ body {
   padding-right: env(safe-area-inset-right);
 }
 
+/* 하단 탭바 safe-area 보정 */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
 /* 네이티브 앱에서만 WKWebView bounce overscroll 제거 — 콘텐츠가 화면보다 작으면 스크롤 안 됨 */
 html.native-app, html.native-app body {
   overscroll-behavior: none;

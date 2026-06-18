@@ -1,171 +1,198 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 
-const navItems = [
-  { to: '/', label: '대시보드', end: true },
-  { to: '/vocab', label: '단어 시험지' },
-  { to: '/reading', label: '지문 문제풀이' },
-  { to: '/wordbook', label: '내 단어장' },
-  { to: '/history', label: '내 기록' },
+interface NavItem {
+  to: string
+  label: string
+  end?: boolean
+  icon: ReactNode
+}
+
+const iconProps = {
+  width: 22,
+  height: 22,
+  viewBox: '0 0 24 24',
+  fill: 'none' as const,
+  stroke: 'currentColor',
+  strokeWidth: 1.6,
+  strokeLinecap: 'round' as const,
+  strokeLinejoin: 'round' as const,
+}
+
+const homeIcon = (
+  <svg {...iconProps}>
+    <path d="M3 11l9-8 9 8" />
+    <path d="M5 10v10h14V10" />
+  </svg>
+)
+const readingIcon = (
+  <svg {...iconProps}>
+    <path d="M4 5a2 2 0 0 1 2-2h5v18H6a2 2 0 0 1-2-2V5Z" />
+    <path d="M20 5a2 2 0 0 0-2-2h-5v18h5a2 2 0 0 0 2-2V5Z" />
+  </svg>
+)
+const vocabIcon = (
+  <svg {...iconProps}>
+    <path d="M9 4h6a2 2 0 0 1 2 2v14l-5-2-5 2V6a2 2 0 0 1 2-2Z" />
+    <path d="M9 8h6M9 11h4" />
+  </svg>
+)
+const wordbookIcon = (
+  <svg {...iconProps}>
+    <path d="M5 3h11a2 2 0 0 1 2 2v16l-3-2-3 2-3-2-3 2V5a2 2 0 0 1 2-2Z" />
+  </svg>
+)
+const historyIcon = (
+  <svg {...iconProps}>
+    <path d="M3 12a9 9 0 1 0 3.4-7.04" />
+    <path d="M3 4v5h5" />
+    <path d="M12 8v4l3 2" />
+  </svg>
+)
+const studentsIcon = (
+  <svg {...iconProps}>
+    <circle cx="9" cy="8" r="3.5" />
+    <path d="M2 20c0-3 3.5-5 7-5s7 2 7 5" />
+    <circle cx="17" cy="9" r="3" />
+    <path d="M22 19c0-2.5-2.5-4-5-4" />
+  </svg>
+)
+const notifyIcon = (
+  <svg {...iconProps}>
+    <path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8" />
+    <path d="M10 21a2 2 0 0 0 4 0" />
+  </svg>
+)
+
+const studentNav: NavItem[] = [
+  { to: '/', label: '홈', end: true, icon: homeIcon },
+  { to: '/reading', label: '지문', icon: readingIcon },
+  { to: '/vocab', label: '단어', icon: vocabIcon },
+  { to: '/wordbook', label: '단어장', icon: wordbookIcon },
+  { to: '/history', label: '기록', icon: historyIcon },
+]
+
+const adminExtraNav: NavItem[] = [
+  { to: '/admin/students', label: '학생', icon: studentsIcon },
+  { to: '/admin/notify', label: '알림', icon: notifyIcon },
 ]
 
 export function Layout() {
   const { profile, logOut } = useAuth()
   const navigate = useNavigate()
-  const [open, setOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const isAdmin = profile?.role === 'admin'
 
   async function handleLogout() {
-    setOpen(false)
+    setMenuOpen(false)
     await logOut()
     navigate('/login')
   }
 
-  const navClass = ({ isActive }: { isActive: boolean }) =>
-    `relative px-3 py-2 rounded-lg text-sm font-medium transition ${
-      isActive
-        ? 'text-slate-900 bg-white shadow-sm'
-        : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-    }`
+  const allNav = isAdmin ? [...studentNav, ...adminExtraNav] : studentNav
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/70 backdrop-blur-md">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="h-16 flex items-center justify-between gap-4">
-            <Link
-              to="/"
-              className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-brand-600 to-brand-700 bg-clip-text text-transparent"
-            >
-              KJHEDU
-            </Link>
+    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
+      {/* 상단 미니멀 헤더 */}
+      <header className="sticky top-0 z-30 bg-white border-b border-slate-200">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
+          <Link
+            to="/"
+            className="text-[15px] font-semibold tracking-tight text-slate-900 flex items-center gap-1.5"
+          >
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-brand-500" />
+            KJHEDU
+          </Link>
 
-            <nav className="hidden md:flex items-center gap-1 bg-slate-100/60 rounded-xl p-1">
-              {navItems.map((i) => (
-                <NavLink key={i.to} to={i.to} end={i.end} className={navClass}>
-                  {i.label}
-                </NavLink>
-              ))}
-              {profile?.role === 'admin' && (
-                <>
-                  <NavLink to="/admin/students" className={navClass}>
-                    학생 관리
-                  </NavLink>
-                  <NavLink to="/admin/notify" className={navClass}>
-                    알림톡
-                  </NavLink>
-                </>
+          <div className="flex items-center gap-2">
+            <span className="hidden sm:inline text-xs text-slate-500">
+              {profile?.displayName}
+              {isAdmin && (
+                <span className="ml-1.5 inline-block rounded bg-brand-50 text-brand-700 px-1.5 py-0.5 text-[10px] font-medium align-middle">
+                  관리자
+                </span>
               )}
-            </nav>
-
-            <div className="hidden md:flex items-center gap-3">
-              <span className="text-sm text-slate-600">
-                {profile?.displayName}
-                {profile?.role === 'admin' && (
-                  <span className="ml-2 inline-block rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-medium text-brand-700 align-middle">
-                    관리자
-                  </span>
-                )}
-              </span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-label="메뉴"
+              className="h-8 w-8 inline-flex items-center justify-center rounded-md text-slate-600 hover:bg-slate-100"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                <circle cx="5" cy="12" r="1" />
+                <circle cx="12" cy="12" r="1" />
+                <circle cx="19" cy="12" r="1" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        {menuOpen && (
+          <div className="border-t border-slate-200 bg-white">
+            <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between text-sm">
+              <span className="text-slate-600">{profile?.displayName}</span>
               <button
                 onClick={handleLogout}
-                className="text-sm text-slate-500 hover:text-slate-900"
+                className="text-slate-600 hover:text-slate-900 underline-offset-2 hover:underline"
               >
                 로그아웃
               </button>
             </div>
-
-            <button
-              onClick={() => setOpen((v) => !v)}
-              aria-label="메뉴"
-              className="md:hidden flex h-10 w-10 items-center justify-center rounded-lg text-slate-700 hover:bg-slate-100"
-            >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                {open ? (
-                  <>
-                    <path d="M6 6 18 18" />
-                    <path d="M6 18 18 6" />
-                  </>
-                ) : (
-                  <>
-                    <path d="M4 7h16" />
-                    <path d="M4 12h16" />
-                    <path d="M4 17h16" />
-                  </>
-                )}
-              </svg>
-            </button>
           </div>
-
-          {open && (
-            <div className="md:hidden pb-4 space-y-1 border-t border-slate-200/60 pt-3">
-              {navItems.map((i) => (
-                <NavLink
-                  key={i.to}
-                  to={i.to}
-                  end={i.end}
-                  onClick={() => setOpen(false)}
-                  className={({ isActive }) =>
-                    `block px-3 py-2.5 rounded-lg text-sm font-medium ${
-                      isActive ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'
-                    }`
-                  }
-                >
-                  {i.label}
-                </NavLink>
-              ))}
-              {profile?.role === 'admin' && (
-                <>
-                  <NavLink
-                    to="/admin/students"
-                    onClick={() => setOpen(false)}
-                    className={({ isActive }) =>
-                      `block px-3 py-2.5 rounded-lg text-sm font-medium ${
-                        isActive ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'
-                      }`
-                    }
-                  >
-                    학생 관리
-                  </NavLink>
-                  <NavLink
-                    to="/admin/notify"
-                    onClick={() => setOpen(false)}
-                    className={({ isActive }) =>
-                      `block px-3 py-2.5 rounded-lg text-sm font-medium ${
-                        isActive ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'
-                      }`
-                    }
-                  >
-                    알림톡
-                  </NavLink>
-                </>
-              )}
-              <div className="mt-3 pt-3 border-t border-slate-200/60 flex items-center justify-between">
-                <span className="text-sm text-slate-600">
-                  {profile?.displayName}
-                  {profile?.role === 'admin' && (
-                    <span className="ml-2 inline-block rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-medium text-brand-700 align-middle">
-                      관리자
-                    </span>
-                  )}
-                </span>
-                <button
-                  onClick={handleLogout}
-                  className="text-sm text-slate-500 hover:text-slate-900"
-                >
-                  로그아웃
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+        )}
       </header>
 
+      {/* 본문 */}
       <main className="flex-1">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 sm:py-8 pb-24 md:pb-10">
           <Outlet />
         </div>
       </main>
+
+      {/* 데스크탑 사이드/상단 보조 네비 (모바일은 하단 탭바 사용) */}
+      <nav className="hidden md:block sticky bottom-0 border-t border-slate-200 bg-white/95 backdrop-blur">
+        <div className="max-w-5xl mx-auto px-6 h-12 flex items-center gap-1">
+          {allNav.map((i) => (
+            <NavLink
+              key={i.to}
+              to={i.to}
+              end={i.end}
+              className={({ isActive }) =>
+                `inline-flex items-center gap-1.5 px-3 h-9 rounded-md text-sm font-medium transition ${
+                  isActive
+                    ? 'bg-slate-100 text-slate-900'
+                    : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                }`
+              }
+            >
+              <span className="w-4 h-4 inline-flex">{i.icon}</span>
+              {i.label}
+            </NavLink>
+          ))}
+        </div>
+      </nav>
+
+      {/* 모바일 하단 탭바 */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur safe-bottom">
+        <div className="grid grid-cols-5 px-1">
+          {allNav.slice(0, 5).map((i) => (
+            <NavLink
+              key={i.to}
+              to={i.to}
+              end={i.end}
+              className={({ isActive }) =>
+                `flex flex-col items-center justify-center gap-0.5 py-2 text-[10.5px] font-medium transition ${
+                  isActive ? 'text-brand-700' : 'text-slate-500 active:bg-slate-100'
+                }`
+              }
+            >
+              <span className="w-5 h-5 inline-flex">{i.icon}</span>
+              {i.label}
+            </NavLink>
+          ))}
+        </div>
+      </nav>
     </div>
   )
 }
