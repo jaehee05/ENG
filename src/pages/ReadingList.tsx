@@ -149,6 +149,10 @@ export function ReadingList() {
   const [explText, setExplText] = useState('')
   const [explBusy, setExplBusy] = useState(false)
   const [explNote, setExplNote] = useState<string | null>(null)
+  const [explReport, setExplReport] = useState<{
+    filled: { reading: string; num: string }[]
+    missing: { reading: string; num: string }[]
+  } | null>(null)
   const explPdfRef = useRef<HTMLInputElement>(null)
 
   async function onExplPdfPick(e: React.ChangeEvent<HTMLInputElement>) {
@@ -198,6 +202,7 @@ export function ReadingList() {
       return
     }
     setExplBusy(true)
+    setExplReport(null)
     const total = group.items.length
     setExplNote(`AI가 지문 ${total}개에 해설 분배 중...`)
     try {
@@ -235,27 +240,40 @@ export function ReadingList() {
       }
       let touchedReadings = 0
       let touchedQuestions = 0
+      const filledList: { reading: string; num: string }[] = []
+      const missingList: { reading: string; num: string }[] = []
+      const inGroup = new Set(group.items.map((it) => it.reading.id))
       const nextItems: Reading[] = []
       for (const it of items) {
-        const u = updates.get(it.id)
-        if (!u) {
+        if (!inGroup.has(it.id)) {
           nextItems.push(it)
           continue
         }
+        const u = updates.get(it.id) ?? []
         const nextQs = it.questions.map((q, i) => {
           const hit = u.find((x) => x.localIndex === i)
-          if (!hit) return q
-          touchedQuestions++
-          return { ...q, explanation: hit.explanation }
+          const numLabel = q.number ? `${q.number}번` : `${i + 1}번`
+          if (hit) {
+            touchedQuestions++
+            filledList.push({ reading: it.title, num: numLabel })
+            return { ...q, explanation: hit.explanation }
+          }
+          missingList.push({ reading: it.title, num: numLabel })
+          return q
         })
-        await updateReadingQuestions(it.id, nextQs)
-        nextItems.push({ ...it, questions: nextQs })
-        touchedReadings++
+        if (u.length > 0) {
+          await updateReadingQuestions(it.id, nextQs)
+          nextItems.push({ ...it, questions: nextQs })
+          touchedReadings++
+        } else {
+          nextItems.push(it)
+        }
       }
       setItems(nextItems)
       setExplNote(
-        `완료: 지문 ${touchedReadings}개 · 문항 ${touchedQuestions}개에 해설 채움`,
+        `완료: 지문 ${touchedReadings}개 · 문항 ${touchedQuestions}개에 해설 채움 · 미채움 ${missingList.length}개`,
       )
+      setExplReport({ filled: filledList, missing: missingList })
     } catch (err) {
       setExplNote(err instanceof Error ? err.message : '해설 분배 실패')
     } finally {
@@ -419,6 +437,47 @@ export function ReadingList() {
             placeholder="해설 텍스트 (전체 문항). AI가 문항 번호로 매칭해 각 지문의 문항 explanation에 채웁니다."
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
+          {explReport &&
+            (explReport.filled.length > 0 ||
+              explReport.missing.length > 0) && (
+              <details className="rounded-md border border-slate-200 bg-slate-50">
+                <summary className="cursor-pointer text-xs font-medium text-slate-700 px-3 py-2 hover:bg-slate-100">
+                  결과 상세 — 채움 {explReport.filled.length} · 미채움 {explReport.missing.length}
+                </summary>
+                <div className="px-3 py-2 border-t border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {explReport.missing.length > 0 && (
+                    <div>
+                      <p className="text-[11px] font-semibold text-red-700 mb-1">
+                        미채움 ({explReport.missing.length})
+                      </p>
+                      <ul className="space-y-0.5 text-xs text-slate-700 max-h-48 overflow-y-auto">
+                        {explReport.missing.map((m, i) => (
+                          <li key={i}>
+                            <span className="text-slate-500">{m.reading}</span>{' '}
+                            · {m.num}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {explReport.filled.length > 0 && (
+                    <div>
+                      <p className="text-[11px] font-semibold text-brand-700 mb-1">
+                        채움 ({explReport.filled.length})
+                      </p>
+                      <ul className="space-y-0.5 text-xs text-slate-700 max-h-48 overflow-y-auto">
+                        {explReport.filled.map((m, i) => (
+                          <li key={i}>
+                            <span className="text-slate-500">{m.reading}</span>{' '}
+                            · {m.num}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </details>
+            )}
         </div>
       )}
 
