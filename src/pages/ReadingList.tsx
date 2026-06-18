@@ -8,7 +8,7 @@ import {
   listReadings,
   setReadingOrder,
 } from '../lib/firestore'
-import type { Reading } from '../lib/types'
+import { inferQuestionNumbers, type Reading } from '../lib/types'
 import { parseExplanations, translatePassage } from '../lib/api'
 import {
   updateReadingPassageKo,
@@ -217,7 +217,11 @@ export function ReadingList() {
         setExplNote(
           `분배 중... ${processed}/${total} (${it.reading.title})`,
         )
-        const qs = it.reading.questions.map((q, i) => ({
+        const numbered = inferQuestionNumbers(
+          it.reading.title,
+          it.reading.questions,
+        )
+        const qs = numbered.map((q, i) => ({
           index: i,
           number: q.number ?? 0,
           q: q.q,

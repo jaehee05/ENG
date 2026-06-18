@@ -310,9 +310,19 @@ export function ReadingEdit() {
     setExplanationsBusy(true)
     setExplanationsNote(null)
     try {
+      // title에서 시작 번호 추출해 number 비어있는 문항에 채움 (18번 / 41-42 / 43-45 등)
+      const titleM = /^(.+?)\s+(\d+)(?:-(\d+))?\s*(?:번|문제)?\s*$/.exec(
+        title.trim(),
+      )
+      const startNum = titleM ? Number.parseInt(titleM[2], 10) : NaN
       const refs = questions.map((q, i) => ({
         index: i,
-        number: q.number ?? 0,
+        number:
+          q.number && q.number > 0
+            ? q.number
+            : Number.isFinite(startNum)
+              ? startNum + i
+              : 0,
         q: q.q,
       }))
       const result = await parseExplanations({
