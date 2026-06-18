@@ -175,6 +175,7 @@ export function AdminStudentDetail() {
   }, [readings])
 
   const assignOptions = assignType === 'vocab' ? vocabSets : readings
+  const [customTitle, setCustomTitle] = useState('')
 
   async function handleAssign(e: React.FormEvent) {
     e.preventDefault()
@@ -183,6 +184,37 @@ export function AdminStudentDetail() {
     const dueDate = assignDue ? new Date(assignDue) : null
     if (dueDate && Number.isNaN(dueDate.getTime())) {
       setAssignError('마감일이 올바르지 않습니다.')
+      return
+    }
+
+    if (assignType === 'custom') {
+      const title = customTitle.trim()
+      if (!title) {
+        setAssignError('과제명을 입력하세요.')
+        return
+      }
+      setAssigning(true)
+      try {
+        await createAssignment({
+          studentUid: id,
+          studentName: account.displayName,
+          assignedBy: profile.id,
+          assignedByName: profile.displayName,
+          type: 'custom',
+          refId: '',
+          refTitle: title,
+          note: assignNote,
+          dueAt: dueDate,
+        })
+        setCustomTitle('')
+        setAssignDue('')
+        setAssignNote('')
+        await reloadAssignments()
+      } catch (err) {
+        setAssignError(err instanceof Error ? err.message : '과제 부여에 실패했습니다.')
+      } finally {
+        setAssigning(false)
+      }
       return
     }
 
@@ -398,18 +430,29 @@ export function AdminStudentDetail() {
               >
                 <option value="reading">지문 문제풀이</option>
                 <option value="vocab">단어 시험지</option>
+                <option value="custom">직접 입력 (외부 과제)</option>
               </select>
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">
-                {assignType === 'vocab'
-                  ? '단어 시험지'
-                  : bundleMode
-                    ? '시험명 묶음'
-                    : '지문'}{' '}
-                선택
+                {assignType === 'custom'
+                  ? '과제명'
+                  : assignType === 'vocab'
+                    ? '단어 시험지'
+                    : bundleMode
+                      ? '시험명 묶음'
+                      : '지문'}{' '}
+                {assignType === 'custom' ? '직접 입력' : '선택'}
               </label>
-              {assignType === 'reading' && bundleMode ? (
+              {assignType === 'custom' ? (
+                <input
+                  type="text"
+                  value={customTitle}
+                  onChange={(e) => setCustomTitle(e.target.value)}
+                  placeholder="예: 학원 종이 시험지 3회, 모의고사 오답노트 등"
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              ) : assignType === 'reading' && bundleMode ? (
                 <select
                   value={bundleCategory}
                   onChange={(e) => setBundleCategory(e.target.value)}
@@ -446,6 +489,12 @@ export function AdminStudentDetail() {
                   />
                   시험명 묶음(풀세트)으로 부여
                 </label>
+              )}
+              {assignType === 'custom' && (
+                <p className="text-[11px] text-slate-500 mt-1">
+                  학생이 직접 풀이 화면이 따로 없는 외부 과제. 완료 여부는
+                  관리자가 칩을 눌러 수동으로 표시합니다.
+                </p>
               )}
             </div>
             <div>
@@ -550,7 +599,11 @@ export function AdminStudentDetail() {
                         )
                       })()}
                       <span className="text-xs text-slate-500">
-                        {a.type === 'vocab' ? '단어 시험지' : '지문'}
+                        {a.type === 'vocab'
+                          ? '단어 시험지'
+                          : a.type === 'reading'
+                            ? '지문'
+                            : '외부 과제'}
                       </span>
                       <span className="text-sm font-semibold text-slate-900 truncate">
                         {a.refTitle}

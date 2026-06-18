@@ -283,7 +283,7 @@ export interface ReadingRef {
   title: string
 }
 
-export type AssignmentType = 'vocab' | 'reading'
+export type AssignmentType = 'vocab' | 'reading' | 'custom'
 
 export interface Assignment {
   id: string

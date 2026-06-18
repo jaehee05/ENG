@@ -87,8 +87,16 @@ const cards: Card[] = [
   },
 ]
 
-function assignmentPath(a: Assignment): string {
-  return a.type === 'vocab' ? `/vocab/${a.refId}` : `/reading/${a.refId}`
+function assignmentPath(a: Assignment): string | null {
+  if (a.type === 'vocab') return `/vocab/${a.refId}`
+  if (a.type === 'reading') return `/reading/${a.refId}`
+  return null
+}
+
+function assignmentLabel(a: Assignment): string {
+  if (a.type === 'vocab') return '단어 시험지'
+  if (a.type === 'reading') return '지문'
+  return '외부 과제'
 }
 
 function isOverdue(a: Assignment): boolean {
@@ -230,33 +238,47 @@ export function Dashboard() {
               if (item.kind === 'single') {
                 const a = item.a
                 const overdue = isOverdue(a)
+                const path = assignmentPath(a)
+                const body = (
+                  <>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="inline-block rounded bg-brand-50 text-brand-700 text-xs font-medium px-2 py-0.5">
+                          {assignmentLabel(a)}
+                        </span>
+                        <span className="text-sm font-semibold text-slate-900 truncate">
+                          {a.refTitle}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500 mt-1">
+                        {a.dueAt && (
+                          <span className={overdue ? 'text-red-600 font-medium' : ''}>
+                            마감: {formatDate(a.dueAt)}
+                            {overdue && ' (지남)'}
+                          </span>
+                        )}
+                        {a.note && <span className="text-slate-600">· {a.note}</span>}
+                      </div>
+                    </div>
+                    <span className="text-slate-300 text-xl shrink-0">
+                      {path ? '→' : ''}
+                    </span>
+                  </>
+                )
                 return (
                   <li key={a.id}>
-                    <Link
-                      to={assignmentPath(a)}
-                      className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50"
-                    >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="inline-block rounded bg-brand-50 text-brand-700 text-xs font-medium px-2 py-0.5">
-                            {a.type === 'vocab' ? '단어 시험지' : '지문'}
-                          </span>
-                          <span className="text-sm font-semibold text-slate-900 truncate">
-                            {a.refTitle}
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500 mt-1">
-                          {a.dueAt && (
-                            <span className={overdue ? 'text-red-600 font-medium' : ''}>
-                              마감: {formatDate(a.dueAt)}
-                              {overdue && ' (지남)'}
-                            </span>
-                          )}
-                          {a.note && <span className="text-slate-600">· {a.note}</span>}
-                        </div>
+                    {path ? (
+                      <Link
+                        to={path}
+                        className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50"
+                      >
+                        {body}
+                      </Link>
+                    ) : (
+                      <div className="flex items-center justify-between gap-3 px-4 py-3">
+                        {body}
                       </div>
-                      <span className="text-slate-300 text-xl shrink-0">→</span>
-                    </Link>
+                    )}
                   </li>
                 )
               }
@@ -315,7 +337,7 @@ export function Dashboard() {
                         return (
                           <li key={a.id}>
                             <Link
-                              to={assignmentPath(a)}
+                              to={assignmentPath(a) ?? '#'}
                               className="flex items-center justify-between gap-3 pl-10 pr-4 py-2.5 hover:bg-white"
                             >
                               <div className="min-w-0">
