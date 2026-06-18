@@ -10,7 +10,8 @@ const config: CapacitorConfig = {
   plugins: {
     CapacitorUpdater: {
       autoUpdate: true,
-      directUpdate: false,
+      // 새 번들 다운로드 즉시 적용 (다음 시작 기다리지 않음)
+      directUpdate: true,
     },
   },
 }
