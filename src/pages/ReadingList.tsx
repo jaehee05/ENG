@@ -211,7 +211,7 @@ export function ReadingList() {
     setExplBusy(true)
     setExplNote(`AI가 ${apiQuestions.length}개 문항에 해설 분배 중...`)
     try {
-      const CHUNK = 8
+      const CHUNK = 3
       const merged: { index: number; explanation: string }[] = []
       for (let i = 0; i < apiQuestions.length; i += CHUNK) {
         const chunk = apiQuestions.slice(i, i + CHUNK)
