@@ -72,6 +72,13 @@ const notifyIcon = (
   </svg>
 )
 
+const adminGearIcon = (
+  <svg {...iconProps}>
+    <circle cx="12" cy="12" r="3" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+  </svg>
+)
+
 const studentNav: NavItem[] = [
   { to: '/', label: '홈', end: true, icon: homeIcon },
   { to: '/assignments', label: '과제', icon: checkIcon },
@@ -80,11 +87,20 @@ const studentNav: NavItem[] = [
   { to: '/wordbook', label: '단어장', icon: wordbookIcon },
 ]
 
+const adminMobileNav: NavItem[] = [
+  { to: '/', label: '홈', end: true, icon: homeIcon },
+  { to: '/assignments', label: '과제', icon: checkIcon },
+  { to: '/reading', label: '지문', icon: readingIcon },
+  { to: '/vocab', label: '단어', icon: vocabIcon },
+  { to: '/admin', label: '관리', icon: adminGearIcon },
+]
+
 const studentExtraNav: NavItem[] = [
   { to: '/history', label: '기록', icon: historyIcon },
 ]
 
 const adminExtraNav: NavItem[] = [
+  { to: '/admin', label: '관리', icon: adminGearIcon },
   { to: '/admin/students', label: '학생', icon: studentsIcon },
   { to: '/admin/notify', label: '알림', icon: notifyIcon },
 ]
@@ -117,18 +133,18 @@ export function Layout() {
     navigate('/login')
   }
 
-  // 데스크탑 하단 가로 네비에는 모든 항목 다 표시
+  // 데스크탑/iPad landscape: 모든 항목 표시
   const desktopNav = isAdmin
     ? [...studentNav, ...studentExtraNav, ...adminExtraNav]
     : [...studentNav, ...studentExtraNav]
-  // 모바일 하단 탭바는 5개만
-  const mobileNav = studentNav
+  // 모바일 + iPad portrait 하단 탭바: 관리자는 단어장 자리에 "관리"
+  const mobileNav = isAdmin ? adminMobileNav : studentNav
 
   return (
     <div className="h-dvh flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* 상단 미니멀 헤더 */}
       <header className="bg-white border-b border-slate-200 safe-top safe-x">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
           <Link
             to="/"
             className="text-[15px] font-semibold tracking-tight text-slate-900 flex items-center gap-1.5"
@@ -177,7 +193,7 @@ export function Layout() {
         </div>
         {menuOpen && (
           <div className="border-t border-slate-200 bg-white">
-            <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3 text-sm flex-wrap">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3 text-sm flex-wrap">
               <span className="text-slate-600">{profile?.displayName}</span>
               <div className="flex items-center gap-3 flex-wrap">
                 <Link
@@ -217,14 +233,14 @@ export function Layout() {
 
       {/* 본문 */}
       <main className="flex-1 overflow-y-auto overscroll-contain safe-x">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 sm:py-8 pb-6">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7 pb-6">
           <Outlet />
         </div>
       </main>
 
-      {/* 데스크탑 사이드/상단 보조 네비 (모바일은 하단 탭바 사용) */}
-      <nav className="hidden md:block sticky bottom-0 border-t border-slate-200 bg-white/95 backdrop-blur">
-        <div className="max-w-5xl mx-auto px-6 h-12 flex items-center gap-1">
+      {/* 데스크탑 / iPad landscape: 하단 가로 네비. lg 이상에서만 (iPad portrait 768은 모바일 탭바) */}
+      <nav className="hidden lg:block sticky bottom-0 border-t border-slate-200 bg-white/95 backdrop-blur">
+        <div className="max-w-6xl mx-auto px-6 h-12 flex items-center gap-1">
           {desktopNav.map((i) => (
             <NavLink
               key={i.to}
@@ -245,8 +261,8 @@ export function Layout() {
         </div>
       </nav>
 
-      {/* 모바일 하단 탭바 */}
-      <nav className="md:hidden border-t border-slate-200 bg-white safe-bottom safe-x">
+      {/* 모바일 + iPad portrait 하단 탭바 */}
+      <nav className="lg:hidden border-t border-slate-200 bg-white safe-bottom safe-x">
         <div className="grid grid-cols-5 px-1">
           {mobileNav.map((i) => (
             <NavLink

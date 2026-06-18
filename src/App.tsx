@@ -28,6 +28,7 @@ import { AdminStudents } from './pages/AdminStudents'
 import { AdminStudentDetail } from './pages/AdminStudentDetail'
 import { AdminNotify } from './pages/AdminNotify'
 import { AdminAnnounce } from './pages/AdminAnnounce'
+import { AdminHub } from './pages/AdminHub'
 import { MyHistory } from './pages/MyHistory'
 import { Notifications } from './pages/Notifications'
 import { Notice } from './pages/Notice'
@@ -82,6 +83,7 @@ function App() {
               <Route path="/reading/new" element={<ReadingNew />} />
               <Route path="/reading/import" element={<ReadingImport />} />
               <Route path="/reading/:id/edit" element={<ReadingEdit />} />
+              <Route path="/admin" element={<AdminHub />} />
               <Route path="/admin/students" element={<AdminStudents />} />
               <Route path="/admin/students/:id" element={<AdminStudentDetail />} />
               <Route path="/admin/notify" element={<AdminNotify />} />
