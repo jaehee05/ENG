@@ -14,6 +14,7 @@ import {
   savePpurioSettings,
   saveScheduleSettings,
   sendBatchAlimtalk,
+  sendPushNotification,
   setAdminSecret,
   type AssignmentStatusSchedule,
   type PpurioSettingsView,
@@ -114,6 +115,52 @@ export function AdminNotify() {
   const [scheduleLoaded, setScheduleLoaded] = useState(false)
   const [scheduleSaving, setScheduleSaving] = useState(false)
   const [scheduleNotice, setScheduleNotice] = useState<string | null>(null)
+
+  const [pushTitle, setPushTitle] = useState('')
+  const [pushBody, setPushBody] = useState('')
+  const [pushSending, setPushSending] = useState(false)
+  const [pushNote, setPushNote] = useState<string | null>(null)
+  const [pushSelected, setPushSelected] = useState<Set<string>>(new Set())
+  const [pushAll, setPushAll] = useState(true)
+
+  async function handleSendPush() {
+    if (!adminSecret) {
+      setPushNote('관리자 비밀키를 먼저 입력하세요.')
+      return
+    }
+    if (!pushTitle.trim() && !pushBody.trim()) {
+      setPushNote('제목 또는 본문을 입력하세요.')
+      return
+    }
+    if (!pushAll && pushSelected.size === 0) {
+      setPushNote('대상 학생을 선택하세요.')
+      return
+    }
+    const targetCount = pushAll ? bundles.length : pushSelected.size
+    if (
+      !window.confirm(
+        `${pushAll ? '전체 활성 학생' : `${targetCount}명`}에게 푸시 알림을 발송합니다. 계속할까요?`,
+      )
+    )
+      return
+    setPushSending(true)
+    setPushNote(null)
+    try {
+      const result = await sendPushNotification({
+        all: pushAll,
+        uids: pushAll ? undefined : Array.from(pushSelected),
+        title: pushTitle.trim(),
+        body: pushBody.trim(),
+      })
+      setPushNote(
+        `발송 완료: 성공 ${result.sent} · 실패 ${result.failed} · 만료 토큰 정리 ${result.invalid}`,
+      )
+    } catch (e) {
+      setPushNote(e instanceof Error ? e.message : '푸시 발송 실패')
+    } finally {
+      setPushSending(false)
+    }
+  }
 
   const [weekly, setWeekly] = useState<WeeklyReportSchedule>(
     DEFAULT_WEEKLY_REPORT_SCHEDULE,
@@ -559,6 +606,85 @@ export function AdminNotify() {
         <p className="text-sm text-slate-500 mt-1">
           학생별 과제 현황을 자동으로 채워 뿌리오 알림톡 변수 CSV를 만듭니다. 다운로드 받아
           뿌리오 대량발송에 그대로 업로드하세요.
+        </p>
+      </div>
+
+      <div className="rounded-lg border border-slate-300 bg-white p-4 space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <p className="text-sm font-semibold text-slate-900">
+            📲 푸시 알림 (KJHEDU 앱 설치 학생)
+          </p>
+          {pushNote && (
+            <span className="text-xs text-brand-700">{pushNote}</span>
+          )}
+        </div>
+        <input
+          type="text"
+          value={pushTitle}
+          onChange={(e) => setPushTitle(e.target.value)}
+          placeholder="제목 (예: 새 과제가 부여되었습니다)"
+          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+        />
+        <textarea
+          value={pushBody}
+          onChange={(e) => setPushBody(e.target.value)}
+          rows={2}
+          placeholder="본문 (예: DAY 1 단어시험을 풀어주세요)"
+          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+        />
+        <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={pushAll}
+            onChange={(e) => setPushAll(e.target.checked)}
+            className="accent-brand-600"
+          />
+          전체 활성 학생에게 발송
+        </label>
+        {!pushAll && (
+          <div className="rounded-md border border-slate-200 bg-slate-50 p-2 max-h-48 overflow-y-auto">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 text-sm">
+              {bundles.map((b) => {
+                const checked = pushSelected.has(b.account.id)
+                return (
+                  <label
+                    key={b.account.id}
+                    className="flex items-center gap-2 cursor-pointer px-2 py-1 rounded hover:bg-white"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) =>
+                        setPushSelected((prev) => {
+                          const next = new Set(prev)
+                          if (e.target.checked) next.add(b.account.id)
+                          else next.delete(b.account.id)
+                          return next
+                        })
+                      }
+                      className="accent-brand-600"
+                    />
+                    <span className="truncate">{b.account.displayName}</span>
+                  </label>
+                )
+              })}
+            </div>
+          </div>
+        )}
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={handleSendPush}
+            disabled={pushSending}
+            className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700 disabled:opacity-50"
+          >
+            {pushSending
+              ? '발송 중...'
+              : `푸시 발송 ${pushAll ? `(전체 ${bundles.length}명)` : `(${pushSelected.size}명)`}`}
+          </button>
+        </div>
+        <p className="text-[11px] text-slate-500">
+          학생이 iOS 앱에서 로그인 + 푸시 권한 허용한 경우만 발송됩니다 (firestore의 fcmTokens가 있는 학생). 알림톡과 별도.
         </p>
       </div>
 
