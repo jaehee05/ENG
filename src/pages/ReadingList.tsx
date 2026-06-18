@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import {
@@ -9,8 +9,11 @@ import {
   setReadingOrder,
 } from '../lib/firestore'
 import type { Reading } from '../lib/types'
-import { translatePassage } from '../lib/api'
-import { updateReadingPassageKo } from '../lib/firestore'
+import { parseExplanations, translatePassage } from '../lib/api'
+import {
+  updateReadingPassageKo,
+  updateReadingQuestions,
+} from '../lib/firestore'
 import { extractTextFromHtml } from '../lib/htmlText'
 
 const TITLE_RE = /^(.+?)\s+(\d+)(?:-(\d+))?\s*(?:번|문제)?\s*$/
@@ -141,6 +144,120 @@ export function ReadingList() {
     return parts.join('\n\n')
   }
 
+  // ───── 카테고리 해설 일괄 입력 ─────
+  const [explCategory, setExplCategory] = useState('')
+  const [explText, setExplText] = useState('')
+  const [explBusy, setExplBusy] = useState(false)
+  const [explNote, setExplNote] = useState<string | null>(null)
+  const explPdfRef = useRef<HTMLInputElement>(null)
+
+  async function onExplPdfPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? [])
+    e.target.value = ''
+    if (files.length === 0) return
+    setExplBusy(true)
+    setExplNote(null)
+    try {
+      const { extractTextFromPdfFile } = await import('../lib/pdfText')
+      const parts: string[] = []
+      for (const f of files) {
+        if (f.size > 30 * 1024 * 1024) {
+          setExplNote(`${f.name}: 30MB 초과 — 건너뜀`)
+          continue
+        }
+        const text = await extractTextFromPdfFile(f)
+        if (text.trim()) parts.push(`[${f.name}]\n${text.trim()}`)
+      }
+      if (parts.length === 0) {
+        setExplNote('추출된 텍스트가 없습니다 (스캔 PDF는 미지원).')
+        return
+      }
+      setExplText((prev) =>
+        prev.trim() ? prev + '\n\n' + parts.join('\n\n') : parts.join('\n\n'),
+      )
+      setExplNote(`PDF ${parts.length}개 텍스트 추출 완료`)
+    } catch (err) {
+      setExplNote(err instanceof Error ? err.message : 'PDF 추출 실패')
+    } finally {
+      setExplBusy(false)
+    }
+  }
+
+  async function handleCategoryExplanations() {
+    if (!explCategory) {
+      setExplNote('카테고리를 선택하세요.')
+      return
+    }
+    if (!explText.trim()) {
+      setExplNote('해설 텍스트를 입력하거나 PDF를 첨부하세요.')
+      return
+    }
+    const group = groups.find((g) => g.category === explCategory)
+    if (!group || group.items.length === 0) {
+      setExplNote('해당 카테고리에 등록된 지문이 없습니다.')
+      return
+    }
+    const flatRefs: { readingId: string; localIndex: number; index: number }[] =
+      []
+    const apiQuestions: { index: number; number: number; q: string }[] = []
+    let global = 0
+    for (const it of group.items) {
+      it.reading.questions.forEach((q, i) => {
+        flatRefs.push({ readingId: it.reading.id, localIndex: i, index: global })
+        apiQuestions.push({ index: global, number: q.number ?? 0, q: q.q })
+        global++
+      })
+    }
+    setExplBusy(true)
+    setExplNote(`AI가 ${apiQuestions.length}개 문항에 해설 분배 중...`)
+    try {
+      const result = await parseExplanations({
+        questions: apiQuestions,
+        text: explText,
+      })
+      const expByGlobal = new Map(
+        result.map((r) => [r.index, r.explanation.trim()] as const),
+      )
+      const updates = new Map<
+        string,
+        { localIndex: number; explanation: string }[]
+      >()
+      for (const f of flatRefs) {
+        const exp = expByGlobal.get(f.index)
+        if (!exp) continue
+        if (!updates.has(f.readingId)) updates.set(f.readingId, [])
+        updates.get(f.readingId)!.push({ localIndex: f.localIndex, explanation: exp })
+      }
+      let touchedReadings = 0
+      let touchedQuestions = 0
+      const nextItems: Reading[] = []
+      for (const it of items) {
+        const u = updates.get(it.id)
+        if (!u) {
+          nextItems.push(it)
+          continue
+        }
+        const nextQs = it.questions.map((q, i) => {
+          const hit = u.find((x) => x.localIndex === i)
+          if (!hit) return q
+          touchedQuestions++
+          return { ...q, explanation: hit.explanation }
+        })
+        await updateReadingQuestions(it.id, nextQs)
+        nextItems.push({ ...it, questions: nextQs })
+        touchedReadings++
+      }
+      setItems(nextItems)
+      setExplNote(
+        `완료: 지문 ${touchedReadings}개 · 문항 ${touchedQuestions}개에 해설 채움`,
+      )
+    } catch (err) {
+      setExplNote(err instanceof Error ? err.message : '해설 분배 실패')
+    } finally {
+      setExplBusy(false)
+    }
+  }
+
   async function handleBulkTranslate() {
     const pending = items.filter((r) => {
       if ((r.passageKo ?? '').trim()) return false
@@ -234,6 +351,70 @@ export function ReadingList() {
           위/아래 버튼으로 순서를 바꾸면 자동 저장됩니다.
           {savingOrder && <span className="ml-2 text-brand-700">저장 중...</span>}
         </p>
+      )}
+
+      {isAdmin && items.length > 0 && !reorderMode && (
+        <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">
+                카테고리 해설 일괄 입력
+              </p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                한 시험명에 속한 모든 지문(18~45번 등)의 해설을 통째로
+                붙여넣으면 AI가 각 문항에 자동 분배.
+              </p>
+              {explNote && (
+                <p className="text-xs text-brand-700 mt-1">{explNote}</p>
+              )}
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2 items-end">
+            <select
+              value={explCategory}
+              onChange={(e) => setExplCategory(e.target.value)}
+              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              <option value="">— 카테고리 선택 —</option>
+              {groups.map((g) => (
+                <option key={g.category} value={g.category}>
+                  {g.category} ({g.items.length}개 지문)
+                </option>
+              ))}
+            </select>
+            <input
+              ref={explPdfRef}
+              type="file"
+              accept="application/pdf"
+              multiple
+              onChange={onExplPdfPick}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => explPdfRef.current?.click()}
+              disabled={explBusy}
+              className="rounded-md border border-slate-300 text-slate-700 text-sm font-medium px-3 py-2 hover:bg-slate-100 disabled:opacity-50"
+            >
+              + 해설 PDF
+            </button>
+            <button
+              type="button"
+              onClick={handleCategoryExplanations}
+              disabled={explBusy}
+              className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700 disabled:opacity-50"
+            >
+              {explBusy ? '분배 중...' : 'AI로 분배'}
+            </button>
+          </div>
+          <textarea
+            value={explText}
+            onChange={(e) => setExplText(e.target.value)}
+            rows={6}
+            placeholder="해설 텍스트 (전체 문항). AI가 문항 번호로 매칭해 각 지문의 문항 explanation에 채웁니다."
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          />
+        </div>
       )}
 
       {isAdmin && items.length > 0 && !reorderMode && (
