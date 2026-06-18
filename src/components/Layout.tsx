@@ -240,7 +240,7 @@ export function Layout() {
 
       {/* 데스크탑 / iPad landscape: 하단 가로 네비. lg 이상에서만 (iPad portrait 768은 모바일 탭바) */}
       <nav className="hidden lg:block sticky bottom-0 border-t border-slate-200 bg-white/95 backdrop-blur">
-        <div className="max-w-6xl mx-auto px-6 h-12 flex items-center gap-1">
+        <div className="max-w-6xl mx-auto px-6 h-12 flex items-center justify-center gap-1">
           {desktopNav.map((i) => (
             <NavLink
               key={i.to}
