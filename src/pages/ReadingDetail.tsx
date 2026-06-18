@@ -13,6 +13,7 @@ import { MyAttemptsBox } from '../components/MyAttemptsBox'
 import { QuestionView } from '../components/QuestionView'
 import { useGlossQueue, type GlossEntry } from '../components/useGlossQueue'
 import { SharedPassageBlock } from '../components/SharedPassageBlock'
+import { renderUnderlines } from '../lib/renderUnderlines'
 import {
   getSharedPassageBlock,
   inferQuestionNumbers,
@@ -197,22 +198,33 @@ export function ReadingDetail() {
                 />
               )}
               {questions.map((q, qi) => (
-                <QuestionView
-                  key={qi}
-                  index={qi}
-                  question={q}
-                  fallbackPassage={fbList[qi]}
-                  passageGlossary={r.glossary}
-                  choicesGlossary={choicesGlossary}
-                  selected={isAdmin ? q.answer : -1}
-                  onSelect={isAdmin ? (ci) => handleSetAnswer(qi, ci) : () => {}}
-                  onSelectPassageWord={
-                    isAdmin ? (w) => addWord(w, 'glossary') : undefined
-                  }
-                  onSelectChoiceWord={
-                    isAdmin ? (w) => addWord(w, 'choices') : undefined
-                  }
-                />
+                <div key={qi} className="space-y-2">
+                  <QuestionView
+                    index={qi}
+                    question={q}
+                    fallbackPassage={fbList[qi]}
+                    passageGlossary={r.glossary}
+                    choicesGlossary={choicesGlossary}
+                    selected={isAdmin ? q.answer : -1}
+                    onSelect={isAdmin ? (ci) => handleSetAnswer(qi, ci) : () => {}}
+                    onSelectPassageWord={
+                      isAdmin ? (w) => addWord(w, 'glossary') : undefined
+                    }
+                    onSelectChoiceWord={
+                      isAdmin ? (w) => addWord(w, 'choices') : undefined
+                    }
+                  />
+                  {isAdmin && q.explanation && q.explanation.trim() && (
+                    <div className="rounded-md border border-amber-200 bg-amber-50/40 px-4 py-3">
+                      <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                        📖 문제 해설 (관리자 전용)
+                      </p>
+                      <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed font-myeongjo">
+                        {renderUnderlines(q.explanation)}
+                      </div>
+                    </div>
+                  )}
+                </div>
               ))}
             </>
           )
