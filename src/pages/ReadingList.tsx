@@ -197,55 +197,41 @@ export function ReadingList() {
       setExplNote('해당 카테고리에 등록된 지문이 없습니다.')
       return
     }
-    const flatRefs: { readingId: string; localIndex: number; index: number }[] =
-      []
-    const apiQuestions: { index: number; number: number; q: string }[] = []
-    let global = 0
-    for (const it of group.items) {
-      it.reading.questions.forEach((q, i) => {
-        flatRefs.push({ readingId: it.reading.id, localIndex: i, index: global })
-        apiQuestions.push({ index: global, number: q.number ?? 0, q: q.q })
-        global++
-      })
-    }
     setExplBusy(true)
-    setExplNote(`AI가 ${apiQuestions.length}개 문항에 해설 분배 중...`)
+    const total = group.items.length
+    setExplNote(`AI가 지문 ${total}개에 해설 분배 중...`)
     try {
-      const CHUNK = 3
-      const merged: { index: number; explanation: string }[] = []
-      for (let i = 0; i < apiQuestions.length; i += CHUNK) {
-        const chunk = apiQuestions.slice(i, i + CHUNK)
-        // 청크 안에서 index를 0부터 다시 부여해 AI에 보냄
-        const localChunk = chunk.map((c, k) => ({ ...c, index: k }))
-        setExplNote(
-          `AI가 분배 중... ${Math.min(i + chunk.length, apiQuestions.length)}/${apiQuestions.length}`,
-        )
-        const partial = await parseExplanations({
-          questions: localChunk,
-          text: explText,
-        })
-        // 응답의 local index → 원래 global index로 환원
-        for (const r of partial) {
-          if (r.index >= 0 && r.index < chunk.length) {
-            merged.push({
-              index: chunk[r.index].index,
-              explanation: r.explanation,
-            })
-          }
-        }
-      }
-      const expByGlobal = new Map(
-        merged.map((r) => [r.index, r.explanation.trim()] as const),
-      )
+      // reading 단위로 호출 — 한 reading 안 문항(2~3개)이라 빠르고 정확
       const updates = new Map<
         string,
         { localIndex: number; explanation: string }[]
       >()
-      for (const f of flatRefs) {
-        const exp = expByGlobal.get(f.index)
-        if (!exp) continue
-        if (!updates.has(f.readingId)) updates.set(f.readingId, [])
-        updates.get(f.readingId)!.push({ localIndex: f.localIndex, explanation: exp })
+      let processed = 0
+      for (const it of group.items) {
+        processed++
+        setExplNote(
+          `분배 중... ${processed}/${total} (${it.reading.title})`,
+        )
+        const qs = it.reading.questions.map((q, i) => ({
+          index: i,
+          number: q.number ?? 0,
+          q: q.q,
+        }))
+        try {
+          const partial = await parseExplanations({
+            questions: qs,
+            text: explText,
+          })
+          const arr: { localIndex: number; explanation: string }[] = []
+          for (const r of partial) {
+            if (r.index >= 0 && r.index < qs.length && r.explanation.trim()) {
+              arr.push({ localIndex: r.index, explanation: r.explanation.trim() })
+            }
+          }
+          if (arr.length > 0) updates.set(it.reading.id, arr)
+        } catch (e) {
+          console.error(`[explanations] ${it.reading.title} 실패`, e)
+        }
       }
       let touchedReadings = 0
       let touchedQuestions = 0
