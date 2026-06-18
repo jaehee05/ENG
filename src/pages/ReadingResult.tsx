@@ -301,7 +301,7 @@ export function ReadingResult() {
                       📖 문제 해설 보기
                     </summary>
                     <div className="px-3 py-2 text-sm text-slate-800 whitespace-pre-wrap leading-relaxed border-t border-amber-100 font-myeongjo">
-                      {exp}
+                      {renderUnderlines(exp)}
                     </div>
                   </details>
                 )
