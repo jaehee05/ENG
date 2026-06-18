@@ -814,7 +814,7 @@ export function AdminNotify() {
             className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
         </div>
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <select
             value={schedCadence}
             onChange={(e) =>
@@ -1444,7 +1444,7 @@ export function AdminNotify() {
             />
             자동 발송 사용
           </label>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">
                 요일

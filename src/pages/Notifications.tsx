@@ -67,7 +67,7 @@ export function Notifications() {
   const unread = items.filter((n) => !n.readAt).length
 
   return (
-    <div className="space-y-5 max-w-2xl">
+    <div className="space-y-5 max-w-3xl">
       <header className="flex items-end justify-between gap-2 flex-wrap">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">

@@ -410,7 +410,7 @@ export function Dashboard() {
         <h2 className="text-[13px] font-semibold text-slate-900 uppercase tracking-wider">
           학습
         </h2>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
           {shortcuts.map((c) => (
             <Link
               key={c.to}

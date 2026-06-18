@@ -390,7 +390,7 @@ export function AdminStudentDetail() {
         </div>
       </header>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
         <StatCard label="총 시험" value={`${stats.totalAttempts}`} />
         <StatCard
           label="평균"
