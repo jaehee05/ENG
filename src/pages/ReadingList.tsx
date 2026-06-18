@@ -211,12 +211,21 @@ export function ReadingList() {
     setExplBusy(true)
     setExplNote(`AI가 ${apiQuestions.length}개 문항에 해설 분배 중...`)
     try {
-      const result = await parseExplanations({
-        questions: apiQuestions,
-        text: explText,
-      })
+      const CHUNK = 8
+      const merged: { index: number; explanation: string }[] = []
+      for (let i = 0; i < apiQuestions.length; i += CHUNK) {
+        const chunk = apiQuestions.slice(i, i + CHUNK)
+        setExplNote(
+          `AI가 분배 중... ${Math.min(i + chunk.length, apiQuestions.length)}/${apiQuestions.length}`,
+        )
+        const partial = await parseExplanations({
+          questions: chunk,
+          text: explText,
+        })
+        merged.push(...partial)
+      }
       const expByGlobal = new Map(
-        result.map((r) => [r.index, r.explanation.trim()] as const),
+        merged.map((r) => [r.index, r.explanation.trim()] as const),
       )
       const updates = new Map<
         string,
