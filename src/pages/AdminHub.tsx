@@ -50,8 +50,8 @@ const tools: AdminTool[] = [
     desc: '공지 작성 / 학생 알림함 발송',
     icon: (
       <svg {...iconProps}>
-        <path d="M3 11h2l4-6v18l-4-6H3z" />
-        <path d="M16 8a4 4 0 0 1 0 8" />
+        <path d="m3 11 18-5v12L3 14v-3z" />
+        <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
       </svg>
     ),
   },
