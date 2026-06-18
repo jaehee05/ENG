@@ -370,6 +370,8 @@ export interface UserNotification {
   kind?: NotificationKind
   /** 클릭 시 이동할 internal 경로 (예: '/reading/abc'). */
   link?: string
+  /** 공지로부터 생성된 알림이면 그 공지의 ID — 공지 삭제 시 같이 삭제. */
+  announcementId?: string
   readAt: Timestamp | null
   createdAt: Timestamp | null
 }

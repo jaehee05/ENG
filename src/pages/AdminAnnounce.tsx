@@ -65,7 +65,7 @@ export function AdminAnnounce() {
         })
         setNotice('공지를 수정했어요.')
       } else {
-        await createAnnouncement({
+        const annId = await createAnnouncement({
           title,
           body,
           pinned,
@@ -85,6 +85,7 @@ export function AdminAnnounce() {
               body: body.trim(),
               kind: 'announcement',
               link: '/notice',
+              announcementId: annId,
             })
           }
           setNotice(`공지 등록 + 학생 ${targets.length}명 알림함에 전송.`)

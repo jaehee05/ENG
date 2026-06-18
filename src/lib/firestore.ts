@@ -560,6 +560,20 @@ export async function updateAnnouncement(
 }
 
 export async function deleteAnnouncement(id: string): Promise<void> {
+  // 이 공지로부터 생성된 학생 알림함 항목들도 함께 정리
+  try {
+    const snap = await getDocs(
+      query(
+        collection(db, 'notifications'),
+        where('announcementId', '==', id),
+      ),
+    )
+    for (const d of snap.docs) {
+      await deleteDoc(d.ref)
+    }
+  } catch (e) {
+    console.warn('[deleteAnnouncement] 연결된 알림 정리 실패:', e)
+  }
   await deleteDoc(doc(db, 'announcements', id))
 }
 
@@ -598,6 +612,7 @@ export async function createUserNotification(input: {
   body: string
   kind?: NotificationKind
   link?: string
+  announcementId?: string
 }): Promise<string> {
   const payload: Record<string, unknown> = {
     recipientUid: input.recipientUid,
@@ -608,6 +623,7 @@ export async function createUserNotification(input: {
     createdAt: serverTimestamp(),
   }
   if (input.link) payload.link = input.link
+  if (input.announcementId) payload.announcementId = input.announcementId
   const ref = await addDoc(collection(db, 'notifications'), payload)
   return ref.id
 }
