@@ -97,8 +97,13 @@ export function CorpusNew() {
   }
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <h1 className="text-2xl font-semibold text-slate-900">새 교재</h1>
+    <div className="space-y-5 max-w-3xl">
+      <header>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+          관리자 · 단어 교재
+        </p>
+        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">새 교재</h1>
+      </header>
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>

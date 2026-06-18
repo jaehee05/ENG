@@ -249,8 +249,13 @@ export function VocabNew() {
     'w-full rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500'
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <h1 className="text-2xl font-semibold text-slate-900">새 단어 시험지</h1>
+    <div className="space-y-5 max-w-3xl">
+      <header>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+          관리자
+        </p>
+        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">새 단어 시험지</h1>
+      </header>
 
       <form onSubmit={handleSubmit} className="space-y-5">
         {seriesList.length > 0 && (

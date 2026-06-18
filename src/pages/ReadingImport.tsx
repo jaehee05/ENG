@@ -190,7 +190,10 @@ export function ReadingImport() {
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">PDF에서 지문 가져오기</h1>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+          관리자
+        </p>
+        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">PDF에서 지문 가져오기</h1>
         <p className="text-sm text-slate-500 mt-1">
           PDF와 문항 번호 범위를 입력하면 AI가 자동으로 문제 본문·선지·유형을 추출합니다. 추출된 문항 하나당
           새 지문이 생성됩니다.

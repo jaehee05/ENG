@@ -22,11 +22,14 @@ export function CorporaList() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
+      <div className="flex items-end justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">교재 관리</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            교재에 단어를 모아두고, 거기서 DAY 시험지를 자동 생성합니다.
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+            관리자
+          </p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">교재 관리</h1>
+          <p className="text-xs text-slate-500 mt-1">
+            교재에 단어를 모아두고 DAY 시험지를 자동 생성합니다.
           </p>
         </div>
         <div className="flex gap-2">

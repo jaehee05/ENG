@@ -61,18 +61,26 @@ export function WordbookTake() {
   if (words.length === 0) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-semibold text-slate-900">내 단어장 시험</h1>
+        <header>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+            단어 시험
+          </p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">내 단어장 시험</h1>
+        </header>
         <p className="text-slate-500 text-sm">시험 볼 단어가 없습니다.</p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">내 단어장 시험</h1>
-        <p className="text-sm text-slate-500 mt-1">총 {words.length}문항</p>
-      </div>
+    <div className="space-y-5 max-w-3xl">
+      <header>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+          단어 시험
+        </p>
+        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">내 단어장 시험</h1>
+        <p className="text-xs text-slate-500 mt-1">{words.length}문항</p>
+      </header>
 
       <form onSubmit={handleSubmit} className="space-y-2">
         <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">

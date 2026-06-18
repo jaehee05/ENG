@@ -57,11 +57,14 @@ export function WordbookResult() {
   if (!attempt) return null
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">내 단어장 시험 결과</h1>
-        <p className="text-sm text-slate-500 mt-1">{attempt.studentName}</p>
-      </div>
+    <div className="space-y-5 max-w-3xl">
+      <header>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+          결과
+        </p>
+        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">내 단어장 시험</h1>
+        <p className="text-xs text-slate-500 mt-1">{attempt.studentName}</p>
+      </header>
 
       <div className="rounded-lg border border-slate-200 bg-white p-5 flex items-baseline gap-3">
         <span className="text-4xl font-bold text-slate-900">

@@ -386,7 +386,12 @@ export function ReadingNew() {
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <h1 className="text-2xl font-semibold text-slate-900">새 지문</h1>
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+          관리자
+        </p>
+        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">새 지문</h1>
+      </div>
 
       <div className="rounded-md border border-brand-200 bg-brand-50/40 p-4 space-y-3">
         <div className="flex items-start justify-between gap-3">

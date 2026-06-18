@@ -411,7 +411,10 @@ export function ReadingEdit() {
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">지문 수정</h1>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+          관리자
+        </p>
+        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">지문 수정</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">

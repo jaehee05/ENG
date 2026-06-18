@@ -319,7 +319,10 @@ export function CorpusDetail() {
           >
             ← 교재 관리
           </Link>
-          <h1 className="text-2xl font-semibold text-slate-900 mt-1">{series.title}</h1>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mt-1 mb-1">
+            교재
+          </p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">{series.title}</h1>
           <p className="text-sm text-slate-500 mt-1">
             전체 {total}단어 · 사용 {used} · 남은 {remaining} · 현재 DAY{' '}
             {series.lastDayNumber}까지 생성

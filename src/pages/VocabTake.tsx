@@ -141,7 +141,10 @@ export function VocabTake() {
   if (blocked) {
     return (
       <div className="space-y-4 max-w-2xl">
-        <h1 className="text-2xl font-semibold text-slate-900">{set.title}</h1>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+          단어 시험
+        </p>
+        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">{set.title}</h1>
         <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           이 시험지의 응시 횟수 제한({set.maxAttempts}회)을 모두 사용했습니다.
           현재 응시: {usedAttempts}회.
