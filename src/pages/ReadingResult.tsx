@@ -14,8 +14,13 @@ interface Section {
   content: string
 }
 
+/** 기존 번역에 섞여 있을 수 있는 --- 구분선을 제거. */
+function stripSeparators(text: string): string {
+  return text.replace(/^\s*-{3,}\s*$/gm, '').replace(/\n{3,}/g, '\n\n')
+}
+
 function splitSections(text: string): Section[] {
-  const lines = text.split(/\n/)
+  const lines = stripSeparators(text).split(/\n/)
   const sections: Section[] = []
   let current: Section = { header: null, content: '' }
   for (const line of lines) {

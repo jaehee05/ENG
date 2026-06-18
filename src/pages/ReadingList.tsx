@@ -138,7 +138,7 @@ export function ReadingList() {
     const parts: string[] = []
     if ((r.passage ?? '').trim()) parts.push(r.passage.trim())
     for (const t of htmlTexts) parts.push(t)
-    return parts.join('\n\n---\n\n')
+    return parts.join('\n\n')
   }
 
   async function handleBulkTranslate() {

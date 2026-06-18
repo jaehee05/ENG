@@ -275,7 +275,7 @@ export function ReadingEdit() {
       // 2) 통합 passageKo (passage + imageHtml 텍스트). order 세트라도
       //    passage나 imageHtml에 다른 본문이 있으면 같이 번역.
       if (parts.length > 0) {
-        const combined = parts.join('\n\n---\n\n')
+        const combined = parts.join('\n\n')
         const ko = await translatePassage(combined)
         setPassageKo(ko)
       }
