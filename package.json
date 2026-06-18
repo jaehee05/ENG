@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "capgo:push": "npm version patch --no-git-tag-version && npm run build && npx @capgo/cli bundle upload --apikey $CAPGO_API_KEY --channel production"
+    "capgo:push": "npm version patch --no-git-tag-version && npm run build && npx @capgo/cli bundle upload --apikey $CAPGO_API_KEY --channel production && npx @capgo/cli channel set production --bundle $(node -p \"require('./package.json').version\") --apikey $CAPGO_API_KEY"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
