@@ -214,9 +214,11 @@ export type SharedPassageBlock =
 
 /**
  * 다중 문항 reading에서 공유 지문을 결정.
- * - 첫 문항이 order이고 partA/B/C/D 중 하나라도 채워져 있으면 그 단락 블록을 공유 지문으로 (43~45 형식)
- * - 그 외 reading.passage가 있으면 그것을 공유 지문으로 (41~42 형식)
- * - 단일 문항이면 분리 안 함 (null) — 기존 카드 안에 본문 표시 그대로
+ * - 첫 문항이 order이고 partA/B/C/D 중 하나라도 채워져 있으면 그 단락 블록 (43~45 형식)
+ * - reading.passage가 있으면 그것을 공유 지문으로 (41~42 형식)
+ * - 그 외 passage 비고 첫 문항 body에만 본문이 있고 나머지 문항 body가 비면
+ *   첫 문항 body를 공유 지문으로 끌어올림 (자동 분류 오인 보정)
+ * - 단일 문항이면 분리 안 함 (null)
  */
 export function getSharedPassageBlock(reading: {
   passage: string
@@ -243,12 +245,21 @@ export function getSharedPassageBlock(reading: {
   if (reading.passage && reading.passage.trim()) {
     return { kind: 'passage', text: reading.passage }
   }
+  if (
+    first &&
+    first.body &&
+    first.body.trim() &&
+    reading.questions.slice(1).every((q) => !q.body || !q.body.trim())
+  ) {
+    return { kind: 'passage', text: first.body }
+  }
   return null
 }
 
-/** SharedPassageBlock을 분리해 표시할 때, 각 문항에서 그 본문은 비워야 한다.
+/** SharedPassageBlock을 분리해 표시할 때, 각 문항에서 그 본문을 비워야 한다.
  *  - kind=order: 첫 문항의 partA/B/C/D 제거
- *  - kind=passage: 변경 없음 (각 문항 fallbackPassage를 undefined로 따로 처리하면 됨)
+ *  - kind=passage: 첫 문항 body가 공유 지문 텍스트와 같으면 그 body도 제거
+ *    (reading.passage 케이스는 이미 body를 안 쓰므로 영향 없음)
  */
 export function questionsWithoutShared(
   questions: ReadingQuestion[],
@@ -261,6 +272,15 @@ export function questionsWithoutShared(
         ? { ...q, partA: '', partB: '', partC: '', partD: '' }
         : q,
     )
+  }
+  if (block.kind === 'passage') {
+    return questions.map((q, i) => {
+      if (i !== 0) return q
+      if (q.body && q.body.trim() === block.text.trim()) {
+        return { ...q, body: '' }
+      }
+      return q
+    })
   }
   return questions
 }
