@@ -31,6 +31,7 @@ import { AdminAnnounce } from './pages/AdminAnnounce'
 import { MyHistory } from './pages/MyHistory'
 import { Notifications } from './pages/Notifications'
 import { Notice } from './pages/Notice'
+import { Assignments } from './pages/Assignments'
 import { CorporaList } from './pages/CorporaList'
 import { CorpusNew } from './pages/CorpusNew'
 import { CorpusDetail } from './pages/CorpusDetail'
@@ -66,6 +67,7 @@ function App() {
               <Route path="/wordbook/result/:attemptId" element={<WordbookResult />} />
 
               <Route path="/history" element={<MyHistory />} />
+              <Route path="/assignments" element={<Assignments />} />
               <Route path="/notifications" element={<Notifications />} />
               <Route path="/notice" element={<Notice />} />
             </Route>

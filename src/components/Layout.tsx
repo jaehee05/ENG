@@ -51,6 +51,12 @@ const historyIcon = (
     <path d="M12 8v4l3 2" />
   </svg>
 )
+const checkIcon = (
+  <svg {...iconProps}>
+    <path d="M9 11l3 3L22 4" />
+    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+  </svg>
+)
 const studentsIcon = (
   <svg {...iconProps}>
     <circle cx="9" cy="8" r="3.5" />
@@ -68,9 +74,13 @@ const notifyIcon = (
 
 const studentNav: NavItem[] = [
   { to: '/', label: '홈', end: true, icon: homeIcon },
+  { to: '/assignments', label: '과제', icon: checkIcon },
   { to: '/reading', label: '지문', icon: readingIcon },
   { to: '/vocab', label: '단어', icon: vocabIcon },
   { to: '/wordbook', label: '단어장', icon: wordbookIcon },
+]
+
+const studentExtraNav: NavItem[] = [
   { to: '/history', label: '기록', icon: historyIcon },
 ]
 
@@ -107,7 +117,12 @@ export function Layout() {
     navigate('/login')
   }
 
-  const allNav = isAdmin ? [...studentNav, ...adminExtraNav] : studentNav
+  // 데스크탑 하단 가로 네비에는 모든 항목 다 표시
+  const desktopNav = isAdmin
+    ? [...studentNav, ...studentExtraNav, ...adminExtraNav]
+    : [...studentNav, ...studentExtraNav]
+  // 모바일 하단 탭바는 5개만
+  const mobileNav = studentNav
 
   return (
     <div className="h-dvh flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
@@ -164,7 +179,14 @@ export function Layout() {
           <div className="border-t border-slate-200 bg-white">
             <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3 text-sm flex-wrap">
               <span className="text-slate-600">{profile?.displayName}</span>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
+                <Link
+                  to="/history"
+                  onClick={() => setMenuOpen(false)}
+                  className="text-slate-600 hover:text-slate-900 underline-offset-2 hover:underline"
+                >
+                  내 기록
+                </Link>
                 <Link
                   to="/notice"
                   onClick={() => setMenuOpen(false)}
@@ -203,7 +225,7 @@ export function Layout() {
       {/* 데스크탑 사이드/상단 보조 네비 (모바일은 하단 탭바 사용) */}
       <nav className="hidden md:block sticky bottom-0 border-t border-slate-200 bg-white/95 backdrop-blur">
         <div className="max-w-5xl mx-auto px-6 h-12 flex items-center gap-1">
-          {allNav.map((i) => (
+          {desktopNav.map((i) => (
             <NavLink
               key={i.to}
               to={i.to}
@@ -226,7 +248,7 @@ export function Layout() {
       {/* 모바일 하단 탭바 */}
       <nav className="md:hidden border-t border-slate-200 bg-white safe-bottom safe-x">
         <div className="grid grid-cols-5 px-1">
-          {allNav.slice(0, 5).map((i) => (
+          {mobileNav.map((i) => (
             <NavLink
               key={i.to}
               to={i.to}
