@@ -37,7 +37,9 @@ function fitToBytes(items: string[], emptyText: string): string {
   const full = items.join('\n')
   if (enc.encode(full).length <= VAR_BYTE_LIMIT) return full
   for (let n = items.length - 1; n >= 1; n--) {
-    const text = [...items.slice(0, n), `외 ${items.length - n}개`].join('\n')
+    const head = items.slice(0, n - 1)
+    const last = `${items[n - 1]} (외 ${items.length - n}개)`
+    const text = [...head, last].join('\n')
     if (enc.encode(text).length <= VAR_BYTE_LIMIT) return text
   }
   return `(총 ${items.length}개)`
