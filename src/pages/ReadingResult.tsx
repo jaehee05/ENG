@@ -173,18 +173,41 @@ export function ReadingResult() {
   const hasAnyKo = hasOrderKo || !!passageKo
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">{attempt.refTitle}</h1>
-        <p className="text-sm text-slate-500 mt-1">{attempt.studentName} 님의 결과</p>
-      </div>
+    <div className="space-y-5 max-w-3xl">
+      <header>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+          결과
+        </p>
+        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
+          {attempt.refTitle}
+        </h1>
+        <p className="text-xs text-slate-500 mt-1">{attempt.studentName}</p>
+      </header>
 
-      <div className="rounded-lg border border-slate-200 bg-white p-5 flex items-baseline gap-3">
-        <span className="text-4xl font-bold text-slate-900">
-          {attempt.correct}
-          <span className="text-2xl text-slate-400"> / {attempt.total}</span>
-        </span>
-        <span className="text-sm text-slate-500">정답률 {ratio}%</span>
+      <div className="rounded-lg border border-slate-200 bg-white p-5">
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <p className="text-[11px] text-slate-500 mb-0.5">정답률</p>
+            <p className="text-3xl font-semibold text-slate-900 tracking-tight">
+              {ratio}%
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-[11px] text-slate-500 mb-0.5">맞은 문항</p>
+            <p className="text-lg font-semibold text-slate-900">
+              {attempt.correct}
+              <span className="text-sm text-slate-400 font-normal">
+                {' '}/ {attempt.total}
+              </span>
+            </p>
+          </div>
+        </div>
+        <div className="mt-3 h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+          <div
+            className="h-full bg-brand-500"
+            style={{ width: `${ratio}%` }}
+          />
+        </div>
       </div>
 
       {hasWrong && (

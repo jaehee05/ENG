@@ -115,49 +115,69 @@ export function ReadingTake() {
   const choicesGlossary = r.choicesGlossary ?? []
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <h1 className="text-2xl font-semibold text-slate-900">{r.title}</h1>
+    <div className="space-y-5 max-w-3xl">
+      <header>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+          지문 문제풀이
+        </p>
+        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
+          {r.title}
+        </h1>
+      </header>
 
-      <div className="rounded-lg border border-slate-200 bg-white">
-        <button
-          type="button"
-          onClick={() => setGlossaryOpen((v) => !v)}
-          className="w-full flex items-center justify-between px-5 py-3 text-sm font-semibold text-slate-700"
-        >
-          단어장 ({r.glossary.length + choicesGlossary.length}개)
-          <span className="text-slate-400 text-xs">{glossaryOpen ? '접기' : '펼치기'}</span>
-        </button>
-        {glossaryOpen && (
-          <div className="border-t border-slate-200 px-5 py-4 space-y-4">
-            {r.glossary.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">지문</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
-                  {r.glossary.map((g, i) => (
-                    <div key={i} className="flex gap-2">
-                      <span className="font-medium text-slate-900 min-w-[120px]">{g.en}</span>
-                      <span className="text-slate-600">{g.ko}</span>
-                    </div>
-                  ))}
-                </div>
+      <details
+        className="rounded-lg border border-slate-200 bg-white"
+        open={glossaryOpen}
+        onToggle={(e) => setGlossaryOpen((e.target as HTMLDetailsElement).open)}
+      >
+        <summary className="cursor-pointer list-none flex items-center justify-between px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+          <span>
+            단어장{' '}
+            <span className="text-slate-400 font-normal">
+              {r.glossary.length + choicesGlossary.length}
+            </span>
+          </span>
+          <span className="text-slate-400 text-xs">
+            {glossaryOpen ? '접기 −' : '펼치기 +'}
+          </span>
+        </summary>
+        <div className="border-t border-slate-100 px-4 py-3 space-y-4">
+          {r.glossary.length > 0 && (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                지문
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-1 text-sm">
+                {r.glossary.map((g, i) => (
+                  <div key={i} className="flex gap-2">
+                    <span className="font-medium text-slate-900 min-w-[110px]">
+                      {g.en}
+                    </span>
+                    <span className="text-slate-600">{g.ko}</span>
+                  </div>
+                ))}
               </div>
-            )}
-            {choicesGlossary.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">선지</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
-                  {choicesGlossary.map((g, i) => (
-                    <div key={i} className="flex gap-2">
-                      <span className="font-medium text-slate-900 min-w-[120px]">{g.en}</span>
-                      <span className="text-slate-600">{g.ko}</span>
-                    </div>
-                  ))}
-                </div>
+            </div>
+          )}
+          {choicesGlossary.length > 0 && (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                선지
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-1 text-sm">
+                {choicesGlossary.map((g, i) => (
+                  <div key={i} className="flex gap-2">
+                    <span className="font-medium text-slate-900 min-w-[110px]">
+                      {g.en}
+                    </span>
+                    <span className="text-slate-600">{g.ko}</span>
+                  </div>
+                ))}
               </div>
-            )}
-          </div>
-        )}
-      </div>
+            </div>
+          )}
+        </div>
+      </details>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {(() => {
@@ -199,15 +219,19 @@ export function ReadingTake() {
           )
         })()}
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && (
+          <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-md px-3 py-2">
+            {error}
+          </p>
+        )}
 
-        <div className="flex justify-end">
+        <div className="sticky bottom-16 md:bottom-14 z-10 -mx-4 sm:mx-0 px-4 sm:px-0 pb-3">
           <button
             type="submit"
             disabled={submitting}
-            className="rounded-md bg-brand-600 text-white text-sm font-medium px-5 py-2 hover:bg-brand-700 transition disabled:opacity-60"
+            className="w-full rounded-lg bg-slate-900 text-white text-[15px] font-medium py-3 hover:bg-slate-800 active:bg-slate-950 disabled:opacity-60 shadow-md transition"
           >
-            {submitting ? '채점 중...' : '제출하기'}
+            {submitting ? '채점 중…' : '답안 제출'}
           </button>
         </div>
       </form>
