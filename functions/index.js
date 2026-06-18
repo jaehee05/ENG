@@ -290,6 +290,19 @@ async function runWeeklyReportBlast(schedule) {
   };
 }
 
+const ASN_VAR_BYTE_LIMIT = 100;
+function fitListToBytes(items, emptyText) {
+  if (items.length === 0) return emptyText;
+  const enc = new TextEncoder();
+  const full = items.join("\n");
+  if (enc.encode(full).length <= ASN_VAR_BYTE_LIMIT) return full;
+  for (let n = items.length - 1; n >= 1; n--) {
+    const text = [...items.slice(0, n), `외 ${items.length - n}개`].join("\n");
+    if (enc.encode(text).length <= ASN_VAR_BYTE_LIMIT) return text;
+  }
+  return `(총 ${items.length}개)`;
+}
+
 async function runAssignmentStatusBlast(schedule) {
   const db = admin.firestore();
   const studentsSnap = await db
@@ -323,8 +336,8 @@ async function runAssignmentStatusBlast(schedule) {
       phone: s.phone,
       name: s.displayName,
       changeWord: {
-        var1: done.length > 0 ? done.join("\n") : "(완료한 과제가 없습니다)",
-        var2: incomplete.length > 0 ? incomplete.join("\n") : "(미완료 과제가 없습니다)",
+        var1: fitListToBytes(done, "(완료한 과제가 없습니다)"),
+        var2: fitListToBytes(incomplete, "(미완료 과제가 없습니다)"),
         var3: schedule.notice || "",
       },
     });

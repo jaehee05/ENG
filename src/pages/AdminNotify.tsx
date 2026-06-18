@@ -29,18 +29,32 @@ interface StudentBundle {
   attempts: Attempt[]
 }
 
+const VAR_BYTE_LIMIT = 100
+
+function fitToBytes(items: string[], emptyText: string): string {
+  if (items.length === 0) return emptyText
+  const enc = new TextEncoder()
+  const full = items.join('\n')
+  if (enc.encode(full).length <= VAR_BYTE_LIMIT) return full
+  for (let n = items.length - 1; n >= 1; n--) {
+    const text = [...items.slice(0, n), `외 ${items.length - n}개`].join('\n')
+    if (enc.encode(text).length <= VAR_BYTE_LIMIT) return text
+  }
+  return `(총 ${items.length}개)`
+}
+
 function doneLines(b: StudentBundle): string {
   const lines = b.assignments
     .filter((a) => isAssignmentDone(a, b.attempts))
     .map((a) => `▶ ${a.refTitle}`)
-  return lines.length > 0 ? lines.join('\n') : '(완료한 과제가 없습니다)'
+  return fitToBytes(lines, '(완료한 과제가 없습니다)')
 }
 
 function incompleteLines(b: StudentBundle): string {
   const lines = b.assignments
     .filter((a) => !isAssignmentDone(a, b.attempts))
     .map((a) => `▶ ${a.refTitle}`)
-  return lines.length > 0 ? lines.join('\n') : '(미완료 과제가 없습니다)'
+  return fitToBytes(lines, '(미완료 과제가 없습니다)')
 }
 
 const TEMPLATE_PREVIEW = `[*이름*]님, 과제 현황 안내입니다.
