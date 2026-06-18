@@ -263,7 +263,7 @@ export function Layout() {
 
       {/* 모바일 + iPad portrait 하단 탭바 */}
       <nav className="lg:hidden border-t border-slate-200 bg-white safe-bottom safe-x">
-        <div className="grid grid-cols-5 px-1">
+        <div className="grid grid-cols-5 px-1 max-w-md mx-auto">
           {mobileNav.map((i) => (
             <NavLink
               key={i.to}
