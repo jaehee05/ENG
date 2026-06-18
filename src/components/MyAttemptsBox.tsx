@@ -28,63 +28,69 @@ export function MyAttemptsBox({ attempts, buildResultPath }: Props) {
   const recent = sorted[0]
 
   return (
-    <div className="rounded-lg border border-brand-200 bg-brand-50/40 overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full text-left px-4 py-3 flex items-center justify-between gap-3 hover:bg-brand-50/70 transition"
-      >
-        <div className="text-sm">
-          <span className="font-semibold text-brand-700">내 응시 기록 {sorted.length}회</span>
+    <details
+      className="rounded-lg border border-slate-200 bg-white overflow-hidden"
+      open={open}
+      onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}
+    >
+      <summary className="list-none cursor-pointer px-4 py-3 flex items-center justify-between gap-3 hover:bg-slate-50">
+        <div className="text-sm flex items-baseline gap-2 flex-wrap">
+          <span className="font-medium text-slate-900">내 응시 기록</span>
+          <span className="text-xs text-slate-500">{sorted.length}회</span>
           {recent && recent.total > 0 && (
-            <span className="ml-2 text-slate-600">
-              최근 {recent.correct}/{recent.total} ({Math.round((recent.correct / recent.total) * 100)}%)
+            <span className="text-xs text-slate-500">
+              · 최근 {Math.round((recent.correct / recent.total) * 100)}%
             </span>
           )}
           {best.total > 0 && (
-            <span className="ml-2 text-slate-500 text-xs">
+            <span className="text-xs text-slate-500">
               · 최고 {Math.round(best.ratio * 100)}%
             </span>
           )}
         </div>
-        <span className="text-brand-700 text-sm">{open ? '−' : '+'}</span>
-      </button>
-      {open && (
-        <ul className="divide-y divide-brand-100 border-t border-brand-100 bg-white">
-          {sorted.map((a, i) => {
-            const ratio = a.total > 0 ? Math.round((a.correct / a.total) * 100) : 0
-            return (
-              <li key={a.id} className="px-4 py-2.5 flex items-center justify-between gap-3 text-sm">
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="text-xs text-slate-400 w-10">{sorted.length - i}회차</span>
-                  <span className="text-slate-500 text-xs">{fmtDate(a.createdAt)}</span>
-                  {a.practice && (
-                    <span className="text-[10px] text-slate-500 bg-slate-100 rounded px-1.5 py-0.5">
-                      연습
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <span className="text-slate-700">
-                    {a.correct}/{a.total}
+        <span className="text-slate-400 text-xs">{open ? '접기 −' : '펼치기 +'}</span>
+      </summary>
+      <ul className="divide-y divide-slate-100 border-t border-slate-100">
+        {sorted.map((a, i) => {
+          const ratio = a.total > 0 ? Math.round((a.correct / a.total) * 100) : 0
+          return (
+            <li
+              key={a.id}
+              className="px-4 py-2.5 flex items-center justify-between gap-3 text-sm"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="text-[11px] text-slate-400 w-9">
+                  {sorted.length - i}회차
+                </span>
+                <span className="text-[11px] text-slate-500">
+                  {fmtDate(a.createdAt)}
+                </span>
+                {a.practice && (
+                  <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+                    연습
                   </span>
-                  <span
-                    className={`font-medium ${ratio >= 80 ? 'text-brand-700' : ratio >= 50 ? 'text-slate-700' : 'text-red-600'}`}
-                  >
-                    {ratio}%
-                  </span>
-                  <Link
-                    to={buildResultPath(a)}
-                    className="text-xs text-brand-700 hover:underline"
-                  >
-                    다시 보기
-                  </Link>
-                </div>
-              </li>
-            )
-          })}
-        </ul>
-      )}
-    </div>
+                )}
+              </div>
+              <div className="flex items-center gap-2.5 shrink-0">
+                <span className="text-slate-600 text-xs">
+                  {a.correct}/{a.total}
+                </span>
+                <span
+                  className={`text-sm font-semibold ${ratio >= 80 ? 'text-brand-700' : ratio >= 50 ? 'text-slate-700' : 'text-red-600'}`}
+                >
+                  {ratio}%
+                </span>
+                <Link
+                  to={buildResultPath(a)}
+                  className="text-xs text-slate-500 hover:text-slate-900 underline-offset-2 hover:underline"
+                >
+                  보기
+                </Link>
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+    </details>
   )
 }

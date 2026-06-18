@@ -81,7 +81,12 @@ export function ReadingSheet() {
   return (
     <div className="space-y-4">
       <div className="no-print flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <h1 className="text-xl font-semibold text-slate-900">{r.title} · 시험지</h1>
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+            시험지 PDF
+          </p>
+          <h1 className="text-xl font-semibold text-slate-900 tracking-tight">{r.title}</h1>
+        </div>
         <div className="flex gap-2 items-center">
           <Link
             to={`/reading/${r.id}`}
