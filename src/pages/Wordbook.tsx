@@ -76,34 +76,39 @@ export function Wordbook() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
+    <div className="space-y-5">
+      <header className="flex items-end justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">내 단어장</h1>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+            나의 학습
+          </p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
+            내 단어장
+          </h1>
           {!loading && words.length > 0 && (
-            <p className="text-xs text-slate-500 mt-1">총 {words.length}개</p>
+            <p className="text-xs text-slate-500 mt-1">{words.length}개 단어</p>
           )}
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-1.5 flex-wrap">
           <button
             type="button"
             onClick={() => setShowAdd((v) => !v)}
-            className="rounded-md border border-slate-300 text-slate-700 text-sm font-medium px-4 py-2 hover:bg-slate-100"
+            className="rounded-md border border-slate-200 text-slate-700 text-xs font-medium px-3 py-1.5 hover:bg-slate-50"
           >
-            {showAdd ? '닫기' : '+ 단어 추가'}
+            {showAdd ? '닫기' : '+ 추가'}
           </button>
           <Link
             to="/wordbook/take"
-            className={`rounded-md text-sm font-medium px-4 py-2 transition ${
+            className={`rounded-md text-xs font-medium px-3 py-1.5 transition ${
               words.length >= 1
-                ? 'bg-brand-600 text-white hover:bg-brand-700'
-                : 'bg-slate-200 text-slate-400 pointer-events-none'
+                ? 'bg-slate-900 text-white hover:bg-slate-800'
+                : 'bg-slate-100 text-slate-400 pointer-events-none'
             }`}
           >
-            단어장으로 시험 보기
+            시험 보기
           </Link>
         </div>
-      </div>
+      </header>
 
       {showAdd && (
         <form

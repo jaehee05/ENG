@@ -102,75 +102,84 @@ export function VocabList() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <h1 className="text-2xl font-semibold text-slate-900">단어 시험지</h1>
+    <div className="space-y-5">
+      <header className="flex items-end justify-between gap-2 flex-wrap">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+            학습
+          </p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
+            단어 시험지
+          </h1>
+        </div>
         {profile?.role === 'admin' && (
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-1.5 flex-wrap">
             <button
               type="button"
               onClick={handleReprocessAll}
               disabled={reprocessing}
-              className="rounded-md border border-slate-300 text-slate-700 text-sm font-medium px-4 py-2 hover:bg-slate-100 disabled:opacity-50"
-              title="옛 파서로 잘못 갈라진 단어를 새 파서로 일괄 정리"
+              className="rounded-md border border-slate-200 text-slate-700 text-xs font-medium px-3 py-1.5 hover:bg-slate-50 disabled:opacity-50"
             >
-              {reprocessing ? '재분석 중...' : '전체 단어 재분석'}
+              {reprocessing ? '재분석 중…' : '단어 재분석'}
             </button>
             <Link
               to="/vocab/corpora"
-              className="rounded-md border border-slate-300 text-slate-700 text-sm font-medium px-4 py-2 hover:bg-slate-100"
+              className="rounded-md border border-slate-200 text-slate-700 text-xs font-medium px-3 py-1.5 hover:bg-slate-50"
             >
-              교재 관리
+              교재
             </Link>
             <Link
               to="/vocab/new"
-              className="rounded-md bg-slate-900 text-white text-sm font-medium px-4 py-2 hover:bg-slate-800"
+              className="rounded-md bg-slate-900 text-white text-xs font-medium px-3 py-1.5 hover:bg-slate-800"
             >
-              새 시험지
+              + 새 시험지
             </Link>
           </div>
         )}
-      </div>
+      </header>
 
       {reprocessNotice && (
-        <p className="text-sm text-brand-700">{reprocessNotice}</p>
+        <p className="text-xs text-brand-700">{reprocessNotice}</p>
       )}
-      {loading && <p className="text-slate-500 text-sm">불러오는 중...</p>}
+      {loading && <p className="text-slate-500 text-sm">불러오는 중…</p>}
       {error && <p className="text-red-600 text-sm">{error}</p>}
       {!loading && sets.length === 0 && (
-        <p className="text-slate-500 text-sm">등록된 시험지가 없습니다.</p>
+        <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+          등록된 시험지가 없어요.
+        </div>
       )}
 
-      <div className="space-y-3">
+      <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white overflow-hidden">
         {sets.map((s) => (
-          <Link
-            key={s.id}
-            to={`/vocab/${s.id}`}
-            className="relative block rounded-lg border border-slate-200 bg-white p-4 hover:border-brand-300 hover:shadow-md transition"
-          >
-            <div className="flex items-baseline justify-between gap-3">
-              <h2 className="text-base font-semibold text-slate-900 truncate">{s.title}</h2>
-              <span className="text-xs text-slate-500 whitespace-nowrap">
-                {formatDate(s.createdAt)}
-              </span>
-            </div>
-            <p className="text-sm text-slate-500 mt-1">
-              {s.words.length}단어 · {s.createdByName}
-            </p>
+          <li key={s.id} className="relative">
+            <Link
+              to={`/vocab/${s.id}`}
+              className="flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-slate-50 active:bg-slate-100"
+            >
+              <div className="min-w-0">
+                <p className="text-[15px] font-medium text-slate-900 truncate">
+                  {s.title}
+                </p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {s.words.length}단어 · {formatDate(s.createdAt)}
+                </p>
+              </div>
+              <span className="text-slate-300 text-lg shrink-0">→</span>
+            </Link>
             {isAdmin && (
               <button
                 type="button"
                 onClick={(e) => handleDelete(e, s)}
                 disabled={deletingId === s.id}
-                className="absolute top-2 right-2 text-xs text-slate-400 hover:text-red-600 px-2 py-1 rounded disabled:opacity-50"
+                className="absolute top-2 right-9 text-[10px] text-slate-400 hover:text-red-600 px-1.5 py-0.5 rounded disabled:opacity-50"
                 aria-label="삭제"
               >
-                {deletingId === s.id ? '삭제 중...' : '삭제'}
+                {deletingId === s.id ? '…' : '삭제'}
               </button>
             )}
-          </Link>
+          </li>
         ))}
-      </div>
+      </ul>
     </div>
   )
 }

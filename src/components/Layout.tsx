@@ -93,7 +93,7 @@ export function Layout() {
   const allNav = isAdmin ? [...studentNav, ...adminExtraNav] : studentNav
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
+    <div className="h-dvh flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* 상단 미니멀 헤더 */}
       <header className="sticky top-0 z-30 bg-white border-b border-slate-200">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
@@ -144,7 +144,7 @@ export function Layout() {
       </header>
 
       {/* 본문 */}
-      <main className="flex-1">
+      <main className="flex-1 overflow-y-auto overscroll-contain">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 sm:py-8 pb-24 md:pb-10">
           <Outlet />
         </div>

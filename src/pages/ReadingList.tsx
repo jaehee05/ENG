@@ -341,37 +341,44 @@ export function ReadingList() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h1 className="text-2xl font-semibold text-slate-900">지문 문제풀이</h1>
+    <div className="space-y-5">
+      <header className="flex items-end justify-between gap-3 flex-wrap">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+            학습
+          </p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
+            지문 문제풀이
+          </h1>
+        </div>
         {isAdmin && (
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-1.5 flex-wrap">
             <button
               type="button"
               onClick={() => setReorderMode((v) => !v)}
-              className={`rounded-md text-sm font-medium px-4 py-2 transition ${
+              className={`rounded-md text-xs font-medium px-3 py-1.5 transition ${
                 reorderMode
-                  ? 'bg-brand-600 text-white hover:bg-brand-700'
-                  : 'border border-slate-300 text-slate-700 hover:bg-slate-100'
+                  ? 'bg-slate-900 text-white hover:bg-slate-800'
+                  : 'border border-slate-200 text-slate-700 hover:bg-slate-50'
               }`}
             >
-              {reorderMode ? '정렬 완료' : '순서 정렬'}
+              {reorderMode ? '정렬 완료' : '순서'}
             </button>
             <Link
               to="/reading/import"
-              className="rounded-md border border-slate-300 text-slate-700 text-sm font-medium px-4 py-2 hover:bg-slate-100"
+              className="rounded-md border border-slate-200 text-slate-700 text-xs font-medium px-3 py-1.5 hover:bg-slate-50"
             >
-              PDF로 가져오기
+              PDF 가져오기
             </Link>
             <Link
               to="/reading/new"
-              className="rounded-md bg-slate-900 text-white text-sm font-medium px-4 py-2 hover:bg-slate-800"
+              className="rounded-md bg-slate-900 text-white text-xs font-medium px-3 py-1.5 hover:bg-slate-800"
             >
-              새 지문
+              + 새 지문
             </Link>
           </div>
         )}
-      </div>
+      </header>
 
       {reorderMode && (
         <p className="text-xs text-slate-500">
