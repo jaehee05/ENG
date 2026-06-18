@@ -158,6 +158,13 @@ export interface PushSendResult {
   errors?: { code: string; message: string }[]
 }
 
+export async function purgeAllNotifications(): Promise<{
+  ok: true
+  deleted: number
+}> {
+  return call('purgeNotifications')
+}
+
 export async function sendPushNotification(input: {
   uids?: string[]
   all?: boolean

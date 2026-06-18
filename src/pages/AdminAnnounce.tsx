@@ -8,6 +8,7 @@ import {
   listAnnouncements,
   updateAnnouncement,
 } from '../lib/firestore'
+import { purgeAllNotifications } from '../lib/ppurioApi'
 import type { Announcement } from '../lib/types'
 
 function fmtDateTime(ts: { toDate: () => Date } | null | undefined): string {
@@ -30,6 +31,26 @@ export function AdminAnnounce() {
   const [submitting, setSubmitting] = useState(false)
 
   const [editingId, setEditingId] = useState<string | null>(null)
+
+  const [purging, setPurging] = useState(false)
+  async function handlePurge() {
+    if (
+      !window.confirm(
+        '모든 학생 알림함의 알림을 전부 삭제할까요? 이 작업은 되돌릴 수 없습니다.',
+      )
+    )
+      return
+    setPurging(true)
+    setNotice(null)
+    try {
+      const r = await purgeAllNotifications()
+      setNotice(`${r.deleted}건 정리 완료.`)
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : '정리 실패')
+    } finally {
+      setPurging(false)
+    }
+  }
 
   async function load() {
     setLoading(true)
@@ -127,13 +148,23 @@ export function AdminAnnounce() {
 
   return (
     <div className="space-y-5">
-      <header>
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-          관리자
-        </p>
-        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
-          공지사항
-        </h1>
+      <header className="flex items-end justify-between gap-3 flex-wrap">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+            관리자
+          </p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
+            공지사항
+          </h1>
+        </div>
+        <button
+          type="button"
+          onClick={handlePurge}
+          disabled={purging}
+          className="rounded-md border border-red-200 text-red-600 text-xs font-medium px-3 py-1.5 hover:bg-red-50 disabled:opacity-50"
+        >
+          {purging ? '정리 중…' : '학생 알림함 전체 정리'}
+        </button>
       </header>
 
       <form

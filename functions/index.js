@@ -127,6 +127,22 @@ exports.ppurioAdmin = onRequest({ invoker: "public" }, async (req, res) => {
       return res.json({ ok: true });
     }
 
+    if (action === "purgeNotifications") {
+      const db = admin.firestore();
+      const snap = await db.collection("notifications").get();
+      let deleted = 0;
+      // 500개씩 batch 삭제
+      const docs = snap.docs;
+      for (let i = 0; i < docs.length; i += 500) {
+        const batch = db.batch();
+        const slice = docs.slice(i, i + 500);
+        for (const d of slice) batch.delete(d.ref);
+        await batch.commit();
+        deleted += slice.length;
+      }
+      return res.json({ ok: true, deleted });
+    }
+
     if (action === "sendPush") {
       const p = payload || {};
       const title = String(p.title || "").trim();
