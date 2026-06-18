@@ -152,6 +152,26 @@ export interface Reading {
   createdAt: Timestamp | null
 }
 
+/**
+ * reading 제목에서 시작 번호를 추출해, number가 비어 있는 문항에 자동 부여.
+ * 예: "2027학년도 6월 모의평가 18번" → 1문항이면 18, 2문항이면 18,19
+ *     "2027학년도 6월 모의평가 43-45번" → 1번째=43, 2번째=44, 3번째=45
+ */
+const TITLE_NUM_RE = /^(.+?)\s+(\d+)(?:-(\d+))?\s*(?:번|문제)?\s*$/
+export function inferQuestionNumbers(
+  title: string,
+  questions: ReadingQuestion[],
+): ReadingQuestion[] {
+  const m = TITLE_NUM_RE.exec(title.trim())
+  if (!m) return questions
+  const start = Number.parseInt(m[2], 10)
+  if (!Number.isFinite(start)) return questions
+  return questions.map((q, i) => {
+    if (q.number && q.number > 0) return q
+    return { ...q, number: start + i }
+  })
+}
+
 /** 문항이 자체 본문(body/image/imageHtml/order parts)을 갖고 있는지 — 공용 지문이 필요 없음을 의미. */
 export function questionHasOwnBody(q: ReadingQuestion): boolean {
   if (q.body && q.body.trim()) return true

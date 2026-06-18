@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getAttempt, getReading } from '../lib/firestore'
 import { renderUnderlines } from '../lib/renderUnderlines'
-import type { Attempt, Reading } from '../lib/types'
+import { inferQuestionNumbers, type Attempt, type Reading } from '../lib/types'
 
 const CHOICE_MARKS = ['①', '②', '③', '④', '⑤']
 
@@ -235,7 +235,10 @@ export function ReadingResult() {
 
       <div className="space-y-3">
         {attempt.readingResults.map((r, i) => {
-          const label = r.number ?? i + 1
+          const fromReading = reading
+            ? inferQuestionNumbers(reading.title, reading.questions)[i]?.number
+            : undefined
+          const label = r.number ?? fromReading ?? i + 1
           const retryAns = retry[i] ?? -1
           const retried = retryAns >= 0
           const retryCorrect = retried && retryAns === r.correctAnswer

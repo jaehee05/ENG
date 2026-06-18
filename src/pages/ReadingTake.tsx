@@ -7,6 +7,7 @@ import { QuestionView } from '../components/QuestionView'
 import { SharedPassageBlock } from '../components/SharedPassageBlock'
 import {
   getSharedPassageBlock,
+  inferQuestionNumbers,
   passageFallbackPerQuestion,
   questionsWithoutShared,
   type Reading,
@@ -160,8 +161,9 @@ export function ReadingTake() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {(() => {
-          const shared = getSharedPassageBlock(r)
-          const questions = questionsWithoutShared(r.questions, shared)
+          const numbered = inferQuestionNumbers(r.title, r.questions)
+          const shared = getSharedPassageBlock({ ...r, questions: numbered })
+          const questions = questionsWithoutShared(numbered, shared)
           const fbList = shared
             ? questions.map(() => undefined)
             : passageFallbackPerQuestion(r.passage, questions)

@@ -4,6 +4,7 @@ import { getReading } from '../lib/firestore'
 import { renderUnderlines as renderWithUnderlines } from '../lib/renderUnderlines'
 import { HtmlPanel } from '../components/HtmlPanel'
 import {
+  inferQuestionNumbers,
   passageFallbackPerQuestion,
   type Reading,
   type ReadingQuestion,
@@ -119,7 +120,7 @@ export function ReadingSheet() {
           </header>
 
           {(() => null)()}
-          {r.questions.map((q, qi, arr) => {
+          {inferQuestionNumbers(r.title, r.questions).map((q, qi, arr) => {
             const fbList = passageFallbackPerQuestion(r.passage, arr)
             const isOrder = q.type === 'order'
             const isSummary = q.type === 'summary'

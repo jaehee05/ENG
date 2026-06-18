@@ -15,6 +15,7 @@ import { useGlossQueue, type GlossEntry } from '../components/useGlossQueue'
 import { SharedPassageBlock } from '../components/SharedPassageBlock'
 import {
   getSharedPassageBlock,
+  inferQuestionNumbers,
   passageFallbackPerQuestion,
   questionsWithoutShared,
   type Attempt,
@@ -178,8 +179,9 @@ export function ReadingDetail() {
 
       <div className="space-y-4">
         {(() => {
-          const shared = getSharedPassageBlock(r)
-          const questions = questionsWithoutShared(r.questions, shared)
+          const numbered = inferQuestionNumbers(r.title, r.questions)
+          const shared = getSharedPassageBlock({ ...r, questions: numbered })
+          const questions = questionsWithoutShared(numbered, shared)
           const fbList = shared
             ? questions.map(() => undefined)
             : passageFallbackPerQuestion(r.passage, questions)
