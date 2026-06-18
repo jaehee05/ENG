@@ -215,14 +215,24 @@ export function ReadingList() {
       const merged: { index: number; explanation: string }[] = []
       for (let i = 0; i < apiQuestions.length; i += CHUNK) {
         const chunk = apiQuestions.slice(i, i + CHUNK)
+        // 청크 안에서 index를 0부터 다시 부여해 AI에 보냄
+        const localChunk = chunk.map((c, k) => ({ ...c, index: k }))
         setExplNote(
           `AI가 분배 중... ${Math.min(i + chunk.length, apiQuestions.length)}/${apiQuestions.length}`,
         )
         const partial = await parseExplanations({
-          questions: chunk,
+          questions: localChunk,
           text: explText,
         })
-        merged.push(...partial)
+        // 응답의 local index → 원래 global index로 환원
+        for (const r of partial) {
+          if (r.index >= 0 && r.index < chunk.length) {
+            merged.push({
+              index: chunk[r.index].index,
+              explanation: r.explanation,
+            })
+          }
+        }
       }
       const expByGlobal = new Map(
         merged.map((r) => [r.index, r.explanation.trim()] as const),
