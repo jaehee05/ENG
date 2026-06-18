@@ -150,14 +150,26 @@ export function ReadingEdit() {
 
   async function handleExtract() {
     setError(null)
-    if (!passage.trim() && !questions.some((q) => q.body.trim())) {
-      setError('지문 또는 문제 본문이 비어 있습니다.')
+    const sources: string[] = []
+    if (passage.trim()) sources.push(passage.trim())
+    for (const q of questions) {
+      if (q.body && q.body.trim()) sources.push(q.body.trim())
+      if (q.intro && q.intro.trim()) sources.push(q.intro.trim())
+      if (q.summaryBox && q.summaryBox.trim()) sources.push(q.summaryBox.trim())
+      if (q.partA && q.partA.trim()) sources.push(q.partA.trim())
+      if (q.partB && q.partB.trim()) sources.push(q.partB.trim())
+      if (q.partC && q.partC.trim()) sources.push(q.partC.trim())
+      if (q.partD && q.partD.trim()) sources.push(q.partD.trim())
+      if (q.imageHtml && q.imageHtml.trim())
+        sources.push(extractTextFromHtml(q.imageHtml))
+    }
+    if (sources.length === 0) {
+      setError('단어를 추출할 영어 텍스트가 없습니다.')
       return
     }
     setExtracting(true)
     try {
-      const bodyParts = questions.map((q) => q.body.trim()).filter(Boolean)
-      const combined = [passage.trim(), ...bodyParts].filter(Boolean).join('\n\n')
+      const combined = sources.filter(Boolean).join('\n\n')
       const allChoices = questions.flatMap((q) => q.choices).filter((c) => c.trim())
       const result = await extractGlossary({
         passage: combined,
