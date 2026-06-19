@@ -174,21 +174,3 @@ export async function sendPushNotification(input: {
 }): Promise<PushSendResult> {
   return call<PushSendResult>('sendPush', input)
 }
-
-export interface AuthDiagResult {
-  ok: boolean
-  projectId?: string | null
-  hasCred?: boolean
-  hasToken?: boolean
-  tokenStart?: string | null
-  expiresIn?: number | null
-  tokenError?: string
-  dryRun?: string
-  dryRunCode?: string | null
-  dryRunMessage?: string
-  error?: string
-}
-
-export async function diagAuth(): Promise<AuthDiagResult> {
-  return call<AuthDiagResult>('diagAuth')
-}
