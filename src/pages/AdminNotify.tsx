@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
+import { doc, getDoc } from 'firebase/firestore'
+import { db } from '../lib/firebase'
+import { useAuth } from '../contexts/useAuth'
 import { listAccounts } from '../lib/account'
 import {
   createPushSchedule,
@@ -214,6 +217,64 @@ export function AdminNotify() {
   const [pushSelected, setPushSelected] = useState<Set<string>>(new Set())
   const [pushAll, setPushAll] = useState(true)
 
+  const { profile } = useAuth()
+  const [myTokens, setMyTokens] = useState<string[]>([])
+  const [diagNote, setDiagNote] = useState<string | null>(null)
+  const [diagSending, setDiagSending] = useState(false)
+
+  async function loadMyTokens() {
+    if (!profile) return
+    try {
+      const snap = await getDoc(doc(db, 'users', profile.id))
+      const arr = snap.exists() ? (snap.data().fcmTokens || []) : []
+      setMyTokens(Array.isArray(arr) ? arr.filter((t) => typeof t === 'string') : [])
+    } catch {
+      setMyTokens([])
+    }
+  }
+
+  useEffect(() => {
+    void loadMyTokens()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile])
+
+  async function handleDiagSend() {
+    if (!profile) return
+    if (!adminSecret) {
+      setDiagNote('관리자 비밀키를 먼저 입력하세요 (아래 알림톡 설정 카드).')
+      return
+    }
+    if (myTokens.length === 0) {
+      setDiagNote('내 기기에 등록된 토큰이 없습니다. 앱에서 알림 권한을 켜고 한 번 로그인하세요.')
+      return
+    }
+    setDiagSending(true)
+    setDiagNote(null)
+    try {
+      const result = await sendPushNotification({
+        uids: [profile.id],
+        title: '진단 푸시',
+        body: '이 알림이 폰에 표시되면 APNs 정상.',
+      })
+      const errLines = (result.errors || []).map(
+        (e) => `${e.code}: ${e.message}`,
+      )
+      const lines = [
+        `토큰 수: ${myTokens.length}`,
+        `성공: ${result.sent}`,
+        `실패: ${result.failed}`,
+        `만료 토큰 정리: ${result.invalid}`,
+        ...errLines.map((s) => `· ${s}`),
+      ]
+      setDiagNote(lines.join('\n'))
+      void loadMyTokens()
+    } catch (e) {
+      setDiagNote(e instanceof Error ? e.message : '진단 발송 실패')
+    } finally {
+      setDiagSending(false)
+    }
+  }
+
   async function handleSendPush() {
     if (!adminSecret) {
       setPushNote('관리자 비밀키를 먼저 입력하세요.')
@@ -245,7 +306,9 @@ export function AdminNotify() {
       })
       const errPart =
         result.errors && result.errors.length > 0
-          ? ` · 에러: ${result.errors.map((e) => e.code).join(', ')}`
+          ? ` · 에러: ${result.errors
+              .map((e) => `${e.code}${e.message ? ` (${e.message})` : ''}`)
+              .join(' / ')}`
           : ''
       setPushNote(
         `발송 완료: 성공 ${result.sent} · 실패 ${result.failed} · 만료 토큰 정리 ${result.invalid}${errPart}`,
@@ -704,6 +767,45 @@ export function AdminNotify() {
         <p className="text-sm text-slate-500 mt-1">
           학생별 과제 현황을 자동으로 채워 뿌리오 알림톡 변수 CSV를 만듭니다. 다운로드 받아
           뿌리오 대량발송에 그대로 업로드하세요.
+        </p>
+      </div>
+
+      <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 space-y-2">
+        <p className="text-sm font-semibold text-slate-900">
+          🩺 푸시 진단 (관리자 본인 기기)
+        </p>
+        <p className="text-[12px] text-slate-700">
+          내 토큰 수: <b>{myTokens.length}</b>
+          {myTokens.length > 0 && (
+            <span className="ml-2 text-slate-500">
+              · 끝 8자: {myTokens.map((t) => t.slice(-8)).join(', ')}
+            </span>
+          )}
+        </p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={handleDiagSend}
+            disabled={diagSending}
+            className="rounded-md bg-slate-900 text-white text-xs font-medium px-3 py-1.5 hover:bg-slate-700 disabled:opacity-50"
+          >
+            {diagSending ? '진단 발송 중...' : '내 폰으로 진단 푸시 보내기'}
+          </button>
+          <button
+            type="button"
+            onClick={() => void loadMyTokens()}
+            className="rounded-md border border-slate-300 bg-white text-slate-700 text-xs font-medium px-3 py-1.5 hover:bg-slate-50"
+          >
+            토큰 새로고침
+          </button>
+        </div>
+        {diagNote && (
+          <pre className="text-[11px] text-slate-700 whitespace-pre-wrap font-mono bg-white border border-amber-200 rounded p-2">
+            {diagNote}
+          </pre>
+        )}
+        <p className="text-[11px] text-slate-500">
+          토큰 0개 → 아직 KJHEDU 앱에서 알림 권한 허용 후 로그인 안 했거나 토큰 등록이 실패한 상태. 토큰 1+ 인데 폰에 알림이 안 오면 결과의 에러 코드/메시지가 원인입니다 (예: third-party-auth-error → Firebase APNs 키 문제).
         </p>
       </div>
 
