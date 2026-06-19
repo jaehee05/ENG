@@ -16,6 +16,7 @@ import type { PushSchedule } from '../lib/types'
 import {
   DEFAULT_ASSIGNMENT_STATUS_SCHEDULE,
   DEFAULT_WEEKLY_REPORT_SCHEDULE,
+  diagAuth,
   fetchPpurioSettings,
   fetchScheduleSettings,
   getAdminSecret,
@@ -797,6 +798,44 @@ export function AdminNotify() {
             className="rounded-md border border-slate-300 bg-white text-slate-700 text-xs font-medium px-3 py-1.5 hover:bg-slate-50"
           >
             토큰 새로고침
+          </button>
+          <button
+            type="button"
+            onClick={async () => {
+              if (!adminSecret) {
+                setDiagNote('관리자 비밀키를 먼저 입력하세요.')
+                return
+              }
+              setDiagSending(true)
+              setDiagNote(null)
+              try {
+                const r = await diagAuth()
+                setDiagNote(
+                  [
+                    `[Functions 인증 진단]`,
+                    `projectId: ${r.projectId}`,
+                    `hasCred: ${r.hasCred}`,
+                    `hasToken: ${r.hasToken}`,
+                    `tokenStart: ${r.tokenStart ?? '(없음)'}`,
+                    `expiresIn: ${r.expiresIn ?? '(없음)'}`,
+                    r.tokenError ? `tokenError: ${r.tokenError}` : '',
+                    `--- 더미 토큰 dryRun ---`,
+                    `dryRunCode: ${r.dryRunCode ?? '(없음)'}`,
+                    `dryRunMessage: ${r.dryRunMessage ?? '(없음)'}`,
+                  ]
+                    .filter(Boolean)
+                    .join('\n'),
+                )
+              } catch (e) {
+                setDiagNote(e instanceof Error ? e.message : '진단 실패')
+              } finally {
+                setDiagSending(false)
+              }
+            }}
+            disabled={diagSending}
+            className="rounded-md border border-amber-400 bg-white text-amber-700 text-xs font-medium px-3 py-1.5 hover:bg-amber-100 disabled:opacity-50"
+          >
+            Functions 인증 진단
           </button>
         </div>
         {diagNote && (

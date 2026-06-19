@@ -127,6 +127,45 @@ exports.ppurioAdmin = onRequest({ invoker: "public" }, async (req, res) => {
       return res.json({ ok: true });
     }
 
+    if (action === "diagAuth") {
+      const out = { ok: true };
+      try {
+        const app = admin.app();
+        out.projectId = app.options.projectId || null;
+        const cred = app.options.credential;
+        out.hasCred = !!cred;
+        if (cred && typeof cred.getAccessToken === "function") {
+          try {
+            const at = await cred.getAccessToken();
+            out.hasToken = !!(at && at.access_token);
+            out.tokenStart = at && at.access_token
+              ? String(at.access_token).slice(0, 18) + "…"
+              : null;
+            out.expiresIn = at && at.expires_in ? at.expires_in : null;
+          } catch (e) {
+            out.tokenError = String(e && e.message || e).slice(0, 300);
+          }
+        }
+        try {
+          await admin.messaging().send(
+            {
+              token: "DIAGNOSTIC_INVALID_TOKEN_xxxxxxxxxxxxxxxxxxxxxxxxxx",
+              notification: { title: "x", body: "x" },
+            },
+            true,
+          );
+          out.dryRun = "OK (예상치 못한 성공)";
+        } catch (e) {
+          out.dryRunCode = (e && e.code) || null;
+          out.dryRunMessage = String((e && e.message) || "").slice(0, 400);
+        }
+      } catch (e) {
+        out.ok = false;
+        out.error = String((e && e.message) || e).slice(0, 300);
+      }
+      return res.json(out);
+    }
+
     if (action === "purgeNotifications") {
       const db = admin.firestore();
       const snap = await db.collection("notifications").get();
