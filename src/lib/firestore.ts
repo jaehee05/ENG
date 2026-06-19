@@ -705,6 +705,22 @@ export async function markAllNotificationsRead(uid: string): Promise<void> {
   }
 }
 
+export async function deleteNotification(id: string): Promise<void> {
+  await deleteDoc(doc(db, 'notifications', id))
+}
+
+export async function deleteAllNotificationsForUser(
+  uid: string,
+): Promise<number> {
+  const snap = await getDocs(
+    query(collection(db, 'notifications'), where('recipientUid', '==', uid)),
+  )
+  for (const d of snap.docs) {
+    await deleteDoc(d.ref)
+  }
+  return snap.size
+}
+
 export function formatDate(ts: Timestamp | null | undefined): string {
   if (!ts) return ''
   const d = ts.toDate()

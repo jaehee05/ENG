@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import {
+  deleteAllNotificationsForUser,
+  deleteNotification,
   formatDate,
   listNotificationsForUser,
   markAllNotificationsRead,
@@ -54,6 +56,28 @@ export function Notifications() {
     }
   }
 
+  async function handleDeleteAll() {
+    if (!profile) return
+    if (!window.confirm('알림함의 모든 알림을 삭제할까요? 되돌릴 수 없어요.'))
+      return
+    setBusy(true)
+    try {
+      await deleteAllNotificationsForUser(profile.id)
+      await load()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleDeleteOne(id: string) {
+    setItems((prev) => prev.filter((n) => n.id !== id))
+    try {
+      await deleteNotification(id)
+    } catch {
+      await load()
+    }
+  }
+
   async function handleItemClick(n: UserNotification) {
     if (!n.readAt) {
       try {
@@ -82,16 +106,28 @@ export function Notifications() {
             </p>
           )}
         </div>
-        {unread > 0 && (
-          <button
-            type="button"
-            onClick={handleMarkAllRead}
-            disabled={busy}
-            className="rounded-md border border-slate-200 text-slate-700 text-xs font-medium px-3 py-1.5 hover:bg-slate-50 disabled:opacity-50"
-          >
-            모두 읽음 처리
-          </button>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          {unread > 0 && (
+            <button
+              type="button"
+              onClick={handleMarkAllRead}
+              disabled={busy}
+              className="rounded-md border border-slate-200 text-slate-700 text-xs font-medium px-3 py-1.5 hover:bg-slate-50 disabled:opacity-50"
+            >
+              모두 읽음 처리
+            </button>
+          )}
+          {items.length > 0 && (
+            <button
+              type="button"
+              onClick={handleDeleteAll}
+              disabled={busy}
+              className="rounded-md border border-red-200 text-red-600 text-xs font-medium px-3 py-1.5 hover:bg-red-50 disabled:opacity-50"
+            >
+              모두 삭제
+            </button>
+          )}
+        </div>
       </header>
 
       {loading && <p className="text-slate-500 text-sm">불러오는 중…</p>}
@@ -131,12 +167,12 @@ export function Notifications() {
             </div>
           )
           return (
-            <li key={n.id}>
+            <li key={n.id} className="relative group">
               {n.link ? (
                 <Link
                   to={n.link}
                   onClick={() => handleItemClick(n)}
-                  className="block hover:bg-slate-50"
+                  className="block hover:bg-slate-50 pr-10"
                 >
                   {body}
                 </Link>
@@ -144,11 +180,25 @@ export function Notifications() {
                 <button
                   type="button"
                   onClick={() => handleItemClick(n)}
-                  className="w-full text-left hover:bg-slate-50"
+                  className="w-full text-left hover:bg-slate-50 pr-10"
                 >
                   {body}
                 </button>
               )}
+              <button
+                type="button"
+                aria-label="알림 삭제"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  void handleDeleteOne(n.id)
+                }}
+                className="absolute top-2 right-2 h-7 w-7 inline-flex items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-red-600"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
             </li>
           )
         })}
