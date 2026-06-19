@@ -178,21 +178,33 @@ exports.ppurioAdmin = onRequest({ invoker: "public" }, async (req, res) => {
       if (tokens.length === 0) {
         return res.json({ ok: true, sent: 0, failed: 0, invalid: 0, results: [] });
       }
+      const linkFromData =
+        p.data && typeof p.data.link === "string" ? p.data.link : null;
       // 푸시 발송 전에 각 학생 알림함에도 기록 (앱 안 켜도 알림함에 남음)
       for (const uid of targetIds) {
-        await db.collection("notifications").add({
+        const notif = {
           recipientUid: uid,
           title,
           body,
           kind: "push",
           readAt: null,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
+        };
+        if (linkFromData) notif.link = linkFromData;
+        await db.collection("notifications").add(notif);
       }
 
+      const dataPayload =
+        p.data && typeof p.data === "object" ? { ...p.data } : {};
+      // FCM data 값은 문자열이어야 함
+      for (const k of Object.keys(dataPayload)) {
+        if (typeof dataPayload[k] !== "string") {
+          dataPayload[k] = String(dataPayload[k]);
+        }
+      }
       const message = {
         notification: { title, body },
-        data: p.data && typeof p.data === "object" ? p.data : {},
+        data: dataPayload,
         tokens,
       };
       const result = await admin.messaging().sendEachForMulticast(message);
@@ -543,6 +555,8 @@ exports.scheduledNotify = onSchedule(
             if (typeof tt === "string" && tt) tokens.push(tt);
           }
         }
+        const schedLink =
+          typeof data.link === "string" && data.link ? data.link : "/notifications";
         // 알림함 기록
         for (const uid of targetIds) {
           await db.collection("notifications").add({
@@ -550,6 +564,7 @@ exports.scheduledNotify = onSchedule(
             title: data.title,
             body: data.body || "",
             kind: "push",
+            link: schedLink,
             readAt: null,
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
           });
@@ -559,6 +574,7 @@ exports.scheduledNotify = onSchedule(
           try {
             await admin.messaging().sendEachForMulticast({
               notification: { title: data.title, body: data.body || "" },
+              data: { link: schedLink },
               tokens,
             });
           } catch (e) {

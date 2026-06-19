@@ -1,5 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
+import { Capacitor } from '@capacitor/core'
+import { FirebaseMessaging } from '@capacitor-firebase/messaging'
 import { useAuth } from '../contexts/useAuth'
 import { unreadNotificationCount } from '../lib/firestore'
 
@@ -126,6 +128,30 @@ export function Layout() {
     }
     // location.pathname 변경 시 다시 카운트 (알림함 페이지 떠난 직후 등 반영)
   }, [profile, location.pathname])
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
+    let removed = false
+    let handle: { remove: () => void } | null = null
+    FirebaseMessaging.addListener('notificationActionPerformed', (event) => {
+      const link = (event?.notification?.data as { link?: unknown } | undefined)
+        ?.link
+      if (typeof link === 'string' && link.startsWith('/')) {
+        navigate(link)
+      } else {
+        navigate('/notifications')
+      }
+    })
+      .then((h) => {
+        if (removed) h.remove()
+        else handle = h
+      })
+      .catch(() => {})
+    return () => {
+      removed = true
+      handle?.remove()
+    }
+  }, [navigate])
 
   async function handleLogout() {
     setMenuOpen(false)

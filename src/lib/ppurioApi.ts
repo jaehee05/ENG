@@ -170,7 +170,16 @@ export async function sendPushNotification(input: {
   all?: boolean
   title: string
   body: string
+  link?: string
   data?: Record<string, string>
 }): Promise<PushSendResult> {
-  return call<PushSendResult>('sendPush', input)
+  const data = { ...(input.data || {}) }
+  if (input.link) data.link = input.link
+  return call<PushSendResult>('sendPush', {
+    uids: input.uids,
+    all: input.all,
+    title: input.title,
+    body: input.body,
+    data,
+  })
 }

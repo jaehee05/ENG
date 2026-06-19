@@ -197,6 +197,7 @@ export function AdminStudentDetail() {
         uids: [id],
         title: '📝 새 과제가 부여되었어요',
         body,
+        link: '/assignments',
       })
     } catch {
       // 실패해도 과제 부여 자체엔 영향 없음

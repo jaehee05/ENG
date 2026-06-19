@@ -120,6 +120,7 @@ export function AdminAnnounce() {
               all: true,
               title: `📢 ${title.trim()}`,
               body: body.trim(),
+              link: '/notice',
             })
             setNotice(
               (prev) =>
