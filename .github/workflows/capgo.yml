@@ -1,0 +1,71 @@
+name: Capgo Deploy
+
+# main 에 코드가 푸시되면 자동으로 버전 patch 올리고 빌드해서
+# Capgo production 채널에 새 번들을 업로드한다.
+# 필요한 것: 저장소 Secrets 에 CAPGO_API_KEY 1개.
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - '.github/**'
+  # 시크릿 추가 후 현재 상태를 수동으로 한 번 배포할 때 사용
+  workflow_dispatch:
+
+# 버전 bump + commit-back 이 동시에 겹치지 않게 직렬화
+concurrency:
+  group: capgo-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # 시크릿이 없으면 (예: 포크) 조용히 건너뜀
+    if: ${{ github.repository == 'jaehee05/eng' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # commit-back 푸시 권한
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install deps
+        run: npm ci || npm install
+
+      - name: Bump patch version
+        run: npm version patch --no-git-tag-version
+
+      - name: Build web bundle
+        run: npm run build
+
+      - name: Upload bundle to Capgo (production)
+        env:
+          CAPGO_API_KEY: ${{ secrets.CAPGO_API_KEY }}
+        run: |
+          if [ -z "$CAPGO_API_KEY" ]; then
+            echo "::error::CAPGO_API_KEY 시크릿이 설정되지 않았습니다. 저장소 Settings > Secrets > Actions 에 추가하세요."
+            exit 1
+          fi
+          VERSION=$(node -p "require('./package.json').version")
+          echo "Uploading bundle $VERSION ..."
+          npx @capgo/cli bundle upload --apikey "$CAPGO_API_KEY" --channel production
+          npx @capgo/cli channel set production --bundle "$VERSION" --apikey "$CAPGO_API_KEY"
+
+      - name: Commit version bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          if git diff --cached --quiet; then
+            echo "버전 변경 없음 — 커밋 생략"
+          else
+            git commit -m "chore: bump version for Capgo release [skip ci]"
+            git push
+          fi
