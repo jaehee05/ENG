@@ -34,7 +34,7 @@ import type {
   WordEntry,
   ReadingQuestion,
 } from './types'
-import { DEFAULT_CATEGORIES } from './types'
+import { DEFAULT_CATEGORIES, isReadingAttemptComplete } from './types'
 
 export async function listVocabSets(): Promise<VocabSet[]> {
   const snap = await getDocs(query(collection(db, 'vocabSets'), orderBy('createdAt', 'desc')))
@@ -493,6 +493,10 @@ export function isAssignmentDone(asn: Assignment, atts: Attempt[]): boolean {
     (a) => a.type === asn.type && a.refId === asn.refId && !a.practice,
   )
   if (matched.length === 0) return false
+  if (asn.type === 'reading') {
+    // 지문 문제풀이는 만점이거나 오답을 모두 재도전으로 맞혀야 완료.
+    return matched.some((a) => isReadingAttemptComplete(a))
+  }
   if (asn.minCorrect && asn.minCorrect > 0) {
     return matched.some((a) => (a.correct ?? 0) >= (asn.minCorrect ?? 0))
   }
@@ -504,6 +508,15 @@ export async function setAssignmentManualDone(
   value: boolean,
 ): Promise<void> {
   await updateDoc(doc(db, 'assignments', id), { manualDone: value })
+}
+
+export async function markAttemptWrongReviewed(
+  id: string,
+  value: boolean,
+): Promise<void> {
+  await updateDoc(doc(db, 'attempts', id), {
+    wrongReviewedAt: value ? serverTimestamp() : null,
+  })
 }
 
 export async function setAttemptPractice(

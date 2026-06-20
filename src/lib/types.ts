@@ -317,7 +317,17 @@ export interface Attempt {
   practice?: boolean
   vocabResults?: VocabResult[]
   readingResults?: ReadingResult[]
+  /** reading 한정: 모든 오답을 재도전으로 맞혀 검토 완료한 시각. */
+  wrongReviewedAt?: Timestamp | null
   createdAt: Timestamp | null
+}
+
+/** reading attempt가 완료(만점이거나 오답 검토 완료)인지 판정. */
+export function isReadingAttemptComplete(a: Attempt): boolean {
+  const total = a.total || 0
+  const correct = a.correct || 0
+  if (total > 0 && correct === total) return true
+  return !!a.wrongReviewedAt
 }
 
 export interface ReadingRef {

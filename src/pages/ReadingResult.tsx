@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { getAttempt, getReading } from '../lib/firestore'
+import {
+  getAttempt,
+  getReading,
+  markAttemptWrongReviewed,
+} from '../lib/firestore'
 import { renderUnderlines } from '../lib/renderUnderlines'
 import {
   getSharedPassageBlock,
@@ -100,6 +104,7 @@ export function ReadingResult() {
 
   // 재도전: 문항별로 선택된 인덱스 보관 (기록 X)
   const [retry, setRetry] = useState<Record<number, number>>({})
+  const [reviewedLocal, setReviewedLocal] = useState(false)
 
   useEffect(() => {
     if (!attemptId) return
@@ -136,6 +141,25 @@ export function ReadingResult() {
       .map((r, i) => (r.correct ? -1 : i))
       .filter((i) => i >= 0)
   }, [attempt])
+
+  const alreadyReviewed = !!attempt?.wrongReviewedAt || reviewedLocal
+  const allWrongRetriedCorrect =
+    wrongIndices.length > 0 &&
+    wrongIndices.every((i) => {
+      const r = attempt?.readingResults?.[i]
+      return r && retry[i] === r.correctAnswer
+    })
+
+  useEffect(() => {
+    if (!attempt) return
+    if (alreadyReviewed) return
+    if (!allWrongRetriedCorrect) return
+    setReviewedLocal(true)
+    void markAttemptWrongReviewed(attempt.id, true).catch(() => {
+      // 비치명적: 다음 진입 시 다시 시도
+      setReviewedLocal(false)
+    })
+  }, [attempt, alreadyReviewed, allWrongRetriedCorrect])
 
   if (loading) return <p className="text-slate-500 text-sm">불러오는 중...</p>
   if (error) return <p className="text-red-600 text-sm">{error}</p>
@@ -209,6 +233,24 @@ export function ReadingResult() {
           />
         </div>
       </div>
+
+      {!hasWrong && (
+        <div className="rounded-lg border border-brand-200 bg-brand-50/60 p-3 text-sm font-medium text-brand-800">
+          ✅ 만점! 과제 완료 처리되었습니다.
+        </div>
+      )}
+
+      {hasWrong && alreadyReviewed && (
+        <div className="rounded-lg border border-brand-200 bg-brand-50/60 p-3 text-sm font-medium text-brand-800">
+          ✅ 오답 검토 완료 — 과제 완료 처리되었습니다.
+        </div>
+      )}
+
+      {hasWrong && !alreadyReviewed && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50/70 p-3 text-sm text-slate-800">
+          ⚠️ <span className="font-semibold">아직 완료가 아니에요.</span> 아래 오답을 모두 재도전해서 정답을 맞혀야 과제가 완료 처리됩니다.
+        </div>
+      )}
 
       {hasWrong && (
         <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4 space-y-3">

@@ -515,12 +515,23 @@ function nowKstParts() {
   };
 }
 
+function isReadingAttemptCompleteSrv(a) {
+  const total = a.total || 0;
+  const correct = a.correct || 0;
+  if (total > 0 && correct === total) return true;
+  return !!a.wrongReviewedAt;
+}
+
 function isAssignmentDoneSrv(asn, attempts) {
   if (asn.manualDone) return true;
   const matched = attempts.filter(
     (a) => a.type === asn.type && a.refId === asn.refId && !a.practice,
   );
   if (matched.length === 0) return false;
+  if (asn.type === "reading") {
+    // 지문 문제풀이는 만점이거나 오답을 모두 검토해야 완료.
+    return matched.some((a) => isReadingAttemptCompleteSrv(a));
+  }
   if (asn.minCorrect && asn.minCorrect > 0) {
     return matched.some((a) => (a.correct || 0) >= asn.minCorrect);
   }
@@ -569,9 +580,23 @@ function buildWeeklyReportVarsSrv(assignments, attempts, windowStartMs) {
   const passCount = vocabAttempts.filter((a) => (a.correct || 0) >= VOCAB_PASS_THRESHOLD).length;
   const sessionCount = vocabAttempts.length;
 
-  const readingAttempts = recentAttempts.filter((a) => a.type === "reading" && !a.practice);
-  const totalR = readingAttempts.reduce((s, a) => s + (a.total || 0), 0);
-  const totalCorrectR = readingAttempts.reduce((s, a) => s + (a.correct || 0), 0);
+  // 지문 통계는 '완료된' attempt(만점이거나 오답 검토 완료)만 집계.
+  // 미완료 attempt까지 합치면 "지문 0개 완료, 정답률 X%" 같은 정합성 깨짐이 생김.
+  const completedReadingAttempts = recentAttempts.filter(
+    (a) => a.type === "reading" && !a.practice && isReadingAttemptCompleteSrv(a),
+  );
+  const uniqueDoneReadingIds = new Set(
+    completedReadingAttempts.map((a) => a.refId),
+  );
+  const doneReadingCount = uniqueDoneReadingIds.size;
+  const totalR = completedReadingAttempts.reduce(
+    (s, a) => s + (a.total || 0),
+    0,
+  );
+  const totalCorrectR = completedReadingAttempts.reduce(
+    (s, a) => s + (a.correct || 0),
+    0,
+  );
   const ratio = totalR > 0 ? Math.round((totalCorrectR / totalR) * 100) : null;
 
   const vocabPctLine =
@@ -581,9 +606,9 @@ function buildWeeklyReportVarsSrv(assignments, attempts, windowStartMs) {
   const vocabBody = sessionCount === 0
     ? "▫️ 지난주 응시 기록 없음"
     : `▫️ 학습 ${vocabAsn.length}회분 · 단어 ${totalWords}개\n▫️ 통과 ${passCount}/${sessionCount}회 (암기 ${totalCorrectV}개)`;
-  const readingBody = readingAttempts.length === 0
-    ? "▫️ 지난주 응시 기록 없음"
-    : `▫️ 지문 ${readingDone}개 완료\n▫️ 📈 정답률 ${ratio}% (${totalCorrectR}/${totalR}문항)`;
+  const readingBody = completedReadingAttempts.length === 0
+    ? "▫️ 지난주 완료한 지문 없음"
+    : `▫️ 지문 ${doneReadingCount}개 완료\n▫️ 📈 정답률 ${ratio}% (${totalCorrectR}/${totalR}문항)`;
 
   return {
     var1: ["📊 지난주 과제 성취도", vocabPctLine, readingPctLine].join("\n"),

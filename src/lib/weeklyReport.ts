@@ -1,4 +1,5 @@
 import { isAssignmentDone } from './firestore'
+import { isReadingAttemptComplete } from './types'
 import type { Assignment, Attempt } from './types'
 
 /** 단어 시험 통과 기준 (회당 맞춘 단어 수). 사용자 템플릿 예시: 30개 중 25개. */
@@ -44,11 +45,20 @@ export function buildWeeklyReportVars(
   ).length
   const sessionCount = vocabAttempts.length
 
-  const readingAttempts = attempts.filter(
-    (a) => a.type === 'reading' && !a.practice,
+  // 지문 통계는 '완료된' attempt(만점이거나 오답 검토 완료)만 집계.
+  // 미완료 attempt까지 합치면 "지문 0개 완료, 정답률 50%" 같은 정합성 깨짐이 생김.
+  const completedReadingAttempts = attempts.filter(
+    (a) => a.type === 'reading' && !a.practice && isReadingAttemptComplete(a),
   )
-  const totalR = readingAttempts.reduce((s, a) => s + (a.total || 0), 0)
-  const totalCorrectR = readingAttempts.reduce(
+  const uniqueDoneReadingIds = new Set(
+    completedReadingAttempts.map((a) => a.refId),
+  )
+  const doneReadingCount = uniqueDoneReadingIds.size
+  const totalR = completedReadingAttempts.reduce(
+    (s, a) => s + (a.total || 0),
+    0,
+  )
+  const totalCorrectR = completedReadingAttempts.reduce(
     (s, a) => s + (a.correct || 0),
     0,
   )
@@ -68,7 +78,7 @@ export function buildWeeklyReportVars(
 
   const var3 = [
     '📝 문제 풀이',
-    `▫️ 지문 ${readingDone}개 완료`,
+    `▫️ 지문 ${doneReadingCount}개 완료`,
     `▫️ 📈 정답률 ${ratio}% (${totalCorrectR}/${totalR}문항)`,
   ].join('\n')
 
