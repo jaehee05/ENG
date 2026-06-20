@@ -44,14 +44,25 @@ function isIos(): boolean {
 
 export const liveActivity = {
   async isSupported(): Promise<boolean> {
-    if (!isIos()) return false
+    const d = await this.diagnose()
+    return d.supported
+  },
+
+  /** 미지원 사유를 구분해서 반환 (디버그용). */
+  async diagnose(): Promise<{
+    supported: boolean
+    reason: 'not-ios' | 'plugin-missing' | 'system-disabled' | 'ok'
+    error?: string
+  }> {
+    if (!isIos()) return { supported: false, reason: 'not-ios' }
     try {
       const r = await native.isSupported()
-      return !!r.supported
+      if (r.supported) return { supported: true, reason: 'ok' }
+      return { supported: false, reason: 'system-disabled' }
     } catch (err) {
-      // 플러그인 미등록·메서드 미존재 → 미지원으로 간주
+      const msg = err instanceof Error ? err.message : String(err)
       console.warn('[liveActivity] isSupported failed:', err)
-      return false
+      return { supported: false, reason: 'plugin-missing', error: msg }
     }
   },
 

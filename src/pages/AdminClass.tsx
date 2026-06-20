@@ -36,15 +36,20 @@ export function AdminClass() {
 
   const [activityId, setActivityId] = useState<string>('')
   const [activitySupported, setActivitySupported] = useState<boolean | null>(null)
+  const [activityDiagnose, setActivityDiagnose] = useState<{
+    reason: string
+    error?: string
+  } | null>(null)
   const [activityBusy, setActivityBusy] = useState(false)
 
   useEffect(() => {
     let cancelled = false
-    Promise.all([getTodayClass(), liveActivity.isSupported(), liveActivity.currentId()])
-      .then(([sched, supported, id]) => {
+    Promise.all([getTodayClass(), liveActivity.diagnose(), liveActivity.currentId()])
+      .then(([sched, diag, id]) => {
         if (cancelled) return
         if (sched) populate(sched)
-        setActivitySupported(supported)
+        setActivitySupported(diag.supported)
+        setActivityDiagnose({ reason: diag.reason, error: diag.error })
         setActivityId(id)
       })
       .catch((e) => {
@@ -283,8 +288,11 @@ export function AdminClass() {
             <header className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-slate-800">Live Activity</h2>
               {activitySupported === false && (
-                <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-0.5">
-                  이 기기 미지원
+                <span
+                  className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-0.5"
+                  title={activityDiagnose?.error ?? ''}
+                >
+                  미지원 ({activityDiagnose?.reason ?? '?'})
                 </span>
               )}
               {activitySupported === true && activityId && (
@@ -296,6 +304,11 @@ export function AdminClass() {
             <p className="text-xs text-slate-500">
               iPhone (iOS 16.1+) 의 KJHEDU 앱에서만 동작합니다. 브라우저에서는 버튼이 동작하지 않아요.
             </p>
+            {activityDiagnose && (
+              <pre className="text-[10px] text-slate-500 bg-slate-50 rounded p-2 overflow-x-auto">
+                diagnose: {JSON.stringify(activityDiagnose, null, 2)}
+              </pre>
+            )}
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
