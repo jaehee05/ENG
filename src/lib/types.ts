@@ -438,6 +438,22 @@ export interface UserNotification {
   createdAt: Timestamp | null
 }
 
+/** 오늘 수업 Dynamic Island Live Activity 입력값. classSchedule/today 단일 문서로 저장. */
+export interface ClassSchedule {
+  /** 수업 장소 (예: "강남 본원 A호"). */
+  location: string
+  /** 시작 측 텍스트 (예: "출발", "강의 시작"). */
+  startLabel: string
+  /** 종료 측 텍스트 (예: "도착", "강의 끝"). */
+  endLabel: string
+  /** 수업 시작 시각. */
+  startAt: Timestamp | null
+  /** 수업 종료 시각. */
+  endAt: Timestamp | null
+  /** 마지막 수정 시각. */
+  updatedAt: Timestamp | null
+}
+
 export interface WordLookup {
   en: string
   ko: string

@@ -21,6 +21,7 @@ import type {
   AssignmentCategory,
   Attempt,
   CategoryConfig,
+  ClassSchedule,
   NotificationKind,
   PersonalTodo,
   PushSchedule,
@@ -825,4 +826,29 @@ export async function updateCategory(
 
 export async function deleteCategory(id: string): Promise<void> {
   await deleteDoc(doc(db, 'categories', id))
+}
+
+// ───── 오늘 수업 Live Activity 입력 ─────
+
+export async function getTodayClass(): Promise<ClassSchedule | null> {
+  const snap = await getDoc(doc(db, 'classSchedule', 'today'))
+  if (!snap.exists()) return null
+  return snap.data() as ClassSchedule
+}
+
+export async function saveTodayClass(input: {
+  location: string
+  startLabel: string
+  endLabel: string
+  startAt: Date | null
+  endAt: Date | null
+}): Promise<void> {
+  await setDoc(doc(db, 'classSchedule', 'today'), {
+    location: input.location,
+    startLabel: input.startLabel,
+    endLabel: input.endLabel,
+    startAt: input.startAt ? Timestamp.fromDate(input.startAt) : null,
+    endAt: input.endAt ? Timestamp.fromDate(input.endAt) : null,
+    updatedAt: serverTimestamp(),
+  })
 }
