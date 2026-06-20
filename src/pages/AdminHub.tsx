@@ -56,7 +56,7 @@ const tools: AdminTool[] = [
     ),
   },
   {
-    to: '/reading',
+    to: '/admin/readings',
     title: '지문 관리',
     desc: '지문 등록 / 수정 / 카테고리',
     icon: (
@@ -67,7 +67,7 @@ const tools: AdminTool[] = [
     ),
   },
   {
-    to: '/vocab',
+    to: '/admin/vocab',
     title: '단어 시험지 관리',
     desc: '시험지 등록 / 단어 재분석',
     icon: (

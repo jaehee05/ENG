@@ -10,9 +10,10 @@ import {
 import type { VocabSense, VocabSet, WordEntry } from '../lib/types'
 import { parseSenseBody } from '../lib/parseTextbookVocab'
 
-export function VocabList() {
+export function VocabList({ manage = false }: { manage?: boolean }) {
   const { profile } = useAuth()
   const isAdmin = profile?.role === 'admin'
+  const canManage = isAdmin && manage
   const [sets, setSets] = useState<VocabSet[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -106,13 +107,13 @@ export function VocabList() {
       <header className="flex items-end justify-between gap-2 flex-wrap">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-            학습
+            {manage ? '관리' : '학습'}
           </p>
           <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
-            단어 시험지
+            {manage ? '단어 시험지 관리' : '단어 시험지'}
           </h1>
         </div>
-        {profile?.role === 'admin' && (
+        {canManage && (
           <div className="flex gap-1.5 flex-wrap">
             <button
               type="button"
@@ -166,7 +167,7 @@ export function VocabList() {
               </div>
               <span className="text-slate-300 text-lg shrink-0">→</span>
             </Link>
-            {isAdmin && (
+            {canManage && (
               <button
                 type="button"
                 onClick={(e) => handleDelete(e, s)}

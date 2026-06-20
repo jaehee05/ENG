@@ -64,9 +64,10 @@ function buildGroups(readings: Reading[]): Group[] {
   return groups
 }
 
-export function ReadingList() {
+export function ReadingList({ manage = false }: { manage?: boolean }) {
   const { profile } = useAuth()
   const isAdmin = profile?.role === 'admin'
+  const canManage = isAdmin && manage
   const [items, setItems] = useState<Reading[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -345,13 +346,13 @@ export function ReadingList() {
       <header className="flex items-end justify-between gap-3 flex-wrap">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-            학습
+            {manage ? '관리' : '학습'}
           </p>
           <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
-            지문 문제풀이
+            {manage ? '지문 관리' : '지문 문제풀이'}
           </h1>
         </div>
-        {isAdmin && (
+        {canManage && (
           <div className="flex gap-1.5 flex-wrap">
             <button
               type="button"
@@ -387,7 +388,7 @@ export function ReadingList() {
         </p>
       )}
 
-      {isAdmin && items.length > 0 && !reorderMode && (
+      {canManage && items.length > 0 && !reorderMode && (
         <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
@@ -492,7 +493,7 @@ export function ReadingList() {
         </div>
       )}
 
-      {isAdmin && items.length > 0 && !reorderMode && (
+      {canManage && items.length > 0 && !reorderMode && (
         <div className="rounded-lg border border-slate-200 bg-white p-4 flex items-center justify-between gap-3 flex-wrap">
           <div>
             <p className="text-sm font-semibold text-slate-900">한글 해석 일괄 생성</p>
@@ -527,7 +528,7 @@ export function ReadingList() {
         <p className="text-slate-500 text-sm">등록된 지문이 없습니다.</p>
       )}
 
-      {reorderMode && isAdmin ? (
+      {reorderMode && canManage ? (
         <div className="space-y-3">
           {items.map((r, i) => (
             <div

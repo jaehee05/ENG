@@ -84,6 +84,8 @@ function App() {
               <Route path="/reading/import" element={<ReadingImport />} />
               <Route path="/reading/:id/edit" element={<ReadingEdit />} />
               <Route path="/admin" element={<AdminHub />} />
+              <Route path="/admin/readings" element={<ReadingList manage />} />
+              <Route path="/admin/vocab" element={<VocabList manage />} />
               <Route path="/admin/students" element={<AdminStudents />} />
               <Route path="/admin/students/:id" element={<AdminStudentDetail />} />
               <Route path="/admin/notify" element={<AdminNotify />} />
