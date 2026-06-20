@@ -3,8 +3,18 @@ import Capacitor
 import Foundation
 
 /// JS 의 `LiveActivity` 플러그인 → ActivityKit 브릿지.
+/// Capacitor 7+ 부터는 CAPBridgedPlugin 프로토콜로 등록.
 @objc(LiveActivityPlugin)
-public class LiveActivityPlugin: CAPPlugin {
+public class LiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
+    public let identifier = "LiveActivityPlugin"
+    public let jsName = "LiveActivity"
+    public let pluginMethods: [CAPPluginMethod] = [
+        CAPPluginMethod(name: "isSupported", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "startClass", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "updateClass", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "endClass", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "currentId", returnType: CAPPluginReturnPromise),
+    ]
 
     @objc public override func load() {
         // 필요시 초기화. 현재는 비어있음.
