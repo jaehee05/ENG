@@ -6,6 +6,7 @@ import {
   createAssignment,
   deleteAssignment,
   deleteAttempt,
+  ensureDefaultCategories,
   isAssignmentDone,
   listAssignmentsForStudent,
   listAttemptsForUser,
@@ -21,20 +22,14 @@ import type {
   AssignmentType,
   AssignmentCategory,
   Attempt,
+  CategoryConfig,
   Reading,
   UserAccount,
   VocabSet,
   WordLookup,
 } from '../lib/types'
 
-const CATEGORY_LABELS: Record<AssignmentCategory, string> = {
-  problem: '문제 풀이',
-  vocab: '단어 시험',
-  mock: '모의고사',
-  etc: '기타',
-}
-
-function defaultCategory(type: AssignmentType): AssignmentCategory {
+function defaultCategoryKey(type: AssignmentType): AssignmentCategory {
   if (type === 'vocab') return 'vocab'
   if (type === 'reading') return 'problem'
   return 'etc'
@@ -80,6 +75,7 @@ export function AdminStudentDetail() {
 
   const [assignType, setAssignType] = useState<AssignmentType>('reading')
   const [assignCategory, setAssignCategory] = useState<AssignmentCategory>('problem')
+  const [categories, setCategories] = useState<CategoryConfig[]>([])
   const [assignRefId, setAssignRefId] = useState('')
   const [assignDue, setAssignDue] = useState('')
   const [assignNote, setAssignNote] = useState('')
@@ -102,8 +98,9 @@ export function AdminStudentDetail() {
       listVocabSets(),
       listReadings(),
       listAssignmentsForStudent(id),
+      ensureDefaultCategories(),
     ])
-      .then(([acc, atts, wb, vs, rd, asn]) => {
+      .then(([acc, atts, wb, vs, rd, asn, cats]) => {
         if (cancelled) return
         if (!acc) {
           setError('학생을 찾을 수 없습니다.')
@@ -115,6 +112,7 @@ export function AdminStudentDetail() {
         setVocabSets(vs)
         setReadings(rd)
         setAssignments(asn)
+        setCategories(cats)
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : '불러오기에 실패했습니다.')
@@ -482,7 +480,7 @@ export function AdminStudentDetail() {
                   const t = e.target.value as AssignmentType
                   setAssignType(t)
                   setAssignRefId('')
-                  setAssignCategory(defaultCategory(t))
+                  setAssignCategory(defaultCategoryKey(t))
                 }}
                 className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               >
@@ -501,9 +499,9 @@ export function AdminStudentDetail() {
                   }
                   className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                 >
-                  {(['problem', 'vocab', 'mock', 'etc'] as const).map((c) => (
-                    <option key={c} value={c}>
-                      {CATEGORY_LABELS[c]}
+                  {categories.map((c) => (
+                    <option key={c.key} value={c.key}>
+                      {c.label}
                     </option>
                   ))}
                 </select>

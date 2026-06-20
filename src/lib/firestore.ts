@@ -20,6 +20,7 @@ import type {
   AssignmentType,
   AssignmentCategory,
   Attempt,
+  CategoryConfig,
   NotificationKind,
   PersonalTodo,
   PushSchedule,
@@ -32,6 +33,7 @@ import type {
   WordEntry,
   ReadingQuestion,
 } from './types'
+import { DEFAULT_CATEGORIES } from './types'
 
 export async function listVocabSets(): Promise<VocabSet[]> {
   const snap = await getDocs(query(collection(db, 'vocabSets'), orderBy('createdAt', 'desc')))
@@ -763,4 +765,52 @@ export function formatDate(ts: Timestamp | null | undefined): string {
   if (!ts) return ''
   const d = ts.toDate()
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
+}
+
+// ───── 과제 카테고리 (관리자 편집 가능) ─────
+
+export async function listCategories(): Promise<CategoryConfig[]> {
+  const snap = await getDocs(collection(db, 'categories'))
+  const items = snap.docs.map(
+    (d) => ({ id: d.id, ...(d.data() as Omit<CategoryConfig, 'id'>) }),
+  )
+  return items.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+}
+
+/** categories 컬렉션이 비어있으면 디폴트 4종을 시드. 이미 있으면 no-op. 시드된 목록 반환. */
+export async function ensureDefaultCategories(): Promise<CategoryConfig[]> {
+  const existing = await listCategories()
+  if (existing.length > 0) return existing
+  const created: CategoryConfig[] = []
+  for (const c of DEFAULT_CATEGORIES) {
+    const ref = await addDoc(collection(db, 'categories'), c)
+    created.push({ id: ref.id, ...c })
+  }
+  return created
+}
+
+export async function createCategory(input: {
+  key: string
+  label: string
+  color: string
+  order: number
+}): Promise<string> {
+  const ref = await addDoc(collection(db, 'categories'), {
+    key: input.key,
+    label: input.label,
+    color: input.color,
+    order: input.order,
+  })
+  return ref.id
+}
+
+export async function updateCategory(
+  id: string,
+  patch: Partial<Pick<CategoryConfig, 'key' | 'label' | 'color' | 'order'>>,
+): Promise<void> {
+  await updateDoc(doc(db, 'categories', id), patch)
+}
+
+export async function deleteCategory(id: string): Promise<void> {
+  await deleteDoc(doc(db, 'categories', id))
 }

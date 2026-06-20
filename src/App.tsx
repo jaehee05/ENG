@@ -28,6 +28,7 @@ import { AdminStudents } from './pages/AdminStudents'
 import { AdminStudentDetail } from './pages/AdminStudentDetail'
 import { AdminNotify } from './pages/AdminNotify'
 import { AdminAnnounce } from './pages/AdminAnnounce'
+import { AdminCategories } from './pages/AdminCategories'
 import { AdminHub } from './pages/AdminHub'
 import { MyHistory } from './pages/MyHistory'
 import { Notifications } from './pages/Notifications'
@@ -90,6 +91,7 @@ function App() {
               <Route path="/admin/students/:id" element={<AdminStudentDetail />} />
               <Route path="/admin/notify" element={<AdminNotify />} />
               <Route path="/admin/announce" element={<AdminAnnounce />} />
+              <Route path="/admin/categories" element={<AdminCategories />} />
             </Route>
           </Route>
 

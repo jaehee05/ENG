@@ -88,6 +88,19 @@ const tools: AdminTool[] = [
       </svg>
     ),
   },
+  {
+    to: '/admin/categories',
+    title: '과제 카테고리',
+    desc: '학생 과제 분류 이름·색상 추가/수정',
+    icon: (
+      <svg {...iconProps}>
+        <circle cx="12" cy="6" r="3" />
+        <circle cx="18" cy="12" r="3" />
+        <circle cx="12" cy="18" r="3" />
+        <circle cx="6" cy="12" r="3" />
+      </svg>
+    ),
+  },
 ]
 
 export function AdminHub() {

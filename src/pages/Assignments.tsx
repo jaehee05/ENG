@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import { Clover, progressToLeaves } from '../components/Clover'
 import { useAuth } from '../contexts/useAuth'
 import {
   addTodo,
   deleteTodo,
+  ensureDefaultCategories,
   formatDate,
   isAssignmentDone,
   listAssignmentsForStudent,
@@ -14,8 +16,8 @@ import {
 import {
   assignmentCategory,
   type Assignment,
-  type AssignmentCategory,
   type Attempt,
+  type CategoryConfig,
   type PersonalTodo,
 } from '../lib/types'
 
@@ -30,48 +32,50 @@ function isOverdue(a: Assignment): boolean {
   return a.dueAt.toMillis() < Date.now()
 }
 
-interface CategoryMeta {
-  key: AssignmentCategory
-  label: string
-  dot: string
-  ring: string
-}
-
-// 표시 순서: 문제 풀이 → 단어 시험 → 모의고사 → 기타
-const CATEGORIES: CategoryMeta[] = [
-  { key: 'problem', label: '문제 풀이', dot: 'bg-sky-500', ring: 'border-sky-500 text-sky-600' },
-  { key: 'vocab', label: '단어 시험', dot: 'bg-violet-500', ring: 'border-violet-500 text-violet-600' },
-  { key: 'mock', label: '모의고사', dot: 'bg-rose-500', ring: 'border-rose-500 text-rose-600' },
-  { key: 'etc', label: '기타', dot: 'bg-emerald-500', ring: 'border-emerald-500 text-emerald-600' },
-]
-
 /** Todomate 스타일 동그란 체크 표시. */
 function CheckCircle({
   done,
-  meta,
+  color,
   onToggle,
 }: {
   done: boolean
-  meta: CategoryMeta
+  color: string
   onToggle?: () => void
 }) {
-  const cls = `shrink-0 h-5 w-5 rounded-full border-2 flex items-center justify-center transition ${
-    done ? `${meta.dot} border-transparent text-white` : `bg-white ${meta.ring}`
-  }`
+  const baseCls =
+    'shrink-0 h-5 w-5 rounded-full border-2 flex items-center justify-center transition'
+  const style = done
+    ? { backgroundColor: color, borderColor: color, color: '#fff' }
+    : { backgroundColor: '#fff', borderColor: color, color }
   const check = (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="3.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M4 12l5 5L20 6" />
     </svg>
   )
   if (onToggle) {
     return (
-      <button type="button" onClick={onToggle} className={cls} aria-label={done ? '완료 취소' : '완료'}>
+      <button
+        type="button"
+        onClick={onToggle}
+        className={baseCls}
+        style={style}
+        aria-label={done ? '완료 취소' : '완료'}
+      >
         {done && check}
       </button>
     )
   }
   return (
-    <span className={cls} aria-hidden>
+    <span className={baseCls} style={style} aria-hidden>
       {done && check}
     </span>
   )
@@ -79,6 +83,7 @@ function CheckCircle({
 
 export function Assignments() {
   const { profile } = useAuth()
+  const [categories, setCategories] = useState<CategoryConfig[]>([])
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [attempts, setAttempts] = useState<Attempt[]>([])
   const [todos, setTodos] = useState<PersonalTodo[]>([])
@@ -93,12 +98,14 @@ export function Assignments() {
       listAssignmentsForStudent(profile.id),
       listAttemptsForUser(profile.id),
       listTodosForStudent(profile.id),
+      ensureDefaultCategories(),
     ])
-      .then(([asn, atts, tds]) => {
+      .then(([asn, atts, tds, cats]) => {
         if (cancelled) return
         setAssignments(asn)
         setAttempts(atts)
         setTodos(tds)
+        setCategories(cats)
       })
       .catch(() => {})
       .finally(() => {
@@ -109,15 +116,24 @@ export function Assignments() {
     }
   }, [profile])
 
-  // 분류별로 과제 묶기
+  /** 카테고리 키 → 설정 lookup. 어떤 과제가 알 수 없는 키를 갖고 있으면 'etc'로 폴백. */
+  const catByKey = useMemo(() => {
+    const map: Record<string, CategoryConfig> = {}
+    for (const c of categories) map[c.key] = c
+    return map
+  }, [categories])
+
+  const etcMeta = catByKey['etc']
+
+  // 카테고리별로 과제 묶기 (모르는 키는 etc로 합침)
   const byCategory = useMemo(() => {
-    const map: Record<AssignmentCategory, Assignment[]> = {
-      problem: [],
-      vocab: [],
-      mock: [],
-      etc: [],
+    const map: Record<string, Assignment[]> = {}
+    for (const c of categories) map[c.key] = []
+    for (const a of assignments) {
+      const key = assignmentCategory(a)
+      if (map[key]) map[key].push(a)
+      else if (map['etc']) map['etc'].push(a)
     }
-    for (const a of assignments) map[assignmentCategory(a)].push(a)
     const sortFn = (x: Assignment, y: Assignment) => {
       const dx = isAssignmentDone(x, attempts) ? 1 : 0
       const dy = isAssignmentDone(y, attempts) ? 1 : 0
@@ -127,14 +143,26 @@ export function Assignments() {
       if (tx !== ty) return tx - ty
       return x.refTitle.localeCompare(y.refTitle, 'ko', { numeric: true })
     }
-    for (const k of Object.keys(map) as AssignmentCategory[]) map[k].sort(sortFn)
+    for (const k of Object.keys(map)) map[k].sort(sortFn)
     return map
-  }, [assignments, attempts])
+  }, [assignments, attempts, categories])
 
   const totalOpen = useMemo(
     () => assignments.filter((a) => !isAssignmentDone(a, attempts)).length,
     [assignments, attempts],
   )
+
+  const overallDone = useMemo(() => {
+    const doneAsn = assignments.filter((a) => isAssignmentDone(a, attempts)).length
+    const doneTodo = todos.filter((t) => t.done).length
+    return doneAsn + doneTodo
+  }, [assignments, attempts, todos])
+
+  const overallTotal = assignments.length + todos.length
+
+  /** 헤더 클로버는 모든 카테고리 중 첫 번째 색을 쓴다 (보통 problem 색). */
+  const headerColor = categories[0]?.color ?? '#10b981'
+  const headerLeaves = progressToLeaves(overallDone, overallTotal)
 
   async function handleAddTodo(e: FormEvent) {
     e.preventDefault()
@@ -175,7 +203,6 @@ export function Assignments() {
     }
   }
 
-  const etcMeta = CATEGORIES.find((c) => c.key === 'etc')!
   const sortedTodos = useMemo(
     () => [...todos].sort((a, b) => (a.done ? 1 : 0) - (b.done ? 1 : 0)),
     [todos],
@@ -183,24 +210,36 @@ export function Assignments() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-          나의 학습
-        </p>
-        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
-          과제
-        </h1>
-        {!loading && (
-          <p className="text-xs text-slate-500 mt-1">남은 과제 {totalOpen}개</p>
+      <header className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+            나의 학습
+          </p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
+            과제
+          </h1>
+          {!loading && (
+            <p className="text-xs text-slate-500 mt-1">
+              남은 과제 {totalOpen}개
+              {overallTotal > 0 && (
+                <>
+                  {' · '}오늘 {overallDone}/{overallTotal}
+                </>
+              )}
+            </p>
+          )}
+        </div>
+        {!loading && overallTotal > 0 && (
+          <Clover filled={headerLeaves} color={headerColor} size={44} />
         )}
       </header>
 
       {loading && <p className="text-slate-500 text-sm">불러오는 중…</p>}
 
       {!loading &&
-        CATEGORIES.map((meta) => {
-          const items = byCategory[meta.key]
-          const isEtc = meta.key === 'etc'
+        categories.map((cat) => {
+          const items = byCategory[cat.key] ?? []
+          const isEtc = cat.key === 'etc'
           // 기타를 제외한 카테고리는 과제가 있을 때만 표시
           if (!isEtc && items.length === 0) return null
 
@@ -208,12 +247,13 @@ export function Assignments() {
             items.filter((a) => isAssignmentDone(a, attempts)).length +
             (isEtc ? todos.filter((t) => t.done).length : 0)
           const totalCount = items.length + (isEtc ? todos.length : 0)
+          const leaves = progressToLeaves(doneCount, totalCount)
 
           return (
-            <section key={meta.key} className="space-y-2">
+            <section key={cat.key} className="space-y-2">
               <div className="flex items-center gap-2">
-                <span className={`h-2.5 w-2.5 rounded-full ${meta.dot}`} />
-                <h2 className="text-sm font-semibold text-slate-800">{meta.label}</h2>
+                <Clover filled={leaves} color={cat.color} size={22} />
+                <h2 className="text-sm font-semibold text-slate-800">{cat.label}</h2>
                 <span className="text-xs text-slate-400">
                   {doneCount}/{totalCount}
                 </span>
@@ -226,7 +266,7 @@ export function Assignments() {
                   const path = assignmentPath(a)
                   const inner = (
                     <>
-                      <CheckCircle done={done} meta={meta} />
+                      <CheckCircle done={done} color={cat.color} />
                       <div className="min-w-0 flex-1">
                         <p
                           className={`text-sm truncate ${
@@ -271,7 +311,11 @@ export function Assignments() {
                 {isEtc &&
                   sortedTodos.map((t) => (
                     <div key={t.id} className="flex items-center gap-3 px-4 py-3 group">
-                      <CheckCircle done={t.done} meta={etcMeta} onToggle={() => toggleTodo(t)} />
+                      <CheckCircle
+                        done={t.done}
+                        color={etcMeta?.color ?? cat.color}
+                        onToggle={() => toggleTodo(t)}
+                      />
                       <p
                         className={`min-w-0 flex-1 text-sm truncate ${
                           t.done ? 'text-slate-400 line-through' : 'text-slate-900'

@@ -327,8 +327,32 @@ export interface ReadingRef {
 
 export type AssignmentType = 'vocab' | 'reading' | 'custom'
 
-/** 학생 과제 페이지의 분류. */
-export type AssignmentCategory = 'problem' | 'vocab' | 'mock' | 'etc'
+/** 학생 과제 페이지의 분류 키. 관리자가 Firestore에서 자유롭게 추가/수정. */
+export type AssignmentCategory = string
+
+/** 기본 4종 카테고리 키 (시드 및 유추 기본값에 사용). */
+export const BUILTIN_CATEGORY_KEYS = ['problem', 'vocab', 'mock', 'etc'] as const
+export type BuiltinCategoryKey = (typeof BUILTIN_CATEGORY_KEYS)[number]
+
+export interface CategoryConfig {
+  id: string
+  /** Assignment.category 에 저장되는 슬러그. builtin 4종은 'problem'/'vocab'/'mock'/'etc' 고정. */
+  key: string
+  label: string
+  /** HEX 색상 (예: "#0ea5e9"). */
+  color: string
+  /** 표시 순서 (오름차순). */
+  order: number
+  /** true 면 키 변경·삭제 불가. */
+  builtin?: boolean
+}
+
+export const DEFAULT_CATEGORIES: Omit<CategoryConfig, 'id'>[] = [
+  { key: 'problem', label: '문제 풀이', color: '#0ea5e9', order: 0, builtin: true },
+  { key: 'vocab', label: '단어 시험', color: '#8b5cf6', order: 1, builtin: true },
+  { key: 'mock', label: '모의고사', color: '#f43f5e', order: 2, builtin: true },
+  { key: 'etc', label: '기타', color: '#10b981', order: 3, builtin: true },
+]
 
 export interface Assignment {
   id: string
@@ -350,7 +374,7 @@ export interface Assignment {
   createdAt: Timestamp | null
 }
 
-/** type에서 기본 분류를 유추 (category 필드가 없는 기존 과제 호환). */
+/** type에서 기본 분류 키를 유추 (category 필드가 없는 기존 과제 호환). */
 export function assignmentCategory(a: Assignment): AssignmentCategory {
   if (a.category) return a.category
   if (a.type === 'vocab') return 'vocab'
