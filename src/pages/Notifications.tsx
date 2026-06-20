@@ -137,6 +137,7 @@ export function Notifications() {
         </div>
       )}
 
+      {items.length > 0 && (
       <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white overflow-hidden">
         {items.map((n) => {
           const body = (
@@ -203,6 +204,7 @@ export function Notifications() {
           )
         })}
       </ul>
+      )}
     </div>
   )
 }
