@@ -71,8 +71,18 @@
 		CCE32F6F2FE3C93D002FDDA7 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		CC22500A2FE66800003D5508 /* Exceptions for "KJHEDULiveActivity" folder in "KJHEDULiveActivityExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = CC224FBD2FE666D4003D5508 /* KJHEDULiveActivityExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		CC224FC42FE666D4003D5508 /* KJHEDULiveActivity */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = KJHEDULiveActivity; sourceTree = "<group>"; };
+		CC224FC42FE666D4003D5508 /* KJHEDULiveActivity */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (CC22500A2FE66800003D5508 /* Exceptions for "KJHEDULiveActivity" folder in "KJHEDULiveActivityExtension" target */, ); explicitFileTypes = {}; explicitFolders = (); path = KJHEDULiveActivity; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
