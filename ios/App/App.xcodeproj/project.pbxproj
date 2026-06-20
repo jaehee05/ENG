@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 60;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -15,8 +15,40 @@
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
+		CC224FC12FE666D4003D5508 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CC224FC02FE666D4003D5508 /* WidgetKit.framework */; };
+		CC224FC32FE666D4003D5508 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CC224FC22FE666D4003D5508 /* SwiftUI.framework */; };
+		CC224FD22FE666D7003D5508 /* KJHEDULiveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CC224FBE2FE666D4003D5508 /* KJHEDULiveActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		CC224FE22FE66905003D5508 /* KJHEDUColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC224FE02FE66905003D5508 /* KJHEDUColors.swift */; };
+		CC224FE32FE66905003D5508 /* KJHEDULiveActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC224FE12FE66905003D5508 /* KJHEDULiveActivityAttributes.swift */; };
+		CC224FE42FE66905003D5508 /* KJHEDUColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC224FE02FE66905003D5508 /* KJHEDUColors.swift */; };
+		CC224FE52FE66905003D5508 /* KJHEDULiveActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC224FE12FE66905003D5508 /* KJHEDULiveActivityAttributes.swift */; };
+		CC224FE92FE6697D003D5508 /* LiveActivityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC224FE72FE6697D003D5508 /* LiveActivityPlugin.swift */; };
 		CCE32F6E2FE3C83F002FDDA7 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = CCE32F6D2FE3C83F002FDDA7 /* GoogleService-Info.plist */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		CC224FD02FE666D7003D5508 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CC224FBD2FE666D4003D5508;
+			remoteInfo = KJHEDULiveActivityExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		CC224FD32FE666D7003D5508 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				CC224FD22FE666D7003D5508 /* KJHEDULiveActivityExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
@@ -29,9 +61,19 @@
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
+		CC224FBE2FE666D4003D5508 /* KJHEDULiveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = KJHEDULiveActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		CC224FC02FE666D4003D5508 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		CC224FC22FE666D4003D5508 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		CC224FE02FE66905003D5508 /* KJHEDUColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KJHEDUColors.swift; sourceTree = "<group>"; };
+		CC224FE12FE66905003D5508 /* KJHEDULiveActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KJHEDULiveActivityAttributes.swift; sourceTree = "<group>"; };
+		CC224FE72FE6697D003D5508 /* LiveActivityPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivityPlugin.swift; sourceTree = "<group>"; };
 		CCE32F6D2FE3C83F002FDDA7 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		CCE32F6F2FE3C93D002FDDA7 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		CC224FC42FE666D4003D5508 /* KJHEDULiveActivity */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = KJHEDULiveActivity; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		504EC3011FED79650016851F /* Frameworks */ = {
@@ -39,6 +81,15 @@
 			buildActionMask = 2147483647;
 			files = (
 				4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CC224FBB2FE666D4003D5508 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CC224FC32FE666D4003D5508 /* SwiftUI.framework in Frameworks */,
+				CC224FC12FE666D4003D5508 /* WidgetKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -50,7 +101,12 @@
 			children = (
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
+				CC224FC42FE666D4003D5508 /* KJHEDULiveActivity */,
+				CC224FBF2FE666D4003D5508 /* Frameworks */,
 				504EC3051FED79650016851F /* Products */,
+				CC224FE02FE66905003D5508 /* KJHEDUColors.swift */,
+				CC224FE12FE66905003D5508 /* KJHEDULiveActivityAttributes.swift */,
+				CC224FE72FE6697D003D5508 /* LiveActivityPlugin.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -58,6 +114,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3041FED79650016851F /* App.app */,
+				CC224FBE2FE666D4003D5508 /* KJHEDULiveActivityExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -79,6 +136,15 @@
 			path = App;
 			sourceTree = "<group>";
 		};
+		CC224FBF2FE666D4003D5508 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				CC224FC02FE666D4003D5508 /* WidgetKit.framework */,
+				CC224FC22FE666D4003D5508 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -89,10 +155,12 @@
 				504EC3001FED79650016851F /* Sources */,
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
+				CC224FD32FE666D7003D5508 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				CC224FD12FE666D7003D5508 /* PBXTargetDependency */,
 			);
 			name = App;
 			packageProductDependencies = (
@@ -102,19 +170,44 @@
 			productReference = 504EC3041FED79650016851F /* App.app */;
 			productType = "com.apple.product-type.application";
 		};
+		CC224FBD2FE666D4003D5508 /* KJHEDULiveActivityExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CC224FD72FE666D7003D5508 /* Build configuration list for PBXNativeTarget "KJHEDULiveActivityExtension" */;
+			buildPhases = (
+				CC224FBA2FE666D4003D5508 /* Sources */,
+				CC224FBB2FE666D4003D5508 /* Frameworks */,
+				CC224FBC2FE666D4003D5508 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				CC224FC42FE666D4003D5508 /* KJHEDULiveActivity */,
+			);
+			name = KJHEDULiveActivityExtension;
+			packageProductDependencies = (
+			);
+			productName = KJHEDULiveActivityExtension;
+			productReference = CC224FBE2FE666D4003D5508 /* KJHEDULiveActivityExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
 		504EC2FC1FED79650016851F /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastSwiftUpdateCheck = 0920;
+				LastSwiftUpdateCheck = 2700;
 				LastUpgradeCheck = 0920;
 				TargetAttributes = {
 					504EC3031FED79650016851F = {
 						CreatedOnToolsVersion = 9.2;
-						LastSwiftMigration = 1100;
+						LastSwiftMigration = 2700;
 						ProvisioningStyle = Automatic;
+					};
+					CC224FBD2FE666D4003D5508 = {
+						CreatedOnToolsVersion = 27.0;
 					};
 				};
 			};
@@ -135,6 +228,7 @@
 			projectRoot = "";
 			targets = (
 				504EC3031FED79650016851F /* App */,
+				CC224FBD2FE666D4003D5508 /* KJHEDULiveActivityExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -154,6 +248,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CC224FBC2FE666D4003D5508 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -161,11 +262,31 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CC224FE42FE66905003D5508 /* KJHEDUColors.swift in Sources */,
+				CC224FE52FE66905003D5508 /* KJHEDULiveActivityAttributes.swift in Sources */,
+				CC224FE92FE6697D003D5508 /* LiveActivityPlugin.swift in Sources */,
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CC224FBA2FE666D4003D5508 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CC224FE22FE66905003D5508 /* KJHEDUColors.swift in Sources */,
+				CC224FE32FE66905003D5508 /* KJHEDULiveActivityAttributes.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		CC224FD12FE666D7003D5508 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CC224FBD2FE666D4003D5508 /* KJHEDULiveActivityExtension */;
+			targetProxy = CC224FD02FE666D7003D5508 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
 		504EC30B1FED79650016851F /* Main.storyboard */ = {
@@ -301,6 +422,7 @@
 			baseConfigurationReference = 958DCC722DB07C7200EA8C5F /* debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -316,6 +438,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.kjhedu.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -325,6 +448,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -339,6 +463,90 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.kjhedu.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		CC224FD42FE666D7003D5508 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2NXUWKQU6N;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = KJHEDULiveActivity/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = KJHEDULiveActivity;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kjhedu.app.KJHEDULiveActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		CC224FD52FE666D7003D5508 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 2NXUWKQU6N;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = KJHEDULiveActivity/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = KJHEDULiveActivity;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kjhedu.app.KJHEDULiveActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -361,6 +569,15 @@
 			buildConfigurations = (
 				504EC3171FED79650016851F /* Debug */,
 				504EC3181FED79650016851F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		CC224FD72FE666D7003D5508 /* Build configuration list for PBXNativeTarget "KJHEDULiveActivityExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CC224FD42FE666D7003D5508 /* Debug */,
+				CC224FD52FE666D7003D5508 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

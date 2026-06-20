@@ -12,9 +12,9 @@ struct KJHEDULiveActivityWidget: Widget {
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    HStack(spacing: 6) {
-                        CarouselDot()
-                            .frame(width: 14, height: 14)
+                    HStack(spacing: 4) {
+                        Text("📍")
+                            .font(.caption2)
                         Text(context.state.location.isEmpty ? "수업" : context.state.location)
                             .font(.caption2)
                             .foregroundColor(.secondary)
@@ -23,9 +23,8 @@ struct KJHEDULiveActivityWidget: Widget {
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     HStack(spacing: 4) {
-                        Image(systemName: "graduationcap.fill")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
+                        CarouselDot()
+                            .frame(width: 14, height: 14)
                         Text("KJHEDU")
                             .font(.caption2)
                             .foregroundColor(.secondary)
@@ -59,9 +58,9 @@ struct LockScreenView: View {
     var body: some View {
         VStack(spacing: 10) {
             HStack(alignment: .center) {
-                HStack(spacing: 6) {
-                    CarouselDot()
-                        .frame(width: 16, height: 16)
+                HStack(spacing: 4) {
+                    Text("📍")
+                        .font(.caption)
                     Text(state.location.isEmpty ? "수업" : state.location)
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -69,9 +68,8 @@ struct LockScreenView: View {
                 }
                 Spacer()
                 HStack(spacing: 4) {
-                    Image(systemName: "graduationcap.fill")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    CarouselDot()
+                        .frame(width: 16, height: 16)
                     Text("KJHEDU")
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -79,22 +77,22 @@ struct LockScreenView: View {
             }
 
             HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(state.startLabel.isEmpty ? "시작" : state.startLabel)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.white)
                     Text(state.startAt, style: .time)
                         .font(.title3.bold())
                         .foregroundColor(.kjheduGreen)
                 }
                 Spacer()
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(state.endLabel.isEmpty ? "끝" : state.endLabel)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(state.endAt, style: .time)
                         .font(.title3.bold())
                         .foregroundColor(.kjheduGreen)
+                    Text(state.endLabel.isEmpty ? "끝" : state.endLabel)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.white)
                 }
             }
 
@@ -193,11 +191,10 @@ struct ExpandedCenterView: View {
     let state: KJHEDULiveActivityAttributes.ClassContentState
 
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
+        HStack(alignment: .firstTextBaseline) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(state.startLabel.isEmpty ? "시작" : state.startLabel)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+                    .font(.subheadline.weight(.semibold))
                 Text(state.startAt, style: .time)
                     .font(.headline)
                     .foregroundColor(.kjheduGreen)
@@ -206,13 +203,12 @@ struct ExpandedCenterView: View {
             Image(systemName: "pencil")
                 .foregroundColor(.kjheduGreen)
             Spacer()
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(state.endLabel.isEmpty ? "끝" : state.endLabel)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(state.endAt, style: .time)
                     .font(.headline)
                     .foregroundColor(.kjheduGreen)
+                Text(state.endLabel.isEmpty ? "끝" : state.endLabel)
+                    .font(.subheadline.weight(.semibold))
             }
         }
     }

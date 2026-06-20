@@ -33,8 +33,17 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = (scene as? UIWindowScene) else { return }
         let window = UIWindow(windowScene: windowScene)
-        window.rootViewController = CAPBridgeViewController()
+        let bridgeVC = KJHEDUBridgeViewController()
+        window.rootViewController = bridgeVC
         self.window = window
         window.makeKeyAndVisible()
+    }
+}
+
+/// Capacitor 8 의 packageClassList(자동 생성) 에는 NPM 플러그인만 들어가서
+/// in-project 커스텀 플러그인은 capacitorDidLoad 에서 직접 등록해야 함.
+class KJHEDUBridgeViewController: CAPBridgeViewController {
+    override open func capacitorDidLoad() {
+        bridge?.registerPluginInstance(LiveActivityPlugin())
     }
 }

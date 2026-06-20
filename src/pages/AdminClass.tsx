@@ -399,24 +399,23 @@ function Preview({
       </p>
       <div className="flex items-center justify-between text-xs">
         <span className="text-slate-400 flex items-center gap-1.5">
-          <span className="inline-block w-4 h-4 rounded" style={{ background: CAROUSEL_COLOR }} />
+          <span aria-hidden>📍</span>
           {location || '수업 장소'}
         </span>
-        <span className="text-slate-400">🪑 KJHEDU</span>
+        <span className="text-slate-400 flex items-center gap-1.5">
+          <img src="/favicon.png" alt="" className="w-4 h-4 rounded-full" />
+          KJHEDU
+        </span>
       </div>
-      <div className="flex items-center justify-between mt-2">
-        <div>
-          <p className="text-xs text-slate-400">{startLabel}</p>
-          <p className="text-base font-semibold" style={{ color: CAROUSEL_COLOR }}>
-            {fmtClock(start)}
-          </p>
-        </div>
-        <div className="text-right">
-          <p className="text-base font-semibold">
-            <span style={{ color: CAROUSEL_COLOR }}>{fmtClock(end)}</span>{' '}
-            <span className="text-slate-300">{endLabel}</span>
-          </p>
-        </div>
+      <div className="flex items-baseline justify-between mt-2">
+        <p className="text-base font-semibold">
+          <span className="text-slate-300">{startLabel}</span>{' '}
+          <span style={{ color: CAROUSEL_COLOR }}>{fmtClock(start)}</span>
+        </p>
+        <p className="text-base font-semibold">
+          <span style={{ color: CAROUSEL_COLOR }}>{fmtClock(end)}</span>{' '}
+          <span className="text-slate-300">{endLabel}</span>
+        </p>
       </div>
       <div className="mt-2 relative h-2 rounded-full bg-slate-700 overflow-hidden">
         <div
