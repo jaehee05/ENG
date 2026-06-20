@@ -327,6 +327,9 @@ export interface ReadingRef {
 
 export type AssignmentType = 'vocab' | 'reading' | 'custom'
 
+/** 학생 과제 페이지의 분류. */
+export type AssignmentCategory = 'problem' | 'vocab' | 'mock' | 'etc'
+
 export interface Assignment {
   id: string
   studentUid: string
@@ -334,6 +337,8 @@ export interface Assignment {
   assignedBy: string
   assignedByName: string
   type: AssignmentType
+  /** 과제 페이지 분류. 없으면 type에서 유추. */
+  category?: AssignmentCategory
   refId: string
   refTitle: string
   note?: string
@@ -342,6 +347,23 @@ export interface Assignment {
   /** Admin-toggled completion. When true, considered done regardless of attempts. */
   manualDone?: boolean
   dueAt: Timestamp | null
+  createdAt: Timestamp | null
+}
+
+/** type에서 기본 분류를 유추 (category 필드가 없는 기존 과제 호환). */
+export function assignmentCategory(a: Assignment): AssignmentCategory {
+  if (a.category) return a.category
+  if (a.type === 'vocab') return 'vocab'
+  if (a.type === 'reading') return 'problem'
+  return 'etc'
+}
+
+/** 학생이 직접 관리하는 '기타' 카테고리의 개인 할 일. */
+export interface PersonalTodo {
+  id: string
+  studentUid: string
+  text: string
+  done: boolean
   createdAt: Timestamp | null
 }
 

@@ -18,8 +18,10 @@ import type {
   Announcement,
   Assignment,
   AssignmentType,
+  AssignmentCategory,
   Attempt,
   NotificationKind,
+  PersonalTodo,
   PushSchedule,
   Reading,
   ReadingResult,
@@ -455,6 +457,7 @@ export async function createAssignment(input: {
   assignedBy: string
   assignedByName: string
   type: AssignmentType
+  category?: AssignmentCategory
   refId: string
   refTitle: string
   note?: string
@@ -472,6 +475,7 @@ export async function createAssignment(input: {
     createdAt: serverTimestamp(),
     dueAt: input.dueAt ? Timestamp.fromDate(input.dueAt) : null,
   }
+  if (input.category) payload.category = input.category
   if (input.note && input.note.trim()) payload.note = input.note.trim()
   if (input.minCorrect && input.minCorrect > 0) {
     payload.minCorrect = Math.trunc(input.minCorrect)
@@ -516,6 +520,40 @@ export async function listAssignmentsForStudent(uid: string): Promise<Assignment
 
 export async function deleteAssignment(id: string): Promise<void> {
   await deleteDoc(doc(db, 'assignments', id))
+}
+
+// ───── 학생 개인 할 일 (기타 카테고리) ─────
+export async function listTodosForStudent(uid: string): Promise<PersonalTodo[]> {
+  const snap = await getDocs(
+    query(collection(db, 'todos'), where('studentUid', '==', uid)),
+  )
+  const items = snap.docs.map(
+    (d) => ({ id: d.id, ...(d.data() as Omit<PersonalTodo, 'id'>) }),
+  )
+  return items.sort(
+    (a, b) => (a.createdAt?.toMillis() ?? 0) - (b.createdAt?.toMillis() ?? 0),
+  )
+}
+
+export async function addTodo(input: {
+  studentUid: string
+  text: string
+}): Promise<string> {
+  const ref = await addDoc(collection(db, 'todos'), {
+    studentUid: input.studentUid,
+    text: input.text.trim(),
+    done: false,
+    createdAt: serverTimestamp(),
+  })
+  return ref.id
+}
+
+export async function setTodoDone(id: string, value: boolean): Promise<void> {
+  await updateDoc(doc(db, 'todos', id), { done: value })
+}
+
+export async function deleteTodo(id: string): Promise<void> {
+  await deleteDoc(doc(db, 'todos', id))
 }
 
 // ───── 공지사항 ─────

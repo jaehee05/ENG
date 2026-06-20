@@ -19,12 +19,26 @@ import { listMyWordbook } from '../lib/wordbook'
 import type {
   Assignment,
   AssignmentType,
+  AssignmentCategory,
   Attempt,
   Reading,
   UserAccount,
   VocabSet,
   WordLookup,
 } from '../lib/types'
+
+const CATEGORY_LABELS: Record<AssignmentCategory, string> = {
+  problem: '문제 풀이',
+  vocab: '단어 시험',
+  mock: '모의고사',
+  etc: '기타',
+}
+
+function defaultCategory(type: AssignmentType): AssignmentCategory {
+  if (type === 'vocab') return 'vocab'
+  if (type === 'reading') return 'problem'
+  return 'etc'
+}
 
 function fmtDate(ts: { toDate: () => Date } | null | undefined): string {
   if (!ts) return ''
@@ -65,6 +79,7 @@ export function AdminStudentDetail() {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
 
   const [assignType, setAssignType] = useState<AssignmentType>('reading')
+  const [assignCategory, setAssignCategory] = useState<AssignmentCategory>('problem')
   const [assignRefId, setAssignRefId] = useState('')
   const [assignDue, setAssignDue] = useState('')
   const [assignNote, setAssignNote] = useState('')
@@ -228,6 +243,7 @@ export function AdminStudentDetail() {
           assignedBy: profile.id,
           assignedByName: profile.displayName,
           type: 'custom',
+          category: assignCategory,
           refId: '',
           refTitle: title,
           note: assignNote,
@@ -261,6 +277,7 @@ export function AdminStudentDetail() {
             assignedBy: profile.id,
             assignedByName: profile.displayName,
             type: 'reading',
+            category: assignCategory,
             refId: r.id,
             refTitle: r.title,
             note: assignNote,
@@ -303,6 +320,7 @@ export function AdminStudentDetail() {
         assignedBy: profile.id,
         assignedByName: profile.displayName,
         type: assignType,
+        category: assignCategory,
         refId: assignRefId,
         refTitle: target.title,
         note: assignNote,
@@ -461,8 +479,10 @@ export function AdminStudentDetail() {
               <select
                 value={assignType}
                 onChange={(e) => {
-                  setAssignType(e.target.value as AssignmentType)
+                  const t = e.target.value as AssignmentType
+                  setAssignType(t)
                   setAssignRefId('')
+                  setAssignCategory(defaultCategory(t))
                 }}
                 className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               >
@@ -470,6 +490,24 @@ export function AdminStudentDetail() {
                 <option value="vocab">단어 시험지</option>
                 <option value="custom">직접 입력 (외부 과제)</option>
               </select>
+              <div className="mt-2">
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  과제 페이지 분류
+                </label>
+                <select
+                  value={assignCategory}
+                  onChange={(e) =>
+                    setAssignCategory(e.target.value as AssignmentCategory)
+                  }
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                >
+                  {(['problem', 'vocab', 'mock', 'etc'] as const).map((c) => (
+                    <option key={c} value={c}>
+                      {CATEGORY_LABELS[c]}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">

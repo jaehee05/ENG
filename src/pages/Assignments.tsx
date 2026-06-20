@@ -1,21 +1,23 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import {
+  addTodo,
+  deleteTodo,
   formatDate,
   isAssignmentDone,
   listAssignmentsForStudent,
   listAttemptsForUser,
+  listTodosForStudent,
+  setTodoDone,
 } from '../lib/firestore'
-import type { Assignment, Attempt } from '../lib/types'
-
-const TITLE_RE = /^(.+?)\s+(\d+(?:-\d+)?)\s*(?:번|문제)?\s*$/
-
-function parseTitle(title: string): { category: string; tag: string } | null {
-  const m = TITLE_RE.exec(title.trim())
-  if (!m) return null
-  return { category: m[1].trim(), tag: m[2] }
-}
+import {
+  assignmentCategory,
+  type Assignment,
+  type AssignmentCategory,
+  type Attempt,
+  type PersonalTodo,
+} from '../lib/types'
 
 function assignmentPath(a: Assignment): string | null {
   if (a.type === 'vocab') return `/vocab/${a.refId}`
@@ -23,89 +25,66 @@ function assignmentPath(a: Assignment): string | null {
   return null
 }
 
-function assignmentLabel(a: Assignment): string {
-  if (a.type === 'vocab') return '단어'
-  if (a.type === 'reading') return '지문'
-  return '외부'
-}
-
 function isOverdue(a: Assignment): boolean {
   if (!a.dueAt) return false
   return a.dueAt.toMillis() < Date.now()
 }
 
-type Tab = 'open' | 'done' | 'all'
-
-interface SingleItem {
-  kind: 'single'
-  a: Assignment
-  sortKey: number
+interface CategoryMeta {
+  key: AssignmentCategory
+  label: string
+  dot: string
+  ring: string
 }
-interface GroupItem {
-  kind: 'group'
-  category: string
-  items: Assignment[]
-  sortKey: number
-}
-type Item = SingleItem | GroupItem
 
-function buildItems(list: Assignment[]): Item[] {
-  const items: Item[] = []
-  const groups = new Map<string, Assignment[]>()
-  for (const a of list) {
-    if (a.type !== 'reading') {
-      items.push({
-        kind: 'single',
-        a,
-        sortKey: a.dueAt?.toMillis() ?? Infinity,
-      })
-      continue
-    }
-    const parsed = parseTitle(a.refTitle)
-    if (!parsed) {
-      items.push({
-        kind: 'single',
-        a,
-        sortKey: a.dueAt?.toMillis() ?? Infinity,
-      })
-      continue
-    }
-    if (!groups.has(parsed.category)) groups.set(parsed.category, [])
-    groups.get(parsed.category)!.push(a)
+// 표시 순서: 문제 풀이 → 단어 시험 → 모의고사 → 기타
+const CATEGORIES: CategoryMeta[] = [
+  { key: 'problem', label: '문제 풀이', dot: 'bg-sky-500', ring: 'border-sky-500 text-sky-600' },
+  { key: 'vocab', label: '단어 시험', dot: 'bg-violet-500', ring: 'border-violet-500 text-violet-600' },
+  { key: 'mock', label: '모의고사', dot: 'bg-rose-500', ring: 'border-rose-500 text-rose-600' },
+  { key: 'etc', label: '기타', dot: 'bg-emerald-500', ring: 'border-emerald-500 text-emerald-600' },
+]
+
+/** Todomate 스타일 동그란 체크 표시. */
+function CheckCircle({
+  done,
+  meta,
+  onToggle,
+}: {
+  done: boolean
+  meta: CategoryMeta
+  onToggle?: () => void
+}) {
+  const cls = `shrink-0 h-5 w-5 rounded-full border-2 flex items-center justify-center transition ${
+    done ? `${meta.dot} border-transparent text-white` : `bg-white ${meta.ring}`
+  }`
+  const check = (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 12l5 5L20 6" />
+    </svg>
+  )
+  if (onToggle) {
+    return (
+      <button type="button" onClick={onToggle} className={cls} aria-label={done ? '완료 취소' : '완료'}>
+        {done && check}
+      </button>
+    )
   }
-  for (const [category, sub] of groups) {
-    if (sub.length === 1) {
-      const a = sub[0]
-      items.push({
-        kind: 'single',
-        a,
-        sortKey: a.dueAt?.toMillis() ?? Infinity,
-      })
-      continue
-    }
-    const minDue = Math.min(...sub.map((a) => a.dueAt?.toMillis() ?? Infinity))
-    const sorted = [...sub].sort((x, y) => {
-      const xn = parseTitle(x.refTitle)?.tag ?? ''
-      const yn = parseTitle(y.refTitle)?.tag ?? ''
-      return xn.localeCompare(yn, 'ko', { numeric: true })
-    })
-    items.push({
-      kind: 'group',
-      category,
-      items: sorted,
-      sortKey: minDue,
-    })
-  }
-  return items.sort((a, b) => a.sortKey - b.sortKey)
+  return (
+    <span className={cls} aria-hidden>
+      {done && check}
+    </span>
+  )
 }
 
 export function Assignments() {
   const { profile } = useAuth()
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [attempts, setAttempts] = useState<Attempt[]>([])
+  const [todos, setTodos] = useState<PersonalTodo[]>([])
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<Tab>('open')
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [newTodo, setNewTodo] = useState('')
+  const [adding, setAdding] = useState(false)
 
   useEffect(() => {
     if (!profile) return
@@ -113,11 +92,13 @@ export function Assignments() {
     Promise.all([
       listAssignmentsForStudent(profile.id),
       listAttemptsForUser(profile.id),
+      listTodosForStudent(profile.id),
     ])
-      .then(([asn, atts]) => {
+      .then(([asn, atts, tds]) => {
         if (cancelled) return
         setAssignments(asn)
         setAttempts(atts)
+        setTodos(tds)
       })
       .catch(() => {})
       .finally(() => {
@@ -128,29 +109,80 @@ export function Assignments() {
     }
   }, [profile])
 
-  function toggle(category: string) {
-    setExpanded((prev) => {
-      const next = new Set(prev)
-      if (next.has(category)) next.delete(category)
-      else next.add(category)
-      return next
-    })
+  // 분류별로 과제 묶기
+  const byCategory = useMemo(() => {
+    const map: Record<AssignmentCategory, Assignment[]> = {
+      problem: [],
+      vocab: [],
+      mock: [],
+      etc: [],
+    }
+    for (const a of assignments) map[assignmentCategory(a)].push(a)
+    const sortFn = (x: Assignment, y: Assignment) => {
+      const dx = isAssignmentDone(x, attempts) ? 1 : 0
+      const dy = isAssignmentDone(y, attempts) ? 1 : 0
+      if (dx !== dy) return dx - dy // 미완료 먼저
+      const tx = x.dueAt?.toMillis() ?? Infinity
+      const ty = y.dueAt?.toMillis() ?? Infinity
+      if (tx !== ty) return tx - ty
+      return x.refTitle.localeCompare(y.refTitle, 'ko', { numeric: true })
+    }
+    for (const k of Object.keys(map) as AssignmentCategory[]) map[k].sort(sortFn)
+    return map
+  }, [assignments, attempts])
+
+  const totalOpen = useMemo(
+    () => assignments.filter((a) => !isAssignmentDone(a, attempts)).length,
+    [assignments, attempts],
+  )
+
+  async function handleAddTodo(e: FormEvent) {
+    e.preventDefault()
+    const text = newTodo.trim()
+    if (!text || !profile) return
+    setAdding(true)
+    try {
+      const id = await addTodo({ studentUid: profile.id, text })
+      setTodos((prev) => [
+        ...prev,
+        { id, studentUid: profile.id, text, done: false, createdAt: null },
+      ])
+      setNewTodo('')
+    } catch {
+      // ignore
+    } finally {
+      setAdding(false)
+    }
   }
 
-  const open = useMemo(
-    () => assignments.filter((a) => !isAssignmentDone(a, attempts)),
-    [assignments, attempts],
-  )
-  const done = useMemo(
-    () => assignments.filter((a) => isAssignmentDone(a, attempts)),
-    [assignments, attempts],
-  )
+  async function toggleTodo(t: PersonalTodo) {
+    const next = !t.done
+    setTodos((prev) => prev.map((x) => (x.id === t.id ? { ...x, done: next } : x)))
+    try {
+      await setTodoDone(t.id, next)
+    } catch {
+      setTodos((prev) => prev.map((x) => (x.id === t.id ? { ...x, done: !next } : x)))
+    }
+  }
 
-  const visible = tab === 'open' ? open : tab === 'done' ? done : assignments
-  const items = useMemo(() => buildItems(visible), [visible])
+  async function removeTodo(t: PersonalTodo) {
+    const prev = todos
+    setTodos((cur) => cur.filter((x) => x.id !== t.id))
+    try {
+      await deleteTodo(t.id)
+    } catch {
+      setTodos(prev)
+    }
+  }
+
+  const etcMeta = CATEGORIES.find((c) => c.key === 'etc')!
+  const sortedTodos = useMemo(
+    () => [...todos].sort((a, b) => (a.done ? 1 : 0) - (b.done ? 1 : 0)),
+    [todos],
+  )
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <header>
         <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
           나의 학습
@@ -159,180 +191,141 @@ export function Assignments() {
           과제
         </h1>
         {!loading && (
-          <p className="text-xs text-slate-500 mt-1">
-            미완료 {open.length} · 완료 {done.length}
-          </p>
+          <p className="text-xs text-slate-500 mt-1">남은 과제 {totalOpen}개</p>
         )}
       </header>
 
-      <div className="flex items-center gap-1 text-xs">
-        {(['open', 'done', 'all'] as const).map((k) => (
-          <button
-            key={k}
-            type="button"
-            onClick={() => setTab(k)}
-            className={`px-3 py-1.5 rounded-full transition ${
-              tab === k
-                ? 'bg-slate-900 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            {k === 'open' ? '미완료' : k === 'done' ? '완료' : '전체'}
-            <span className="ml-1 text-[10px] opacity-70">
-              {k === 'open'
-                ? open.length
-                : k === 'done'
-                  ? done.length
-                  : assignments.length}
-            </span>
-          </button>
-        ))}
-      </div>
-
       {loading && <p className="text-slate-500 text-sm">불러오는 중…</p>}
-      {!loading && items.length === 0 && (
-        <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
-          {tab === 'open'
-            ? '미완료 과제가 없어요. 잘 하고 있어요!'
-            : tab === 'done'
-              ? '완료한 과제가 아직 없어요.'
-              : '부여된 과제가 없어요.'}
-        </div>
-      )}
 
-      <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white overflow-hidden">
-        {items.map((item) => {
-          if (item.kind === 'single') {
-            const a = item.a
-            const overdue = isOverdue(a)
-            const path = assignmentPath(a)
-            const done = isAssignmentDone(a, attempts)
-            const body = (
-              <>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span
-                      className={`inline-block rounded text-[10px] font-medium px-1.5 py-0.5 ${
-                        done
-                          ? 'bg-brand-50 text-brand-700'
-                          : 'bg-slate-100 text-slate-600'
-                      }`}
-                    >
-                      {assignmentLabel(a)} {done ? '· 완료' : ''}
-                    </span>
-                    <span className="text-sm font-medium text-slate-900 truncate">
-                      {a.refTitle}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-x-3 text-[11px] text-slate-500 mt-1">
-                    {a.dueAt && (
-                      <span className={overdue && !done ? 'text-red-600 font-medium' : ''}>
-                        마감 {formatDate(a.dueAt)}
-                        {overdue && !done && ' (지남)'}
-                      </span>
-                    )}
-                    {a.note && <span className="text-slate-600">· {a.note}</span>}
-                  </div>
-                </div>
-                <span className="text-slate-300 text-lg shrink-0">
-                  {path ? '→' : ''}
-                </span>
-              </>
-            )
-            return (
-              <li key={a.id}>
-                {path ? (
-                  <Link
-                    to={path}
-                    className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50"
-                  >
-                    {body}
-                  </Link>
-                ) : (
-                  <div className="flex items-center justify-between gap-3 px-4 py-3">
-                    {body}
-                  </div>
-                )}
-              </li>
-            )
-          }
-          const isOpen = expanded.has(item.category)
-          const overdueCount = item.items.filter(isOverdue).length
-          const doneInGroup = item.items.filter((a) =>
-            isAssignmentDone(a, attempts),
-          ).length
+      {!loading &&
+        CATEGORIES.map((meta) => {
+          const items = byCategory[meta.key]
+          const isEtc = meta.key === 'etc'
+          // 기타를 제외한 카테고리는 과제가 있을 때만 표시
+          if (!isEtc && items.length === 0) return null
+
+          const doneCount =
+            items.filter((a) => isAssignmentDone(a, attempts)).length +
+            (isEtc ? todos.filter((t) => t.done).length : 0)
+          const totalCount = items.length + (isEtc ? todos.length : 0)
+
           return (
-            <li key={`g-${item.category}`}>
-              <button
-                type="button"
-                onClick={() => toggle(item.category)}
-                className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50 text-left"
-              >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="inline-block rounded bg-slate-100 text-slate-600 text-[10px] font-medium px-1.5 py-0.5">
-                      지문 묶음
-                    </span>
-                    <span className="text-sm font-medium text-slate-900 truncate">
-                      {item.category}
-                    </span>
-                    <span className="text-[11px] text-slate-500">
-                      {doneInGroup}/{item.items.length}
-                    </span>
-                  </div>
-                  {overdueCount > 0 && (
-                    <p className="text-[11px] text-red-600 mt-1">
-                      지난 과제 {overdueCount}건
-                    </p>
-                  )}
-                </div>
-                <span className="text-slate-400 text-base shrink-0">
-                  {isOpen ? '▴' : '▾'}
+            <section key={meta.key} className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className={`h-2.5 w-2.5 rounded-full ${meta.dot}`} />
+                <h2 className="text-sm font-semibold text-slate-800">{meta.label}</h2>
+                <span className="text-xs text-slate-400">
+                  {doneCount}/{totalCount}
                 </span>
-              </button>
-              {isOpen && (
-                <ul className="divide-y divide-slate-100 bg-slate-50/60 border-t border-slate-100">
-                  {item.items.map((a) => {
-                    const overdue = isOverdue(a)
-                    const parsed = parseTitle(a.refTitle)
-                    const label = parsed ? `${parsed.tag}번` : a.refTitle
-                    const doneA = isAssignmentDone(a, attempts)
-                    return (
-                      <li key={a.id}>
-                        <Link
-                          to={assignmentPath(a) ?? '#'}
-                          className="flex items-center justify-between gap-3 pl-10 pr-4 py-2.5 hover:bg-white"
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden divide-y divide-slate-100">
+                {items.map((a) => {
+                  const done = isAssignmentDone(a, attempts)
+                  const overdue = isOverdue(a) && !done
+                  const path = assignmentPath(a)
+                  const inner = (
+                    <>
+                      <CheckCircle done={done} meta={meta} />
+                      <div className="min-w-0 flex-1">
+                        <p
+                          className={`text-sm truncate ${
+                            done ? 'text-slate-400 line-through' : 'text-slate-900'
+                          }`}
                         >
-                          <div className="min-w-0 flex items-center gap-2">
-                            <span className="text-sm text-slate-900">
-                              {label}
-                            </span>
-                            {doneA && (
-                              <span className="text-[10px] text-brand-700">
-                                ✓
-                              </span>
-                            )}
+                          {a.refTitle}
+                        </p>
+                        {(a.dueAt || a.note) && (
+                          <p className="text-[11px] text-slate-500 mt-0.5 truncate">
                             {a.dueAt && (
-                              <span
-                                className={`text-[11px] ${overdue && !doneA ? 'text-red-600' : 'text-slate-500'}`}
-                              >
+                              <span className={overdue ? 'text-red-600 font-medium' : ''}>
                                 마감 {formatDate(a.dueAt)}
+                                {overdue && ' (지남)'}
                               </span>
                             )}
-                          </div>
-                          <span className="text-slate-300 text-base shrink-0">
-                            →
-                          </span>
+                            {a.dueAt && a.note && ' · '}
+                            {a.note}
+                          </p>
+                        )}
+                      </div>
+                      {path && <span className="text-slate-300 text-lg shrink-0">→</span>}
+                    </>
+                  )
+                  return (
+                    <div key={a.id}>
+                      {path ? (
+                        <Link
+                          to={path}
+                          className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50"
+                        >
+                          {inner}
                         </Link>
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
-            </li>
+                      ) : (
+                        <div className="flex items-center gap-3 px-4 py-3">{inner}</div>
+                      )}
+                    </div>
+                  )
+                })}
+
+                {/* 기타: 학생 개인 할 일 (직접 추가/완료) */}
+                {isEtc &&
+                  sortedTodos.map((t) => (
+                    <div key={t.id} className="flex items-center gap-3 px-4 py-3 group">
+                      <CheckCircle done={t.done} meta={etcMeta} onToggle={() => toggleTodo(t)} />
+                      <p
+                        className={`min-w-0 flex-1 text-sm truncate ${
+                          t.done ? 'text-slate-400 line-through' : 'text-slate-900'
+                        }`}
+                      >
+                        {t.text}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => removeTodo(t)}
+                        className="shrink-0 text-slate-300 hover:text-red-500 text-sm px-1"
+                        aria-label="삭제"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+
+                {isEtc && items.length === 0 && todos.length === 0 && (
+                  <p className="px-4 py-3 text-xs text-slate-400">
+                    직접 할 일을 추가해 보세요.
+                  </p>
+                )}
+
+                {/* 기타: 추가 입력 */}
+                {isEtc && (
+                  <form
+                    onSubmit={handleAddTodo}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-slate-50/60"
+                  >
+                    <span className="shrink-0 h-5 w-5 rounded-full border-2 border-dashed border-slate-300 flex items-center justify-center text-slate-400 text-sm">
+                      +
+                    </span>
+                    <input
+                      value={newTodo}
+                      onChange={(e) => setNewTodo(e.target.value)}
+                      placeholder="할 일 추가"
+                      className="flex-1 bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
+                    />
+                    {newTodo.trim() && (
+                      <button
+                        type="submit"
+                        disabled={adding}
+                        className="shrink-0 rounded-md bg-slate-900 text-white text-xs font-medium px-3 py-1.5 hover:bg-slate-800 disabled:opacity-50"
+                      >
+                        추가
+                      </button>
+                    )}
+                  </form>
+                )}
+              </div>
+            </section>
           )
         })}
-      </ul>
     </div>
   )
 }
