@@ -16,7 +16,9 @@ import {
   fetchPpurioSettings,
   fetchScheduleSettings,
   getAdminSecret,
+  persistAdminSecretToDb,
   savePpurioSettings,
+  saveManualDefaults,
   saveScheduleSettings,
   sendBatchAlimtalk,
   sendPushNotification,
@@ -80,10 +82,6 @@ function csvEscape(s: string): string {
   return s
 }
 
-const LS_TEMPLATE_CODE = 'eng_notify_template_code'
-const LS_MSG_TYPE = 'eng_notify_msg_type'
-const LS_NOTICE = 'eng_notify_notice'
-
 type MsgType = '기본형' | '이미지형' | '강조표기형' | '아이템리스트형'
 
 const MSG_TYPES: MsgType[] = ['기본형', '이미지형', '강조표기형', '아이템리스트형']
@@ -95,18 +93,19 @@ const MSG_TYPE_CODE: Record<MsgType, string> = {
   아이템리스트형: 'ALI',
 }
 
+const MSG_TYPE_FROM_CODE: Record<string, MsgType> = {
+  AT: '기본형',
+  AI: '이미지형',
+  ALH: '강조표기형',
+  ALI: '아이템리스트형',
+}
+
 export function AdminNotify() {
   const [bundles, setBundles] = useState<StudentBundle[]>([])
-  const [templateCode, setTemplateCode] = useState(
-    () => localStorage.getItem(LS_TEMPLATE_CODE) ?? '',
-  )
-  const [msgType, setMsgType] = useState<MsgType>(() => {
-    const v = localStorage.getItem(LS_MSG_TYPE) as MsgType | null
-    return v && MSG_TYPES.includes(v) ? v : '강조표기형'
-  })
-  const [notice, setNotice] = useState(
-    () => localStorage.getItem(LS_NOTICE) ?? '',
-  )
+  const [templateCode, setTemplateCode] = useState('')
+  const [msgType, setMsgType] = useState<MsgType>('강조표기형')
+  const [notice, setNotice] = useState('')
+  const [manualDefaultsLoaded, setManualDefaultsLoaded] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
@@ -294,6 +293,26 @@ export function AdminNotify() {
     setApiKeyMasked(v.apiKeyMasked)
     setHasApiKey(v.hasApiKey)
     setFooterLine(v.footer)
+    const md = v.manualDefaults
+    const hasDbValues = !!(md && (md.templateCode || md.notice))
+    if (hasDbValues) {
+      setTemplateCode(md.templateCode || '')
+      setNotice(md.notice || '')
+      const mt = MSG_TYPE_FROM_CODE[md.messageType || 'ALH']
+      if (mt) setMsgType(mt)
+    } else {
+      // 레거시 localStorage 값이 있으면 채워두고, 디바운스 저장 effect가 DB로 옮긴 뒤 정리.
+      const legacyTC = localStorage.getItem('eng_notify_template_code')
+      const legacyMT = localStorage.getItem('eng_notify_msg_type') as MsgType | null
+      const legacyN = localStorage.getItem('eng_notify_notice')
+      if (legacyTC) setTemplateCode(legacyTC)
+      if (legacyMT && MSG_TYPES.includes(legacyMT)) setMsgType(legacyMT)
+      if (legacyN) setNotice(legacyN)
+      localStorage.removeItem('eng_notify_template_code')
+      localStorage.removeItem('eng_notify_msg_type')
+      localStorage.removeItem('eng_notify_notice')
+    }
+    setManualDefaultsLoaded(true)
   }
 
   async function loadCreds() {
@@ -520,15 +539,18 @@ export function AdminNotify() {
     }
   }
 
+  // 사용자가 templateCode/msgType/notice를 바꾸면 디바운스 후 DB에 저장.
   useEffect(() => {
-    localStorage.setItem(LS_TEMPLATE_CODE, templateCode)
-  }, [templateCode])
-  useEffect(() => {
-    localStorage.setItem(LS_MSG_TYPE, msgType)
-  }, [msgType])
-  useEffect(() => {
-    localStorage.setItem(LS_NOTICE, notice)
-  }, [notice])
+    if (!manualDefaultsLoaded || !adminSecret) return
+    const t = setTimeout(() => {
+      void saveManualDefaults({
+        templateCode,
+        messageType: MSG_TYPE_CODE[msgType],
+        notice,
+      }).catch(() => {})
+    }, 800)
+    return () => clearTimeout(t)
+  }, [manualDefaultsLoaded, adminSecret, templateCode, msgType, notice])
 
   useEffect(() => {
     let cancelled = false
@@ -978,13 +1000,13 @@ export function AdminNotify() {
               <label className="block text-xs font-medium text-slate-600 mb-1">
                 관리자 비밀키 (ADMIN_SECRET){' '}
               </label>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <input
                   type="password"
                   value={adminSecret}
                   onChange={(e) => persistSecret(e.target.value)}
-                  placeholder="Cloud Functions ADMIN_SECRET 값"
-                  className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  placeholder="자동 bootstrap 되지 않으면 직접 입력"
+                  className="flex-1 min-w-[200px] rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
                 <button
                   type="button"
@@ -994,9 +1016,25 @@ export function AdminNotify() {
                 >
                   {credsLoading ? '확인 중...' : '서버 설정 불러오기'}
                 </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setCredsNotice(null)
+                    try {
+                      await persistAdminSecretToDb()
+                      setCredsNotice('DB에 시크릿 저장됨 — 다른 기기에서도 자동 로드됩니다.')
+                    } catch (e) {
+                      setCredsNotice(e instanceof Error ? e.message : '저장 실패')
+                    }
+                  }}
+                  disabled={!adminSecret}
+                  className="rounded-md border border-brand-300 bg-brand-50 text-brand-700 text-sm font-medium px-3 py-2 hover:bg-brand-100 disabled:opacity-50"
+                >
+                  DB에 시크릿 저장
+                </button>
               </div>
               <p className="text-[11px] text-slate-500 mt-1">
-                Cloud Functions의 <code>ADMIN_SECRET</code> env 값과 동일해야 합니다. 이 브라우저에만 저장됩니다.
+                로그인 시 자동 bootstrap. 처음 설정 시엔 ADMIN_SECRET env 값을 직접 입력 후 [DB에 시크릿 저장]을 누르면, 그 이후엔 다른 기기에서도 자동으로 받아옵니다.
               </p>
             </div>
 
@@ -1135,6 +1173,53 @@ export function AdminNotify() {
           {scheduleNotice && (
             <span className="text-xs text-brand-700">{scheduleNotice}</span>
           )}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">
+              템플릿 코드 (자동 발송용)
+            </label>
+            <input
+              type="text"
+              value={schedule.templateCode}
+              onChange={(e) =>
+                setSchedule((s) => ({ ...s, templateCode: e.target.value }))
+              }
+              placeholder="과제 현황 템플릿 코드"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">
+              발송 유형
+            </label>
+            <select
+              value={schedule.messageType}
+              onChange={(e) =>
+                setSchedule((s) => ({ ...s, messageType: e.target.value }))
+              }
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              <option value="AT">기본형</option>
+              <option value="AI">이미지형</option>
+              <option value="ALH">강조표기형</option>
+              <option value="ALI">아이템리스트형</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1">
+            안내사항 (자동 발송 시 [*3*] 칸)
+          </label>
+          <textarea
+            value={schedule.notice}
+            onChange={(e) =>
+              setSchedule((s) => ({ ...s, notice: e.target.value }))
+            }
+            rows={2}
+            placeholder="예) 이번 주말까지 미완료 과제 마무리 부탁드립니다."
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          />
         </div>
         <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none">
           <input

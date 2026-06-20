@@ -49,12 +49,25 @@ function setCors(res) {
   res.set("Access-Control-Allow-Headers", "Content-Type, X-Admin-Secret");
 }
 
-function verifySecret(req) {
-  const expected = process.env.ADMIN_SECRET;
-  if (!expected) return false;
+async function verifySecret(req) {
   const fromHeader = req.headers["x-admin-secret"];
   const fromBody = req.body && req.body.adminSecret;
-  return fromHeader === expected || fromBody === expected;
+  const provided = fromHeader || fromBody;
+  if (!provided) return false;
+  const envSecret = process.env.ADMIN_SECRET;
+  if (envSecret && provided === envSecret) return true;
+  const snap = await admin.firestore().doc("settings/notifyConfig").get();
+  const dbSecret = snap.exists ? snap.data().adminSecret : null;
+  return !!dbSecret && provided === dbSecret;
+}
+
+function normalizeManualDefaults(raw) {
+  const r = raw || {};
+  return {
+    templateCode: String(r.templateCode || ""),
+    messageType: String(r.messageType || "ALH"),
+    notice: String(r.notice || ""),
+  };
 }
 
 exports.ppurioAdmin = onRequest({ invoker: "public" }, async (req, res) => {
@@ -63,14 +76,35 @@ exports.ppurioAdmin = onRequest({ invoker: "public" }, async (req, res) => {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
 
   try {
-    if (!process.env.ADMIN_SECRET) {
-      return res.status(500).json({ error: "서버에 ADMIN_SECRET 환경변수가 설정되지 않았습니다." });
-    }
-    if (!verifySecret(req)) {
-      return res.status(401).json({ error: "관리자 인증 실패" });
+    const { action, payload } = req.body || {};
+
+    // bootstrap: uid+password 로 인증해서 adminSecret + manualDefaults 반환.
+    // 클라이언트가 첫 로그인 직후 호출. localStorage 의존 없이 DB 에서 받아온다.
+    if (action === "bootstrap") {
+      const p = payload || {};
+      const uid = String(p.uid || "");
+      const password = String(p.password || "");
+      if (!uid || !password) {
+        return res.status(400).json({ error: "uid/password 필요" });
+      }
+      const userSnap = await admin.firestore().doc(`users/${uid}`).get();
+      const user = userSnap.exists ? userSnap.data() : null;
+      if (!user || user.password !== password || user.role !== "admin") {
+        return res.status(401).json({ error: "관리자 인증 실패" });
+      }
+      const cfgSnap = await admin.firestore().doc("settings/notifyConfig").get();
+      const cfg = cfgSnap.exists ? cfgSnap.data() : {};
+      const ppurioSnap = await admin.firestore().doc("settings/ppurio").get();
+      const ppurio = ppurioSnap.exists ? ppurioSnap.data() : {};
+      return res.json({
+        adminSecret: cfg.adminSecret || process.env.ADMIN_SECRET || "",
+        manualDefaults: normalizeManualDefaults(ppurio.manualDefaults),
+      });
     }
 
-    const { action, payload } = req.body || {};
+    if (!(await verifySecret(req))) {
+      return res.status(401).json({ error: "관리자 인증 실패" });
+    }
 
     if (action === "get") {
       const snap = await admin.firestore().doc("settings/ppurio").get();
@@ -81,6 +115,7 @@ exports.ppurioAdmin = onRequest({ invoker: "public" }, async (req, res) => {
         apiKeyMasked: d.apiKey ? "••••" + String(d.apiKey).slice(-4) : "",
         hasApiKey: !!d.apiKey,
         footer: d.footer || "",
+        manualDefaults: normalizeManualDefaults(d.manualDefaults),
       });
     }
 
@@ -95,10 +130,41 @@ exports.ppurioAdmin = onRequest({ invoker: "public" }, async (req, res) => {
         footer: String(p.footer || ""),
         updatedAt: Date.now(),
       };
+      if (p.manualDefaults !== undefined) {
+        update.manualDefaults = normalizeManualDefaults(p.manualDefaults);
+      } else if (existing.manualDefaults) {
+        update.manualDefaults = normalizeManualDefaults(existing.manualDefaults);
+      }
       await admin.firestore().doc("settings/ppurio").set(update);
       if (p.apiKey || p.ppurioAccount) {
         await admin.firestore().doc("settings/ppurio_token").delete().catch(() => {});
       }
+      return res.json({ ok: true });
+    }
+
+    // manualDefaults만 단독 저장 (입력 시마다 가벼운 동기화).
+    if (action === "saveManualDefaults") {
+      const p = payload || {};
+      await admin.firestore().doc("settings/ppurio").set(
+        {
+          manualDefaults: normalizeManualDefaults(p),
+          updatedAt: Date.now(),
+        },
+        { merge: true },
+      );
+      return res.json({ ok: true });
+    }
+
+    // settings/notifyConfig.adminSecret 를 갱신/설치. 호출 시점에는 env var
+    // 혹은 기존 DB 값으로 인증되어야 함. 한 번 저장되면 그 이후엔 DB 값으로 인증 가능.
+    if (action === "setAdminSecret") {
+      const p = payload || {};
+      const next = String(p.adminSecret || "");
+      if (!next) return res.status(400).json({ error: "adminSecret 필요" });
+      await admin.firestore().doc("settings/notifyConfig").set(
+        { adminSecret: next, updatedAt: Date.now() },
+        { merge: true },
+      );
       return res.json({ ok: true });
     }
 

@@ -2,7 +2,14 @@
 const DEFAULT_URL = 'https://ppurioadmin-cfq2cexd2a-du.a.run.app'
 const ENDPOINT_URL =
   import.meta.env.VITE_PPURIO_ADMIN_URL ?? DEFAULT_URL
-const LS_SECRET = 'eng_admin_secret'
+const SS_SECRET = 'eng_admin_secret_session'
+const LEGACY_LS_SECRET = 'eng_admin_secret'
+
+export interface ManualDefaults {
+  templateCode: string
+  messageType: string
+  notice: string
+}
 
 export interface PpurioSettingsView {
   ppurioAccount: string
@@ -10,6 +17,7 @@ export interface PpurioSettingsView {
   apiKeyMasked: string
   hasApiKey: boolean
   footer: string
+  manualDefaults: ManualDefaults
 }
 
 export interface PpurioSettingsInput {
@@ -17,6 +25,7 @@ export interface PpurioSettingsInput {
   senderProfile: string
   apiKey?: string
   footer: string
+  manualDefaults?: ManualDefaults
 }
 
 export interface SendRecipient {
@@ -33,13 +42,61 @@ export interface SendResultItem {
   error?: string
 }
 
+export interface BootstrapResult {
+  adminSecret: string
+  manualDefaults: ManualDefaults
+}
+
+let memSecret: string | null = null
+
 export function getAdminSecret(): string {
-  return localStorage.getItem(LS_SECRET) ?? ''
+  if (memSecret) return memSecret
+  const fromSession = sessionStorage.getItem(SS_SECRET)
+  if (fromSession) {
+    memSecret = fromSession
+    return fromSession
+  }
+  // 마이그레이션: 기존 localStorage 값을 sessionStorage로 옮긴 뒤 제거.
+  const legacy = localStorage.getItem(LEGACY_LS_SECRET)
+  if (legacy) {
+    sessionStorage.setItem(SS_SECRET, legacy)
+    localStorage.removeItem(LEGACY_LS_SECRET)
+    memSecret = legacy
+    return legacy
+  }
+  return ''
 }
 
 export function setAdminSecret(s: string): void {
-  if (s) localStorage.setItem(LS_SECRET, s)
-  else localStorage.removeItem(LS_SECRET)
+  memSecret = s || null
+  if (s) sessionStorage.setItem(SS_SECRET, s)
+  else sessionStorage.removeItem(SS_SECRET)
+}
+
+/** uid + password 로 인증해서 adminSecret + manualDefaults를 DB에서 받아옴. */
+export async function bootstrapAdmin(
+  uid: string,
+  password: string,
+): Promise<BootstrapResult> {
+  const res = await fetch(ENDPOINT_URL, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      action: 'bootstrap',
+      payload: { uid, password },
+    }),
+  })
+  if (!res.ok) {
+    let msg = `bootstrap 실패 (HTTP ${res.status})`
+    try {
+      const body = (await res.json()) as { error?: string }
+      if (body.error) msg = body.error
+    } catch {
+      // ignore
+    }
+    throw new Error(msg)
+  }
+  return (await res.json()) as BootstrapResult
 }
 
 async function call<T>(action: string, payload?: unknown): Promise<T> {
@@ -64,6 +121,15 @@ async function call<T>(action: string, payload?: unknown): Promise<T> {
     throw new Error(msg)
   }
   return (await res.json()) as T
+}
+
+/** 현재 secret을 DB(settings/notifyConfig)에 저장. 이후 다른 기기에서 bootstrap로 받아올 수 있음. */
+export async function persistAdminSecretToDb(): Promise<void> {
+  await call<{ ok: true }>('setAdminSecret', { adminSecret: getAdminSecret() })
+}
+
+export async function saveManualDefaults(input: ManualDefaults): Promise<void> {
+  await call<{ ok: true }>('saveManualDefaults', input)
 }
 
 export async function fetchPpurioSettings(): Promise<PpurioSettingsView> {
