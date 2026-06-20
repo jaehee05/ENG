@@ -11,30 +11,18 @@ struct KJHEDULiveActivityWidget: Widget {
                 .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
             DynamicIsland {
+                // 좁은 leading/trailing 에는 아이콘만 — 카메라 노치 옆이라 텍스트는 자주 깨짐
                 DynamicIslandExpandedRegion(.leading) {
-                    HStack(spacing: 4) {
-                        Text("📍")
-                            .font(.caption2)
-                        Text(context.state.location.isEmpty ? "수업" : context.state.location)
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                    }
+                    Text("📍")
+                        .font(.callout)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    HStack(spacing: 4) {
-                        CarouselDot()
-                            .frame(width: 14, height: 14)
-                        Text("KJHEDU")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
+                    CarouselDot()
+                        .frame(width: 18, height: 18)
                 }
-                DynamicIslandExpandedRegion(.center) {
-                    ExpandedCenterView(state: context.state)
-                }
+                // 정보는 모두 bottom 영역(노치 아래 풀-와이드)에 배치
                 DynamicIslandExpandedRegion(.bottom) {
-                    ExpandedBottomView(state: context.state)
+                    ExpandedFullView(state: context.state)
                 }
             } compactLeading: {
                 Image(systemName: "pencil")
@@ -187,38 +175,48 @@ struct CompactTrailing: View {
     }
 }
 
-struct ExpandedCenterView: View {
+/// Dynamic Island expanded 의 bottom 영역에 들어가는 풀-와이드 뷰.
+/// LockScreenView 와 거의 동일하나 상단의 location/KJHEDU 행이 다이내믹 아일랜드 안으로 들어가게 됨.
+struct ExpandedFullView: View {
     let state: KJHEDULiveActivityAttributes.ClassContentState
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(state.startLabel.isEmpty ? "시작" : state.startLabel)
-                    .font(.subheadline.weight(.semibold))
-                Text(state.startAt, style: .time)
-                    .font(.headline)
-                    .foregroundColor(.kjheduGreen)
+        VStack(spacing: 8) {
+            HStack {
+                HStack(spacing: 4) {
+                    Text("📍").font(.caption)
+                    Text(state.location.isEmpty ? "수업" : state.location)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+                Spacer(minLength: 8)
+                HStack(spacing: 4) {
+                    CarouselDot()
+                        .frame(width: 14, height: 14)
+                    Text("KJHEDU")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
-            Spacer()
-            Image(systemName: "pencil")
-                .foregroundColor(.kjheduGreen)
-            Spacer()
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(state.endAt, style: .time)
-                    .font(.headline)
-                    .foregroundColor(.kjheduGreen)
-                Text(state.endLabel.isEmpty ? "끝" : state.endLabel)
-                    .font(.subheadline.weight(.semibold))
+            HStack(alignment: .firstTextBaseline) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(state.startLabel.isEmpty ? "시작" : state.startLabel)
+                        .font(.subheadline.weight(.semibold))
+                    Text(state.startAt, style: .time)
+                        .font(.title3.bold())
+                        .foregroundColor(.kjheduGreen)
+                }
+                Spacer()
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(state.endAt, style: .time)
+                        .font(.title3.bold())
+                        .foregroundColor(.kjheduGreen)
+                    Text(state.endLabel.isEmpty ? "끝" : state.endLabel)
+                        .font(.subheadline.weight(.semibold))
+                }
             }
-        }
-    }
-}
-
-struct ExpandedBottomView: View {
-    let state: KJHEDULiveActivityAttributes.ClassContentState
-
-    var body: some View {
-        VStack(spacing: 6) {
             ProgressBar(state: state)
                 .frame(height: 12)
             HStack {
@@ -237,6 +235,7 @@ struct ExpandedBottomView: View {
                 }
             }
         }
+        .padding(.horizontal, 4)
     }
 }
 
