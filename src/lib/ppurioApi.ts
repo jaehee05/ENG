@@ -165,6 +165,31 @@ export async function purgeAllNotifications(): Promise<{
   return call('purgeNotifications')
 }
 
+export interface ManualSendResult {
+  ok: true
+  sent: number
+  failed: number
+  results: SendResultItem[]
+}
+
+/** 특정 학생 1명에게 주간 리포트 즉시 발송 (학생/학부모 둘 다 번호 있으면 둘 다). */
+export async function sendWeeklyReportNow(
+  studentUid: string,
+): Promise<ManualSendResult> {
+  return call<ManualSendResult>('sendWeeklyReportNow', { studentUid })
+}
+
+/** 특정 학생 1명에게 과제 현황 알림톡 즉시 발송. notice 비우면 스케줄 기본값 사용. */
+export async function sendAssignmentStatusNow(
+  studentUid: string,
+  notice?: string,
+): Promise<ManualSendResult> {
+  return call<ManualSendResult>('sendAssignmentStatusNow', {
+    studentUid,
+    notice,
+  })
+}
+
 export async function sendPushNotification(input: {
   uids?: string[]
   all?: boolean

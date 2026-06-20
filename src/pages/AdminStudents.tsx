@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import {
@@ -7,8 +7,17 @@ import {
   setAccountPassword,
   setAccountStatus,
 } from '../lib/account'
-import { regradeAllReadings } from '../lib/firestore'
-import type { UserAccount, UserStatus } from '../lib/types'
+import {
+  isAssignmentDone,
+  listAllAssignments,
+  listAllAttempts,
+  regradeAllReadings,
+} from '../lib/firestore'
+import {
+  sendAssignmentStatusNow,
+  sendWeeklyReportNow,
+} from '../lib/ppurioApi'
+import type { Assignment, Attempt, UserAccount, UserStatus } from '../lib/types'
 
 const STATUS_LABEL: Record<UserStatus, string> = {
   pending: '승인 대기',
@@ -17,9 +26,63 @@ const STATUS_LABEL: Record<UserStatus, string> = {
 }
 
 const STATUS_CLASS: Record<UserStatus, string> = {
-  pending: 'bg-brand-100 text-brand-700',
+  pending: 'bg-amber-100 text-amber-700',
   active: 'bg-brand-100 text-brand-700',
   rejected: 'bg-slate-200 text-slate-600',
+}
+
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000
+const VOCAB_PASS_THRESHOLD = 25
+
+interface StudentStats {
+  asnTotal: number
+  asnDone: number
+  asnRate: number | null
+  vocabSessions: number
+  vocabPass: number
+  readingTotal: number
+  readingCorrect: number
+  readingRate: number | null
+}
+
+function inLastWeek(ts: { toMillis(): number } | null | undefined): boolean {
+  if (!ts) return false
+  return ts.toMillis() >= Date.now() - WEEK_MS
+}
+
+function computeStats(
+  assignments: Assignment[],
+  attempts: Attempt[],
+): StudentStats {
+  const recentAsn = assignments.filter((a) => inLastWeek(a.dueAt || a.createdAt))
+  const recentAtt = attempts.filter(
+    (a) => inLastWeek(a.createdAt) && !a.practice,
+  )
+  const asnDone = recentAsn.filter((a) => isAssignmentDone(a, attempts)).length
+  const asnRate =
+    recentAsn.length > 0 ? Math.round((asnDone / recentAsn.length) * 100) : null
+
+  const vocabAtt = recentAtt.filter((a) => a.type === 'vocab')
+  const vocabPass = vocabAtt.filter(
+    (a) => (a.correct ?? 0) >= VOCAB_PASS_THRESHOLD,
+  ).length
+
+  const readingAtt = recentAtt.filter((a) => a.type === 'reading')
+  const readingTotal = readingAtt.reduce((s, a) => s + (a.total || 0), 0)
+  const readingCorrect = readingAtt.reduce((s, a) => s + (a.correct || 0), 0)
+  const readingRate =
+    readingTotal > 0 ? Math.round((readingCorrect / readingTotal) * 100) : null
+
+  return {
+    asnTotal: recentAsn.length,
+    asnDone,
+    asnRate,
+    vocabSessions: vocabAtt.length,
+    vocabPass,
+    readingTotal,
+    readingCorrect,
+    readingRate,
+  }
 }
 
 function fmt(ts: UserAccount['createdAt']): string {
@@ -28,17 +91,235 @@ function fmt(ts: UserAccount['createdAt']): string {
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
 }
 
+function StatTile({
+  label,
+  value,
+  sub,
+  tone = 'neutral',
+}: {
+  label: string
+  value: string
+  sub?: string
+  tone?: 'neutral' | 'good' | 'warn' | 'bad'
+}) {
+  const toneCls = {
+    neutral: 'text-slate-900',
+    good: 'text-emerald-700',
+    warn: 'text-amber-700',
+    bad: 'text-red-600',
+  }[tone]
+  return (
+    <div className="flex-1 min-w-0 rounded-lg bg-slate-50 px-3 py-2">
+      <p className="text-[10px] uppercase tracking-wider text-slate-400">{label}</p>
+      <p className={`text-base font-semibold mt-0.5 ${toneCls}`}>{value}</p>
+      {sub && <p className="text-[10px] text-slate-500 truncate">{sub}</p>}
+    </div>
+  )
+}
+
+function StudentCard({
+  account,
+  stats,
+  pendingActions,
+  onAction,
+  busyAction,
+}: {
+  account: UserAccount
+  stats: StudentStats
+  pendingActions: Set<string>
+  busyAction: string | null
+  onAction: (
+    kind:
+      | 'approve'
+      | 'reject'
+      | 'password'
+      | 'delete'
+      | 'weeklyReport'
+      | 'assignmentStatus',
+  ) => void
+}) {
+  const isActive = account.status === 'active'
+  const asnRateTone: 'good' | 'warn' | 'bad' | 'neutral' =
+    stats.asnRate == null
+      ? 'neutral'
+      : stats.asnRate >= 80
+        ? 'good'
+        : stats.asnRate >= 50
+          ? 'warn'
+          : 'bad'
+  const readingRateTone: 'good' | 'warn' | 'bad' | 'neutral' =
+    stats.readingRate == null
+      ? 'neutral'
+      : stats.readingRate >= 80
+        ? 'good'
+        : stats.readingRate >= 60
+          ? 'warn'
+          : 'bad'
+
+  const isBusy = (k: string) =>
+    busyAction === `${account.id}:${k}` || pendingActions.has(`${account.id}:${k}`)
+
+  return (
+    <article className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+      <header className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <Link
+            to={`/admin/students/${account.id}`}
+            className="text-base font-semibold text-slate-900 hover:underline"
+          >
+            {account.displayName}
+          </Link>
+          <p className="text-xs text-slate-500 mt-0.5 truncate">
+            {account.school || '학교 미입력'}
+          </p>
+          <p className="text-[11px] text-slate-400 truncate">
+            {account.phone || '-'}
+            {account.parentPhone && ` · 학부모 ${account.parentPhone}`}
+          </p>
+        </div>
+        <span
+          className={`shrink-0 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLASS[account.status]}`}
+        >
+          {STATUS_LABEL[account.status]}
+        </span>
+      </header>
+
+      {isActive && (
+        <>
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
+              지난 7일
+            </p>
+            <p className="text-[10px] text-slate-400">{fmt(account.createdAt)} 가입</p>
+          </div>
+          <div className="flex gap-2">
+            <StatTile
+              label="과제율"
+              value={stats.asnRate == null ? '—' : `${stats.asnRate}%`}
+              sub={
+                stats.asnTotal === 0
+                  ? '과제 없음'
+                  : `${stats.asnDone}/${stats.asnTotal}완료`
+              }
+              tone={asnRateTone}
+            />
+            <StatTile
+              label="단어 통과"
+              value={`${stats.vocabPass}회`}
+              sub={
+                stats.vocabSessions === 0
+                  ? '응시 없음'
+                  : `${stats.vocabSessions}회 응시`
+              }
+            />
+            <StatTile
+              label="문제 정답률"
+              value={stats.readingRate == null ? '—' : `${stats.readingRate}%`}
+              sub={
+                stats.readingTotal === 0
+                  ? '응시 없음'
+                  : `${stats.readingCorrect}/${stats.readingTotal}문`
+              }
+              tone={readingRateTone}
+            />
+          </div>
+        </>
+      )}
+
+      <div className="flex flex-wrap items-center gap-1.5 pt-1">
+        {account.status === 'pending' && (
+          <>
+            <button
+              onClick={() => onAction('approve')}
+              className="rounded-md bg-brand-600 text-white text-xs font-medium px-3 py-1.5 hover:bg-brand-700"
+            >
+              승인
+            </button>
+            <button
+              onClick={() => onAction('reject')}
+              className="rounded-md bg-slate-200 text-slate-700 text-xs font-medium px-3 py-1.5 hover:bg-slate-300"
+            >
+              거부
+            </button>
+          </>
+        )}
+        {account.status === 'rejected' && (
+          <button
+            onClick={() => onAction('approve')}
+            className="rounded-md bg-brand-600 text-white text-xs font-medium px-3 py-1.5 hover:bg-brand-700"
+          >
+            승인으로 변경
+          </button>
+        )}
+        {isActive && (
+          <>
+            <button
+              onClick={() => onAction('weeklyReport')}
+              disabled={isBusy('weeklyReport')}
+              className="rounded-md bg-slate-900 text-white text-xs font-medium px-3 py-1.5 hover:bg-slate-800 disabled:opacity-50"
+              title="이 학생에게 지난 7일 주간 리포트 알림톡 즉시 발송"
+            >
+              {isBusy('weeklyReport') ? '발송 중…' : '주간 리포트'}
+            </button>
+            <button
+              onClick={() => onAction('assignmentStatus')}
+              disabled={isBusy('assignmentStatus')}
+              className="rounded-md border border-slate-300 text-slate-700 text-xs font-medium px-3 py-1.5 hover:bg-slate-50 disabled:opacity-50"
+              title="이 학생에게 과제 현황 알림톡 즉시 발송"
+            >
+              {isBusy('assignmentStatus') ? '발송 중…' : '과제 알림'}
+            </button>
+          </>
+        )}
+        <Link
+          to={`/admin/students/${account.id}`}
+          className="rounded-md border border-slate-200 text-slate-600 text-xs font-medium px-3 py-1.5 hover:bg-slate-50"
+        >
+          상세
+        </Link>
+        <button
+          onClick={() => onAction('password')}
+          className="rounded-md border border-slate-200 text-slate-600 text-xs font-medium px-3 py-1.5 hover:bg-slate-50"
+        >
+          비번
+        </button>
+        <button
+          onClick={() => onAction('delete')}
+          className="rounded-md text-red-600 text-xs font-medium px-3 py-1.5 hover:bg-red-50 ml-auto"
+        >
+          삭제
+        </button>
+      </div>
+    </article>
+  )
+}
+
+type StatusFilter = 'all' | UserStatus
+
 export function AdminStudents() {
   const { profile } = useAuth()
   const [accounts, setAccounts] = useState<UserAccount[]>([])
+  const [assignments, setAssignments] = useState<Assignment[]>([])
+  const [attempts, setAttempts] = useState<Attempt[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [filter, setFilter] = useState<StatusFilter>('all')
+  const [search, setSearch] = useState('')
+  const [busyAction, setBusyAction] = useState<string | null>(null)
+  const [feedback, setFeedback] = useState<{ kind: 'ok' | 'err'; msg: string } | null>(null)
 
-  async function load() {
+  async function loadAll() {
     setLoading(true)
     setError(null)
     try {
-      setAccounts(await listAccounts())
+      const [acc, asn, att] = await Promise.all([
+        listAccounts(),
+        listAllAssignments(),
+        listAllAttempts(),
+      ])
+      setAccounts(acc)
+      setAssignments(asn)
+      setAttempts(att)
     } catch (e) {
       setError(e instanceof Error ? e.message : '목록을 불러오지 못했습니다.')
     } finally {
@@ -47,44 +328,80 @@ export function AdminStudents() {
   }
 
   useEffect(() => {
-    let cancelled = false
-    listAccounts()
-      .then((list) => {
-        if (!cancelled) setAccounts(list)
-      })
-      .catch((e) => {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : '목록을 불러오지 못했습니다.')
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
+    loadAll()
   }, [])
 
-  async function changeStatus(id: string, status: UserStatus) {
-    await setAccountStatus(id, status)
-    load()
-  }
-
-  async function changePassword(id: string) {
-    const pw = window.prompt('새 비밀번호를 입력하세요')
-    if (!pw) return
-    try {
-      await setAccountPassword(id, pw)
-      load()
-    } catch (e) {
-      window.alert(e instanceof Error ? e.message : '비밀번호 변경에 실패했습니다.')
+  /** studentUid 별로 그룹핑된 assignments / attempts (메모이즈) */
+  const byStudent = useMemo(() => {
+    const asnMap: Record<string, Assignment[]> = {}
+    const attMap: Record<string, Attempt[]> = {}
+    for (const a of assignments) {
+      ;(asnMap[a.studentUid] ??= []).push(a)
     }
-  }
+    for (const a of attempts) {
+      ;(attMap[a.studentUid] ??= []).push(a)
+    }
+    return { asnMap, attMap }
+  }, [assignments, attempts])
 
-  async function remove(id: string, name: string) {
-    if (!window.confirm(`${name} 님의 계정을 정말 삭제하시겠습니까?`)) return
-    await deleteAccount(id)
-    load()
+  async function handleAction(
+    student: UserAccount,
+    kind:
+      | 'approve'
+      | 'reject'
+      | 'password'
+      | 'delete'
+      | 'weeklyReport'
+      | 'assignmentStatus',
+  ) {
+    setFeedback(null)
+    const tag = `${student.id}:${kind}`
+    setBusyAction(tag)
+    try {
+      if (kind === 'approve') {
+        await setAccountStatus(student.id, 'active')
+        await loadAll()
+      } else if (kind === 'reject') {
+        await setAccountStatus(student.id, 'rejected')
+        await loadAll()
+      } else if (kind === 'password') {
+        const pw = window.prompt('새 비밀번호를 입력하세요')
+        if (!pw) return
+        await setAccountPassword(student.id, pw)
+        setFeedback({ kind: 'ok', msg: `${student.displayName} 비밀번호 변경됨` })
+      } else if (kind === 'delete') {
+        if (!window.confirm(`${student.displayName} 님의 계정을 정말 삭제할까요?`)) {
+          return
+        }
+        await deleteAccount(student.id)
+        await loadAll()
+      } else if (kind === 'weeklyReport') {
+        if (!window.confirm(`${student.displayName} 님에게 지난 7일 주간 리포트를 지금 보낼까요?`)) {
+          return
+        }
+        const r = await sendWeeklyReportNow(student.id)
+        setFeedback({
+          kind: r.failed > 0 ? 'err' : 'ok',
+          msg: `${student.displayName} 주간 리포트: 성공 ${r.sent} · 실패 ${r.failed}`,
+        })
+      } else if (kind === 'assignmentStatus') {
+        if (!window.confirm(`${student.displayName} 님에게 과제 현황 알림톡을 지금 보낼까요?`)) {
+          return
+        }
+        const r = await sendAssignmentStatusNow(student.id)
+        setFeedback({
+          kind: r.failed > 0 ? 'err' : 'ok',
+          msg: `${student.displayName} 과제 알림: 성공 ${r.sent} · 실패 ${r.failed}`,
+        })
+      }
+    } catch (e) {
+      setFeedback({
+        kind: 'err',
+        msg: e instanceof Error ? e.message : '작업 실패',
+      })
+    } finally {
+      setBusyAction(null)
+    }
   }
 
   const [regrading, setRegrading] = useState(false)
@@ -94,9 +411,8 @@ export function AdminStudents() {
       !window.confirm(
         '모든 지문 시험 기록을 현재 정답 기준으로 다시 채점합니다. 진행할까요?',
       )
-    ) {
+    )
       return
-    }
     setRegrading(true)
     setRegradeNote(null)
     try {
@@ -113,7 +429,30 @@ export function AdminStudents() {
 
   const others = accounts.filter((a) => a.id !== profile?.id)
   const me = accounts.find((a) => a.id === profile?.id)
-  const pending = others.filter((a) => a.status === 'pending').length
+  const pendingCount = others.filter((a) => a.status === 'pending').length
+  const activeCount = others.filter((a) => a.status === 'active').length
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return others
+      .filter((a) => filter === 'all' || a.status === filter)
+      .filter((a) => {
+        if (!q) return true
+        return (
+          a.displayName.toLowerCase().includes(q) ||
+          (a.school || '').toLowerCase().includes(q) ||
+          (a.phone || '').includes(q) ||
+          (a.email || '').toLowerCase().includes(q)
+        )
+      })
+      .sort((x, y) => {
+        // 대기 먼저, 그 다음 활성, 그 다음 거부
+        const order = { pending: 0, active: 1, rejected: 2 }
+        const od = order[x.status] - order[y.status]
+        if (od !== 0) return od
+        return x.displayName.localeCompare(y.displayName, 'ko')
+      })
+  }, [others, filter, search])
 
   return (
     <div className="space-y-5">
@@ -121,16 +460,27 @@ export function AdminStudents() {
         <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
           관리자
         </p>
-        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">학생 관리</h1>
+        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
+          학생 관리
+        </h1>
         <p className="text-xs text-slate-500 mt-1">
-          전체 {accounts.length}명 · 승인 대기 {pending}명
+          전체 {others.length}명 · 활성 {activeCount} · 승인 대기 {pendingCount}
         </p>
       </header>
 
-      {loading && <p className="text-slate-500 text-sm">불러오는 중…</p>}
-      {error && <p className="text-red-600 text-sm">{error}</p>}
+      {feedback && (
+        <div
+          className={`rounded-md border px-3 py-2 text-sm ${
+            feedback.kind === 'ok'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : 'border-red-200 bg-red-50 text-red-700'
+          }`}
+        >
+          {feedback.msg}
+        </div>
+      )}
 
-      <div className="rounded-lg border border-slate-200 bg-white p-3 flex items-center justify-between gap-3 flex-wrap">
+      <div className="rounded-lg border border-slate-200 bg-white p-3 flex flex-wrap items-center justify-between gap-3">
         <div className="text-xs">
           <span className="font-medium text-slate-900">{me?.displayName}</span>
           <span className="text-slate-500"> · {me?.email}</span>
@@ -148,87 +498,69 @@ export function AdminStudents() {
           {regrading ? '재채점 중…' : '지문 일괄 재채점'}
         </button>
       </div>
-      {regradeNote && (
-        <p className="text-xs text-brand-700 -mt-3">{regradeNote}</p>
+      {regradeNote && <p className="text-xs text-brand-700 -mt-3">{regradeNote}</p>}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="inline-flex rounded-md border border-slate-200 bg-white p-0.5">
+          {(['all', 'pending', 'active', 'rejected'] as const).map((s) => {
+            const label =
+              s === 'all'
+                ? '전체'
+                : s === 'pending'
+                  ? `대기 ${pendingCount}`
+                  : s === 'active'
+                    ? `활성 ${activeCount}`
+                    : '거부'
+            return (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setFilter(s)}
+                className={`rounded px-3 py-1.5 text-xs font-medium transition ${
+                  filter === s
+                    ? 'bg-slate-900 text-white'
+                    : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="이름 / 학교 / 전화번호 검색"
+          className="flex-1 min-w-[180px] max-w-xs rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+        />
+      </div>
+
+      {loading && <p className="text-slate-500 text-sm">불러오는 중…</p>}
+      {error && <p className="text-red-600 text-sm">{error}</p>}
+
+      {!loading && filtered.length === 0 && (
+        <div className="rounded-lg border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">
+          {others.length === 0 ? '아직 가입한 학생이 없습니다.' : '조건에 맞는 학생이 없어요.'}
+        </div>
       )}
 
-      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-        <table className="min-w-full text-sm">
-          <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
-            <tr>
-              <th className="px-4 py-3 text-left font-semibold">이름</th>
-              <th className="px-4 py-3 text-left font-semibold">학교</th>
-              <th className="px-4 py-3 text-left font-semibold">학생 연락처</th>
-              <th className="px-4 py-3 text-left font-semibold">학부모 연락처</th>
-              <th className="px-4 py-3 text-left font-semibold">이메일</th>
-              <th className="px-4 py-3 text-left font-semibold">상태</th>
-              <th className="px-4 py-3 text-left font-semibold">가입일</th>
-              <th className="px-4 py-3 text-left font-semibold">관리</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {others.length === 0 && !loading && (
-              <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
-                  아직 가입한 학생이 없습니다.
-                </td>
-              </tr>
-            )}
-            {others.map((a) => {
-              return (
-                <tr key={a.id}>
-                  <td className="px-4 py-3 font-medium text-slate-900 whitespace-nowrap">
-                    <Link to={`/admin/students/${a.id}`} className="hover:underline">
-                      {a.displayName}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{a.school || '-'}</td>
-                  <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{a.phone || '-'}</td>
-                  <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{a.parentPhone || '-'}</td>
-                  <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{a.email}</td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLASS[a.status]}`}>
-                      {STATUS_LABEL[a.status]}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-slate-500 text-xs">{fmt(a.createdAt)}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap items-center gap-1">
-                      {a.status !== 'active' && (
-                        <button
-                          onClick={() => changeStatus(a.id, 'active')}
-                          className="rounded bg-brand-600 text-white text-xs font-medium px-2 py-1 hover:bg-brand-700"
-                        >
-                          승인
-                        </button>
-                      )}
-                      {a.status !== 'rejected' && (
-                        <button
-                          onClick={() => changeStatus(a.id, 'rejected')}
-                          className="rounded bg-slate-200 text-slate-700 text-xs font-medium px-2 py-1 hover:bg-slate-300"
-                        >
-                          거부
-                        </button>
-                      )}
-                      <button
-                        onClick={() => changePassword(a.id)}
-                        className="rounded border border-slate-300 text-slate-700 text-xs font-medium px-2 py-1 hover:bg-slate-100"
-                      >
-                        비번 변경
-                      </button>
-                      <button
-                        onClick={() => remove(a.id, a.displayName)}
-                        className="rounded text-red-600 text-xs font-medium px-2 py-1 hover:bg-red-50"
-                      >
-                        삭제
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+        {filtered.map((a) => {
+          const studentAsn = byStudent.asnMap[a.id] ?? []
+          const studentAtt = byStudent.attMap[a.id] ?? []
+          const stats = computeStats(studentAsn, studentAtt)
+          return (
+            <StudentCard
+              key={a.id}
+              account={a}
+              stats={stats}
+              pendingActions={new Set<string>()}
+              busyAction={busyAction}
+              onAction={(kind) => handleAction(a, kind)}
+            />
+          )
+        })}
       </div>
     </div>
   )

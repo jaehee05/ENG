@@ -276,6 +276,154 @@ exports.ppurioAdmin = onRequest({ invoker: "public" }, async (req, res) => {
       return res.json({ ok: true, sent, failed, results });
     }
 
+    if (action === "sendWeeklyReportNow") {
+      const p = payload || {};
+      const studentUid = String(p.studentUid || "").trim();
+      if (!studentUid) return res.status(400).json({ error: "studentUid 필요" });
+
+      const db = admin.firestore();
+      const schedSnap = await db.doc("settings/notifySchedules").get();
+      const sched = normalizeWeeklySchedule(
+        schedSnap.exists ? schedSnap.data().weeklyReport : null,
+      );
+      if (!sched.templateCode) {
+        return res.status(400).json({
+          error: "주간 리포트 템플릿 코드가 알림톡/푸시 설정에 없어요.",
+        });
+      }
+
+      const sDoc = await db.collection("users").doc(studentUid).get();
+      if (!sDoc.exists) return res.status(404).json({ error: "학생을 찾을 수 없습니다." });
+      const s = sDoc.data() || {};
+
+      const [asnSnap, attSnap] = await Promise.all([
+        db.collection("assignments").where("studentUid", "==", studentUid).get(),
+        db.collection("attempts").where("studentUid", "==", studentUid).get(),
+      ]);
+      const assignments = asnSnap.docs.map((x) => ({ id: x.id, ...x.data() }));
+      const attempts = attSnap.docs.map((x) => ({ id: x.id, ...x.data() }));
+      const windowStart = Date.now() - WEEK_MS;
+      const vars = buildWeeklyReportVarsSrv(assignments, attempts, windowStart);
+      const changeWord = {
+        var1: vars.var1,
+        var2: vars.var2,
+        var3: vars.var3,
+        var4: sched.closing,
+      };
+
+      const recipients = [];
+      if ((s.phone || "").trim()) {
+        recipients.push({ phone: s.phone, label: `${s.displayName}(학생)` });
+      }
+      if ((s.parentPhone || "").trim()) {
+        recipients.push({ phone: s.parentPhone, label: `${s.displayName}(학부모)` });
+      }
+      if (recipients.length === 0) {
+        return res.status(400).json({ error: "학생/학부모 연락처가 없어요." });
+      }
+
+      const results = [];
+      for (const r of recipients) {
+        try {
+          await sendOne({
+            phone: r.phone,
+            name: s.displayName,
+            changeWord,
+            templateCode: sched.templateCode,
+            messageType: sched.messageType,
+          });
+          results.push({ label: r.label, phone: r.phone, ok: true });
+        } catch (e) {
+          console.error(`[sendWeeklyReportNow] ${r.label} 실패:`, e);
+          results.push({
+            label: r.label,
+            phone: r.phone,
+            ok: false,
+            error: String(e.message || e),
+          });
+        }
+      }
+      return res.json({
+        ok: true,
+        sent: results.filter((x) => x.ok).length,
+        failed: results.filter((x) => !x.ok).length,
+        results,
+      });
+    }
+
+    if (action === "sendAssignmentStatusNow") {
+      const p = payload || {};
+      const studentUid = String(p.studentUid || "").trim();
+      if (!studentUid) return res.status(400).json({ error: "studentUid 필요" });
+
+      const db = admin.firestore();
+      const schedSnap = await db.doc("settings/notifySchedules").get();
+      const sched = normalizeSchedule(
+        schedSnap.exists ? schedSnap.data().assignmentStatus : null,
+      );
+      if (!sched.templateCode) {
+        return res.status(400).json({
+          error: "과제 현황 템플릿 코드가 알림톡/푸시 설정에 없어요.",
+        });
+      }
+
+      const sDoc = await db.collection("users").doc(studentUid).get();
+      if (!sDoc.exists) return res.status(404).json({ error: "학생을 찾을 수 없습니다." });
+      const s = sDoc.data() || {};
+      if (!(s.phone || "").trim()) {
+        return res.status(400).json({ error: "학생 연락처가 없어요." });
+      }
+
+      const [asnSnap, attSnap] = await Promise.all([
+        db.collection("assignments").where("studentUid", "==", studentUid).get(),
+        db.collection("attempts").where("studentUid", "==", studentUid).get(),
+      ]);
+      const assignments = asnSnap.docs.map((x) => ({ id: x.id, ...x.data() }));
+      const attempts = attSnap.docs.map((x) => ({ id: x.id, ...x.data() }));
+      const done = assignments
+        .filter((a) => isAssignmentDoneSrv(a, attempts))
+        .map((a) => `▶ ${a.refTitle}`);
+      const incomplete = assignments
+        .filter((a) => !isAssignmentDoneSrv(a, attempts))
+        .map((a) => `▶ ${a.refTitle}`);
+      const notice = typeof p.notice === "string" && p.notice.trim()
+        ? p.notice.trim()
+        : (sched.notice || "");
+
+      try {
+        await sendOne({
+          phone: s.phone,
+          name: s.displayName,
+          changeWord: {
+            var1: fitListToBytes(done, "(완료한 과제가 없습니다)"),
+            var2: fitListToBytes(incomplete, "(미완료 과제가 없습니다)"),
+            var3: notice,
+          },
+          templateCode: sched.templateCode,
+          messageType: sched.messageType,
+        });
+        return res.json({
+          ok: true,
+          sent: 1,
+          failed: 0,
+          results: [{ label: s.displayName, phone: s.phone, ok: true }],
+        });
+      } catch (e) {
+        console.error(`[sendAssignmentStatusNow] ${s.displayName} 실패:`, e);
+        return res.json({
+          ok: true,
+          sent: 0,
+          failed: 1,
+          results: [{
+            label: s.displayName,
+            phone: s.phone,
+            ok: false,
+            error: String(e.message || e),
+          }],
+        });
+      }
+    }
+
     return res.status(400).json({ error: `unknown action: ${action}` });
   } catch (err) {
     console.error("ppurioAdmin 오류:", err);
@@ -313,41 +461,68 @@ function isAssignmentDoneSrv(asn, attempts) {
   return true;
 }
 
-function buildWeeklyReportVarsSrv(assignments, attempts) {
-  const vocabAsn = assignments.filter((a) => a.type === "vocab");
-  const readingAsn = assignments.filter((a) => a.type === "reading");
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+function tsToMillis(ts) {
+  if (!ts) return null;
+  if (typeof ts.toMillis === "function") return ts.toMillis();
+  if (typeof ts._seconds === "number") return ts._seconds * 1000;
+  if (typeof ts.seconds === "number") return ts.seconds * 1000;
+  if (ts instanceof Date) return ts.getTime();
+  if (typeof ts === "number") return ts;
+  return null;
+}
+
+/**
+ * 지난 7일(롤링) 통계로 var1~var3 생성.
+ * - 과제는 dueAt(없으면 createdAt)이 [windowStart, now] 안에 들어오는 것만 집계
+ * - attempts는 createdAt이 윈도우 안인 것만 집계
+ */
+function buildWeeklyReportVarsSrv(assignments, attempts, windowStartMs) {
+  const start = Number.isFinite(windowStartMs)
+    ? windowStartMs
+    : Date.now() - WEEK_MS;
+
+  function inWindow(ts) {
+    const ms = tsToMillis(ts);
+    return ms != null && ms >= start;
+  }
+
+  const recentAsn = assignments.filter((a) => inWindow(a.dueAt || a.createdAt));
+  const vocabAsn = recentAsn.filter((a) => a.type === "vocab");
+  const readingAsn = recentAsn.filter((a) => a.type === "reading");
   const vocabDone = vocabAsn.filter((a) => isAssignmentDoneSrv(a, attempts)).length;
   const readingDone = readingAsn.filter((a) => isAssignmentDoneSrv(a, attempts)).length;
-  const vocabPct = vocabAsn.length > 0 ? Math.round((vocabDone / vocabAsn.length) * 100) : 0;
-  const readingPct = readingAsn.length > 0 ? Math.round((readingDone / readingAsn.length) * 100) : 0;
+  const vocabPct = vocabAsn.length > 0 ? Math.round((vocabDone / vocabAsn.length) * 100) : null;
+  const readingPct = readingAsn.length > 0 ? Math.round((readingDone / readingAsn.length) * 100) : null;
 
-  const vocabAttempts = attempts.filter((a) => a.type === "vocab" && !a.practice);
+  const recentAttempts = attempts.filter((a) => inWindow(a.createdAt));
+  const vocabAttempts = recentAttempts.filter((a) => a.type === "vocab" && !a.practice);
   const totalWords = vocabAttempts.reduce((s, a) => s + (a.total || 0), 0);
   const totalCorrectV = vocabAttempts.reduce((s, a) => s + (a.correct || 0), 0);
   const passCount = vocabAttempts.filter((a) => (a.correct || 0) >= VOCAB_PASS_THRESHOLD).length;
   const sessionCount = vocabAttempts.length;
 
-  const readingAttempts = attempts.filter((a) => a.type === "reading" && !a.practice);
+  const readingAttempts = recentAttempts.filter((a) => a.type === "reading" && !a.practice);
   const totalR = readingAttempts.reduce((s, a) => s + (a.total || 0), 0);
   const totalCorrectR = readingAttempts.reduce((s, a) => s + (a.correct || 0), 0);
-  const ratio = totalR > 0 ? Math.round((totalCorrectR / totalR) * 100) : 0;
+  const ratio = totalR > 0 ? Math.round((totalCorrectR / totalR) * 100) : null;
+
+  const vocabPctLine =
+    vocabPct == null ? "▫️ 단어 암기: 지난주 과제 없음" : `▫️ 단어 암기: ${vocabPct}% 완료`;
+  const readingPctLine =
+    readingPct == null ? "▫️ 문제 풀이: 지난주 과제 없음" : `▫️ 문제 풀이: ${readingPct}% 완료`;
+  const vocabBody = sessionCount === 0
+    ? "▫️ 지난주 응시 기록 없음"
+    : `▫️ 학습 ${vocabAsn.length}회분 · 단어 ${totalWords}개\n▫️ 통과 ${passCount}/${sessionCount}회 (암기 ${totalCorrectV}개)`;
+  const readingBody = readingAttempts.length === 0
+    ? "▫️ 지난주 응시 기록 없음"
+    : `▫️ 지문 ${readingDone}개 완료\n▫️ 📈 정답률 ${ratio}% (${totalCorrectR}/${totalR}문항)`;
 
   return {
-    var1: [
-      "📊 지난주 과제 성취도",
-      `▫️ 단어 암기: ${vocabPct}% 완료`,
-      `▫️ 문제 풀이: ${readingPct}% 완료`,
-    ].join("\n"),
-    var2: [
-      "🔤 단어 시험",
-      `▫️ 학습 ${vocabAsn.length}회분 · 단어 ${totalWords}개`,
-      `▫️ 통과 ${passCount}/${sessionCount}회 (암기 ${totalCorrectV}개)`,
-    ].join("\n"),
-    var3: [
-      "📝 문제 풀이",
-      `▫️ 지문 ${readingDone}개 완료`,
-      `▫️ 📈 정답률 ${ratio}% (${totalCorrectR}/${totalR}문항)`,
-    ].join("\n"),
+    var1: ["📊 지난주 과제 성취도", vocabPctLine, readingPctLine].join("\n"),
+    var2: ["🔤 단어 시험", vocabBody].join("\n"),
+    var3: ["📝 문제 풀이", readingBody].join("\n"),
   };
 }
 
@@ -370,7 +545,8 @@ async function runWeeklyReportBlast(schedule) {
     ]);
     const assignments = asnSnap.docs.map((x) => ({ id: x.id, ...x.data() }));
     const attempts = attSnap.docs.map((x) => ({ id: x.id, ...x.data() }));
-    const vars = buildWeeklyReportVarsSrv(assignments, attempts);
+    const windowStart = Date.now() - WEEK_MS;
+    const vars = buildWeeklyReportVarsSrv(assignments, attempts, windowStart);
     const changeWord = {
       var1: vars.var1,
       var2: vars.var2,

@@ -520,6 +520,18 @@ export async function listAssignmentsForStudent(uid: string): Promise<Assignment
   return items.sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0))
 }
 
+/** 모든 과제. 학생 관리 대시보드용 — studentUid 별로 클라이언트에서 그룹핑. */
+export async function listAllAssignments(): Promise<Assignment[]> {
+  const snap = await getDocs(collection(db, 'assignments'))
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Assignment, 'id'>) }))
+}
+
+/** 모든 응시 기록. 학생 관리 대시보드용. */
+export async function listAllAttempts(): Promise<Attempt[]> {
+  const snap = await getDocs(collection(db, 'attempts'))
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Attempt, 'id'>) }))
+}
+
 export async function deleteAssignment(id: string): Promise<void> {
   await deleteDoc(doc(db, 'assignments', id))
 }
