@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { Clover, progressToLeaves } from '../components/Clover'
+import { Clover, CloverCheck, progressToLeaves } from '../components/Clover'
 import { useAuth } from '../contexts/useAuth'
 import {
   addTodo,
@@ -30,55 +30,6 @@ function assignmentPath(a: Assignment): string | null {
 function isOverdue(a: Assignment): boolean {
   if (!a.dueAt) return false
   return a.dueAt.toMillis() < Date.now()
-}
-
-/** Todomate 스타일 동그란 체크 표시. */
-function CheckCircle({
-  done,
-  color,
-  onToggle,
-}: {
-  done: boolean
-  color: string
-  onToggle?: () => void
-}) {
-  const baseCls =
-    'shrink-0 h-5 w-5 rounded-full border-2 flex items-center justify-center transition'
-  const style = done
-    ? { backgroundColor: color, borderColor: color, color: '#fff' }
-    : { backgroundColor: '#fff', borderColor: color, color }
-  const check = (
-    <svg
-      width="12"
-      height="12"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="3.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M4 12l5 5L20 6" />
-    </svg>
-  )
-  if (onToggle) {
-    return (
-      <button
-        type="button"
-        onClick={onToggle}
-        className={baseCls}
-        style={style}
-        aria-label={done ? '완료 취소' : '완료'}
-      >
-        {done && check}
-      </button>
-    )
-  }
-  return (
-    <span className={baseCls} style={style} aria-hidden>
-      {done && check}
-    </span>
-  )
 }
 
 export function Assignments() {
@@ -266,7 +217,7 @@ export function Assignments() {
                   const path = assignmentPath(a)
                   const inner = (
                     <>
-                      <CheckCircle done={done} color={cat.color} />
+                      <CloverCheck done={done} color={cat.color} size={26} />
                       <div className="min-w-0 flex-1">
                         <p
                           className={`text-sm truncate ${
@@ -311,9 +262,10 @@ export function Assignments() {
                 {isEtc &&
                   sortedTodos.map((t) => (
                     <div key={t.id} className="flex items-center gap-3 px-4 py-3 group">
-                      <CheckCircle
+                      <CloverCheck
                         done={t.done}
                         color={etcMeta?.color ?? cat.color}
+                        size={26}
                         onToggle={() => toggleTodo(t)}
                       />
                       <p
