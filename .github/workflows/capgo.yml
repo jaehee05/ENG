@@ -55,8 +55,9 @@ jobs:
           fi
           VERSION=$(node -p "require('./package.json').version")
           echo "Uploading bundle $VERSION ..."
-          npx @capgo/cli bundle upload --apikey "$CAPGO_API_KEY" --channel production
-          npx @capgo/cli channel set production --bundle "$VERSION" --apikey "$CAPGO_API_KEY"
+          # CLI 8.9.x 에 auth 버그(Invalid API key) 가 있어 항상 latest 사용. package.json 잠금 무시.
+          npx --yes @capgo/cli@latest bundle upload --apikey "$CAPGO_API_KEY" --channel production
+          npx --yes @capgo/cli@latest channel set production --bundle "$VERSION" --apikey "$CAPGO_API_KEY"
 
       - name: Commit version bump
         run: |
