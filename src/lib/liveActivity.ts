@@ -37,40 +37,51 @@ export interface LiveActivityPlugin {
 
 const native = registerPlugin<LiveActivityPlugin>('LiveActivity')
 
-/** iOS 가 아니면 모든 호출은 no-op (브라우저, Android 안전 처리). */
-function isAvailable(): boolean {
-  return Capacitor.getPlatform() === 'ios' && Capacitor.isPluginAvailable('LiveActivity')
+/** iOS 가 아닐 때만 빠르게 차단. iOS 면 네이티브 호출 시도해서 동작 여부 판정. */
+function isIos(): boolean {
+  return Capacitor.getPlatform() === 'ios'
 }
 
 export const liveActivity = {
   async isSupported(): Promise<boolean> {
-    if (!isAvailable()) return false
+    if (!isIos()) return false
     try {
       const r = await native.isSupported()
-      return r.supported
-    } catch {
+      return !!r.supported
+    } catch (err) {
+      // 플러그인 미등록·메서드 미존재 → 미지원으로 간주
+      console.warn('[liveActivity] isSupported failed:', err)
       return false
     }
   },
 
   async start(input: StartClassActivityInput): Promise<string | null> {
-    if (!isAvailable()) return null
-    const r = await native.startClass(input)
-    return r.id
+    if (!isIos()) return null
+    try {
+      const r = await native.startClass(input)
+      return r.id
+    } catch (err) {
+      console.warn('[liveActivity] start failed:', err)
+      throw err
+    }
   },
 
   async update(input: UpdateClassActivityInput): Promise<void> {
-    if (!isAvailable()) return
+    if (!isIos()) return
     await native.updateClass(input)
   },
 
   async end(id?: string): Promise<void> {
-    if (!isAvailable()) return
-    await native.endClass(id ? { id } : undefined)
+    if (!isIos()) return
+    try {
+      await native.endClass(id ? { id } : undefined)
+    } catch (err) {
+      console.warn('[liveActivity] end failed:', err)
+    }
   },
 
   async currentId(): Promise<string> {
-    if (!isAvailable()) return ''
+    if (!isIos()) return ''
     try {
       const r = await native.currentId()
       return r.id
