@@ -506,13 +506,16 @@ export function ReadingResult() {
                             <button
                               key={ci}
                               type="button"
-                              disabled={retried}
+                              aria-disabled={retried}
                               onClick={(e) => {
                                 e.preventDefault()
                                 e.stopPropagation()
+                                if (retried) return
                                 void handleRetryChoice(i, ci)
                               }}
-                              className={`rounded-full w-10 h-10 inline-flex items-center justify-center border text-sm font-medium transition disabled:cursor-default ${baseColor}`}
+                              className={`rounded-full w-10 h-10 inline-flex items-center justify-center border text-sm font-medium transition ${
+                                retried ? 'cursor-default' : 'cursor-pointer'
+                              } ${baseColor}`}
                             >
                               {CHOICE_MARKS[ci]}
                             </button>
