@@ -13,8 +13,10 @@ import {
   listVocabSets,
   setAssignmentManualDone,
   setAttemptPractice,
+  updateAssignment,
 } from '../lib/firestore'
 import { sendPushNotification } from '../lib/ppurioApi'
+import { buildWeeklyReportVars } from '../lib/weeklyReport'
 import { listMyWordbook } from '../lib/wordbook'
 import {
   getAssignmentStatusView,
@@ -347,6 +349,20 @@ export function AdminStudentDetail() {
     await reloadAssignments()
   }
 
+  async function handleSaveAssignmentEdit(
+    asn: Assignment,
+    input: {
+      dueAt?: Date | null
+      note?: string
+      minCorrect?: number | null
+      category?: AssignmentCategory
+      refTitle?: string
+    },
+  ) {
+    await updateAssignment(asn.id, input)
+    await reloadAssignments()
+  }
+
   async function handleToggleAssignmentDone(asn: Assignment) {
     const next = !asn.manualDone
     try {
@@ -463,6 +479,12 @@ export function AdminStudentDetail() {
           />
         </div>
       </section>
+
+      <WeeklyReportPreview
+        studentName={account.displayName}
+        assignments={assignments}
+        attempts={attempts}
+      />
 
       <section className="space-y-3">
         <div className="flex items-center justify-between">
@@ -710,8 +732,12 @@ export function AdminStudentDetail() {
                           a={x.a}
                           status={x.status}
                           dday={x.dday}
+                          categories={categories}
                           onToggleDone={() => handleToggleAssignmentDone(x.a)}
                           onDelete={() => handleDeleteAssignment(x.a)}
+                          onSave={(input) =>
+                            handleSaveAssignmentEdit(x.a, input)
+                          }
                           fmtDate={fmtDate}
                         />
                       ))}
@@ -730,8 +756,12 @@ export function AdminStudentDetail() {
                           a={x.a}
                           status={x.status}
                           dday={x.dday}
+                          categories={categories}
                           onToggleDone={() => handleToggleAssignmentDone(x.a)}
                           onDelete={() => handleDeleteAssignment(x.a)}
+                          onSave={(input) =>
+                            handleSaveAssignmentEdit(x.a, input)
+                          }
                           fmtDate={fmtDate}
                         />
                       ))}
@@ -919,75 +949,307 @@ const TYPE_SHORT: Record<Assignment['type'], string> = {
   custom: '외부',
 }
 
+function tsToDateInput(ts: { toDate: () => Date } | null | undefined): string {
+  if (!ts) return ''
+  const d = ts.toDate()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 function AssignmentRow({
   a,
   status,
   dday,
+  categories,
   onToggleDone,
   onDelete,
+  onSave,
   fmtDate,
 }: {
   a: Assignment
   status: AssignmentStatusView
   dday: DDayView
+  categories: CategoryConfig[]
   onToggleDone: () => void
   onDelete: () => void
+  onSave: (input: {
+    dueAt?: Date | null
+    note?: string
+    minCorrect?: number | null
+    category?: AssignmentCategory
+    refTitle?: string
+  }) => Promise<void>
   fmtDate: (ts: { toDate: () => Date } | null | undefined) => string
 }) {
   const isDone = status.status === 'done'
   const autoDone = isDone && !a.manualDone
+
+  const [editing, setEditing] = useState(false)
+  const [eDue, setEDue] = useState('')
+  const [eNote, setENote] = useState('')
+  const [eMinCorrect, setEMinCorrect] = useState('')
+  const [eCategory, setECategory] = useState<AssignmentCategory>('etc')
+  const [eRefTitle, setERefTitle] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+
+  function startEdit() {
+    setEDue(tsToDateInput(a.dueAt))
+    setENote(a.note ?? '')
+    setEMinCorrect(a.minCorrect ? String(a.minCorrect) : '')
+    setECategory(a.category ?? (a.type === 'vocab' ? 'vocab' : a.type === 'reading' ? 'problem' : 'etc'))
+    setERefTitle(a.refTitle)
+    setEditError(null)
+    setEditing(true)
+  }
+
+  async function handleSubmit() {
+    setSaving(true)
+    setEditError(null)
+    try {
+      const input: Parameters<typeof onSave>[0] = {
+        category: eCategory,
+        note: eNote,
+      }
+      input.dueAt = eDue ? new Date(`${eDue}T00:00`) : null
+      if (a.type === 'vocab') {
+        const n = Number.parseInt(eMinCorrect, 10)
+        input.minCorrect = Number.isFinite(n) && n > 0 ? n : null
+      }
+      if (a.type === 'custom') {
+        const t = eRefTitle.trim()
+        if (!t) {
+          setEditError('과제명을 비울 수 없습니다.')
+          setSaving(false)
+          return
+        }
+        input.refTitle = t
+      }
+      await onSave(input)
+      setEditing(false)
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : '저장 실패')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
-    <li className="px-4 py-3 flex items-start justify-between gap-3">
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-            {TYPE_SHORT[a.type]}
-          </span>
+    <li className="px-4 py-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+              {TYPE_SHORT[a.type]}
+            </span>
+            <button
+              type="button"
+              onClick={autoDone ? undefined : onToggleDone}
+              disabled={autoDone}
+              title={
+                autoDone
+                  ? '학생 응시 기록으로 자동 완료 — 응시 기록 삭제 시 해제'
+                  : '클릭으로 완료 ↔ 미완료 전환'
+              }
+              className={`rounded-full px-2 py-0.5 text-[11px] font-medium border transition ${
+                STATUS_TONE_CLASS[status.tone]
+              } ${autoDone ? 'cursor-default opacity-90' : 'cursor-pointer hover:brightness-95'}`}
+            >
+              {status.label}
+            </button>
+            {dday.tone !== 'none' && (
+              <span
+                className={`rounded-full px-2 py-0.5 text-[11px] font-medium border ${
+                  DDAY_TONE_CLASS[dday.tone]
+                }`}
+              >
+                {dday.label}
+              </span>
+            )}
+          </div>
+          <p className="text-sm font-semibold text-slate-900 mt-1 truncate">
+            {a.refTitle}
+          </p>
+          <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-500 mt-0.5">
+            {a.dueAt && <span>마감 {fmtDate(a.dueAt)}</span>}
+            <span>부여 {fmtDate(a.createdAt)}</span>
+            {a.minCorrect && a.minCorrect > 0 && (
+              <span className="text-slate-600">완료 기준 {a.minCorrect}개↑</span>
+            )}
+            {a.note && <span className="text-slate-600">· {a.note}</span>}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
-            onClick={autoDone ? undefined : onToggleDone}
-            disabled={autoDone}
-            title={
-              autoDone
-                ? '학생 응시 기록으로 자동 완료 — 응시 기록 삭제 시 해제'
-                : '클릭으로 완료 ↔ 미완료 전환'
-            }
-            className={`rounded-full px-2 py-0.5 text-[11px] font-medium border transition ${
-              STATUS_TONE_CLASS[status.tone]
-            } ${autoDone ? 'cursor-default opacity-90' : 'cursor-pointer hover:brightness-95'}`}
+            onClick={() => (editing ? setEditing(false) : startEdit())}
+            className="text-xs text-slate-500 hover:text-slate-900 px-1"
           >
-            {status.label}
+            {editing ? '닫기' : '수정'}
           </button>
-          {dday.tone !== 'none' && (
-            <span
-              className={`rounded-full px-2 py-0.5 text-[11px] font-medium border ${
-                DDAY_TONE_CLASS[dday.tone]
-              }`}
-            >
-              {dday.label}
-            </span>
-          )}
-        </div>
-        <p className="text-sm font-semibold text-slate-900 mt-1 truncate">
-          {a.refTitle}
-        </p>
-        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-500 mt-0.5">
-          {a.dueAt && <span>마감 {fmtDate(a.dueAt)}</span>}
-          <span>부여 {fmtDate(a.createdAt)}</span>
-          {a.minCorrect && a.minCorrect > 0 && (
-            <span className="text-slate-600">완료 기준 {a.minCorrect}개↑</span>
-          )}
-          {a.note && <span className="text-slate-600">· {a.note}</span>}
+          <button
+            type="button"
+            onClick={onDelete}
+            className="text-xs text-slate-400 hover:text-red-600 px-1"
+          >
+            삭제
+          </button>
         </div>
       </div>
-      <button
-        type="button"
-        onClick={onDelete}
-        className="text-xs text-slate-400 hover:text-red-600 px-1 shrink-0"
-      >
-        삭제
-      </button>
+
+      {editing && (
+        <div className="mt-3 rounded-md border border-slate-200 bg-slate-50/70 p-3 space-y-2">
+          {a.type === 'custom' && (
+            <div>
+              <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                과제명
+              </label>
+              <input
+                type="text"
+                value={eRefTitle}
+                onChange={(e) => setERefTitle(e.target.value)}
+                className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                마감일 <span className="text-slate-400 font-normal">(비우면 제거)</span>
+              </label>
+              <input
+                type="date"
+                value={eDue}
+                onChange={(e) => setEDue(e.target.value)}
+                className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                분류
+              </label>
+              <select
+                value={eCategory}
+                onChange={(e) =>
+                  setECategory(e.target.value as AssignmentCategory)
+                }
+                className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                {categories.map((c) => (
+                  <option key={c.key} value={c.key}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className={a.type === 'vocab' ? '' : 'sm:col-span-2'}>
+              <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                메모
+              </label>
+              <input
+                type="text"
+                value={eNote}
+                onChange={(e) => setENote(e.target.value)}
+                placeholder="예: 시간 재고 풀어보기"
+                className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
+            {a.type === 'vocab' && (
+              <div>
+                <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                  완료 기준{' '}
+                  <span className="text-slate-400 font-normal">
+                    (최소 정답 수, 비우면 제거)
+                  </span>
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  value={eMinCorrect}
+                  onChange={(e) => setEMinCorrect(e.target.value)}
+                  placeholder="예: 25"
+                  className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+            )}
+          </div>
+          {editError && <p className="text-xs text-red-600">{editError}</p>}
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              className="rounded-md border border-slate-300 text-slate-700 text-xs font-medium px-3 py-1.5 hover:bg-slate-100"
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={saving}
+              className="rounded-md bg-slate-900 text-white text-xs font-medium px-3 py-1.5 hover:bg-slate-800 disabled:opacity-50"
+            >
+              {saving ? '저장 중…' : '저장'}
+            </button>
+          </div>
+        </div>
+      )}
     </li>
+  )
+}
+
+function WeeklyReportPreview({
+  studentName,
+  assignments,
+  attempts,
+}: {
+  studentName: string
+  assignments: Assignment[]
+  attempts: Attempt[]
+}) {
+  const vars = useMemo(
+    () => buildWeeklyReportVars(assignments, attempts),
+    [assignments, attempts],
+  )
+  return (
+    <section className="space-y-3">
+      <details className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-slate-900 hover:bg-slate-50 select-none flex items-center justify-between">
+          <span>📨 주간 리포트 미리보기 (지난 7일)</span>
+          <span className="text-[11px] font-normal text-slate-500">
+            실제 발송과 동일한 7일 윈도우
+          </span>
+        </summary>
+        <div className="px-4 pb-4 pt-1 space-y-3 border-t border-slate-100">
+          <p className="text-[11px] text-slate-500 mt-2">
+            <strong className="font-semibold text-slate-700">
+              {studentName}님
+            </strong>{' '}
+            앞으로 발송될 var1~var3 내용. 마지막 격려 멘트(var4)는 알림톡 설정의
+            주간 리포트 closing 값으로 들어갑니다.
+          </p>
+          <div className="space-y-2">
+            <PreviewBlock label="var1" body={vars.var1} />
+            <PreviewBlock label="var2" body={vars.var2} />
+            <PreviewBlock label="var3" body={vars.var3} />
+          </div>
+        </div>
+      </details>
+    </section>
+  )
+}
+
+function PreviewBlock({ label, body }: { label: string; body: string }) {
+  return (
+    <div className="rounded-md border border-slate-200 bg-slate-50/60 overflow-hidden">
+      <div className="px-3 py-1 text-[10px] font-semibold text-slate-500 uppercase tracking-wider bg-white border-b border-slate-200">
+        {label}
+      </div>
+      <pre className="px-3 py-2 text-sm text-slate-800 whitespace-pre-wrap font-sans leading-relaxed">
+        {body}
+      </pre>
+    </div>
   )
 }
 

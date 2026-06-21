@@ -512,6 +512,45 @@ export async function setAssignmentManualDone(
   await updateDoc(doc(db, 'assignments', id), { manualDone: value })
 }
 
+/**
+ * 부여한 과제의 메타데이터 부분 수정. 전달된 필드만 변경.
+ * dueAt: Date면 그 날짜로, null이면 삭제, undefined면 미변경.
+ * minCorrect: number면 그 값으로, null이면 삭제, undefined면 미변경.
+ * note/category/refTitle: 빈 문자열도 허용 (note만 빈 문자열이면 삭제).
+ */
+export async function updateAssignment(
+  id: string,
+  input: {
+    dueAt?: Date | null
+    note?: string
+    minCorrect?: number | null
+    category?: AssignmentCategory
+    refTitle?: string
+  },
+): Promise<void> {
+  const update: Record<string, unknown> = {}
+  if (input.dueAt !== undefined) {
+    update.dueAt = input.dueAt ? Timestamp.fromDate(input.dueAt) : null
+  }
+  if (input.note !== undefined) {
+    const trimmed = input.note.trim()
+    update.note = trimmed ? trimmed : deleteField()
+  }
+  if (input.minCorrect !== undefined) {
+    update.minCorrect =
+      input.minCorrect && input.minCorrect > 0
+        ? Math.trunc(input.minCorrect)
+        : deleteField()
+  }
+  if (input.category !== undefined) update.category = input.category
+  if (input.refTitle !== undefined) {
+    const trimmed = input.refTitle.trim()
+    if (trimmed) update.refTitle = trimmed
+  }
+  if (Object.keys(update).length === 0) return
+  await updateDoc(doc(db, 'assignments', id), update)
+}
+
 export async function markAttemptWrongReviewed(
   id: string,
   value: boolean,

@@ -5,6 +5,8 @@ import type { Assignment, Attempt } from './types'
 /** 단어 시험 통과 기준 (회당 맞춘 단어 수). 사용자 템플릿 예시: 30개 중 25개. */
 export const VOCAB_PASS_THRESHOLD = 25
 
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000
+
 export interface WeeklyReportVars {
   /** var1: 과제 성취도 */
   var1: string
@@ -14,28 +16,48 @@ export interface WeeklyReportVars {
   var3: string
 }
 
+function tsToMillis(ts: { toMillis?: () => number; toDate?: () => Date } | null | undefined): number | null {
+  if (!ts) return null
+  if (typeof ts.toMillis === 'function') return ts.toMillis()
+  if (typeof ts.toDate === 'function') return ts.toDate().getTime()
+  return null
+}
+
 /**
  * 주간 리포트 알림톡 변수 생성.
- * 현재는 학생의 전체 과제/응시 기준 — 추후 기간 필터 가능.
+ * 서버 `buildWeeklyReportVarsSrv`와 동일한 7일 롤링 윈도우 + 빈 상태 문구.
+ *
+ * - 과제는 dueAt(없으면 createdAt)이 [windowStart, now] 안에 들어오는 것만 집계
+ * - attempts는 createdAt이 윈도우 안인 것만 집계
  */
 export function buildWeeklyReportVars(
   assignments: Assignment[],
   attempts: Attempt[],
+  now: Date = new Date(),
 ): WeeklyReportVars {
-  const vocabAsn = assignments.filter((a) => a.type === 'vocab')
-  const readingAsn = assignments.filter((a) => a.type === 'reading')
+  const start = now.getTime() - WEEK_MS
+  const inWindow = (ts: { toMillis?: () => number; toDate?: () => Date } | null | undefined): boolean => {
+    const ms = tsToMillis(ts)
+    return ms != null && ms >= start
+  }
+
+  const recentAsn = assignments.filter((a) => inWindow(a.dueAt || a.createdAt))
+  const recentAttempts = attempts.filter((a) => inWindow(a.createdAt))
+
+  const vocabAsn = recentAsn.filter((a) => a.type === 'vocab')
+  const readingAsn = recentAsn.filter((a) => a.type === 'reading')
   const vocabDone = vocabAsn.filter((a) => isAssignmentDone(a, attempts)).length
   const readingDone = readingAsn.filter((a) =>
     isAssignmentDone(a, attempts),
   ).length
   const vocabPct =
-    vocabAsn.length > 0 ? Math.round((vocabDone / vocabAsn.length) * 100) : 0
+    vocabAsn.length > 0 ? Math.round((vocabDone / vocabAsn.length) * 100) : null
   const readingPct =
     readingAsn.length > 0
       ? Math.round((readingDone / readingAsn.length) * 100)
-      : 0
+      : null
 
-  const vocabAttempts = attempts.filter(
+  const vocabAttempts = recentAttempts.filter(
     (a) => a.type === 'vocab' && !a.practice,
   )
   const totalWords = vocabAttempts.reduce((s, a) => s + (a.total || 0), 0)
@@ -46,8 +68,7 @@ export function buildWeeklyReportVars(
   const sessionCount = vocabAttempts.length
 
   // 지문 통계는 '완료된' attempt(만점이거나 오답 검토 완료)만 집계.
-  // 미완료 attempt까지 합치면 "지문 0개 완료, 정답률 50%" 같은 정합성 깨짐이 생김.
-  const completedReadingAttempts = attempts.filter(
+  const completedReadingAttempts = recentAttempts.filter(
     (a) => a.type === 'reading' && !a.practice && isReadingAttemptComplete(a),
   )
   const uniqueDoneReadingIds = new Set(
@@ -62,25 +83,28 @@ export function buildWeeklyReportVars(
     (s, a) => s + (a.correct || 0),
     0,
   )
-  const ratio = totalR > 0 ? Math.round((totalCorrectR / totalR) * 100) : 0
+  const ratio = totalR > 0 ? Math.round((totalCorrectR / totalR) * 100) : null
 
-  const var1 = [
-    '📊 지난주 과제 성취도',
-    `▫️ 단어 암기: ${vocabPct}% 완료`,
-    `▫️ 문제 풀이: ${readingPct}% 완료`,
-  ].join('\n')
+  const vocabPctLine =
+    vocabPct == null
+      ? '▫️ 단어 암기: 지난주 과제 없음'
+      : `▫️ 단어 암기: ${vocabPct}% 완료`
+  const readingPctLine =
+    readingPct == null
+      ? '▫️ 문제 풀이: 지난주 과제 없음'
+      : `▫️ 문제 풀이: ${readingPct}% 완료`
+  const vocabBody =
+    sessionCount === 0
+      ? '▫️ 지난주 응시 기록 없음'
+      : `▫️ 학습 ${vocabAsn.length}회분 · 단어 ${totalWords}개\n▫️ 통과 ${passCount}/${sessionCount}회 (암기 ${totalCorrectV}개)`
+  const readingBody =
+    completedReadingAttempts.length === 0
+      ? '▫️ 지난주 완료한 지문 없음'
+      : `▫️ 지문 ${doneReadingCount}개 완료\n▫️ 📈 정답률 ${ratio}% (${totalCorrectR}/${totalR}문항)`
 
-  const var2 = [
-    '🔤 단어 시험',
-    `▫️ 학습 ${vocabAsn.length}회분 · 단어 ${totalWords}개`,
-    `▫️ 통과 ${passCount}/${sessionCount}회 (암기 ${totalCorrectV}개)`,
-  ].join('\n')
-
-  const var3 = [
-    '📝 문제 풀이',
-    `▫️ 지문 ${doneReadingCount}개 완료`,
-    `▫️ 📈 정답률 ${ratio}% (${totalCorrectR}/${totalR}문항)`,
-  ].join('\n')
-
-  return { var1, var2, var3 }
+  return {
+    var1: ['📊 지난주 과제 성취도', vocabPctLine, readingPctLine].join('\n'),
+    var2: ['🔤 단어 시험', vocabBody].join('\n'),
+    var3: ['📝 문제 풀이', readingBody].join('\n'),
+  }
 }
