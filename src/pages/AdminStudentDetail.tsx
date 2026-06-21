@@ -7,7 +7,6 @@ import {
   deleteAssignment,
   deleteAttempt,
   ensureDefaultCategories,
-  isAssignmentDone,
   listAssignmentsForStudent,
   listAttemptsForUser,
   listReadings,
@@ -17,16 +16,20 @@ import {
 } from '../lib/firestore'
 import { sendPushNotification } from '../lib/ppurioApi'
 import { listMyWordbook } from '../lib/wordbook'
-import type {
-  Assignment,
-  AssignmentType,
-  AssignmentCategory,
-  Attempt,
-  CategoryConfig,
-  Reading,
-  UserAccount,
-  VocabSet,
-  WordLookup,
+import {
+  getAssignmentStatusView,
+  getDDay,
+  type Assignment,
+  type AssignmentType,
+  type AssignmentCategory,
+  type AssignmentStatusView,
+  type Attempt,
+  type CategoryConfig,
+  type DDayView,
+  type Reading,
+  type UserAccount,
+  type VocabSet,
+  type WordLookup,
 } from '../lib/types'
 
 function defaultCategoryKey(type: AssignmentType): AssignmentCategory {
@@ -469,108 +472,112 @@ export function AdminStudentDetail() {
 
         <form
           onSubmit={handleAssign}
-          className="rounded-lg border border-brand-200 bg-brand-50/40 p-4 space-y-3"
+          className="rounded-lg border border-brand-200 bg-brand-50/40 p-4 space-y-4"
         >
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">유형</label>
+          {/* 1. 유형 — 세그먼트 컨트롤 */}
+          <div>
+            <p className="text-xs font-medium text-slate-600 mb-1.5">유형</p>
+            <div className="grid grid-cols-3 gap-1 rounded-md border border-slate-200 bg-white p-1">
+              {(
+                [
+                  { key: 'reading', label: '지문 문제풀이' },
+                  { key: 'vocab', label: '단어 시험지' },
+                  { key: 'custom', label: '외부 과제' },
+                ] as { key: AssignmentType; label: string }[]
+              ).map((opt) => {
+                const active = assignType === opt.key
+                return (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() => {
+                      setAssignType(opt.key)
+                      setAssignRefId('')
+                      setAssignCategory(defaultCategoryKey(opt.key))
+                      if (opt.key !== 'reading') setBundleMode(false)
+                    }}
+                    className={`rounded px-2 py-1.5 text-xs font-medium transition ${
+                      active
+                        ? 'bg-slate-900 text-white'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                )
+              })}
+            </div>
+            {assignType === 'reading' && readingCategories.length > 0 && (
+              <label className="mt-2 flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={bundleMode}
+                  onChange={(e) => setBundleMode(e.target.checked)}
+                  className="accent-brand-600"
+                />
+                <span className="font-medium">묶음(풀세트)으로 부여</span>
+                <span className="text-slate-400">
+                  같은 시험명의 지문 전부를 한 번에 부여
+                </span>
+              </label>
+            )}
+            {assignType === 'custom' && (
+              <p className="text-[11px] text-slate-500 mt-1.5">
+                학생 풀이 화면 없는 외부 과제. 완료는 관리자가 수동 표시.
+              </p>
+            )}
+          </div>
+
+          {/* 2. 대상 — 지문/시험지/제목 */}
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">
+              {assignType === 'custom'
+                ? '과제명'
+                : assignType === 'vocab'
+                  ? '단어 시험지'
+                  : bundleMode
+                    ? '시험명 묶음'
+                    : '지문'}
+            </label>
+            {assignType === 'custom' ? (
+              <input
+                type="text"
+                value={customTitle}
+                onChange={(e) => setCustomTitle(e.target.value)}
+                placeholder="예: 학원 종이 시험지 3회, 모의고사 오답노트 등"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            ) : assignType === 'reading' && bundleMode ? (
               <select
-                value={assignType}
-                onChange={(e) => {
-                  const t = e.target.value as AssignmentType
-                  setAssignType(t)
-                  setAssignRefId('')
-                  setAssignCategory(defaultCategoryKey(t))
-                }}
+                value={bundleCategory}
+                onChange={(e) => setBundleCategory(e.target.value)}
                 className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               >
-                <option value="reading">지문 문제풀이</option>
-                <option value="vocab">단어 시험지</option>
-                <option value="custom">직접 입력 (외부 과제)</option>
+                <option value="">— 선택 —</option>
+                {readingCategories.map((g) => (
+                  <option key={g.category} value={g.category}>
+                    {g.category} ({g.list.length}개)
+                  </option>
+                ))}
               </select>
-              <div className="mt-2">
-                <label className="block text-xs font-medium text-slate-600 mb-1">
-                  과제 페이지 분류
-                </label>
-                <select
-                  value={assignCategory}
-                  onChange={(e) =>
-                    setAssignCategory(e.target.value as AssignmentCategory)
-                  }
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                >
-                  {categories.map((c) => (
-                    <option key={c.key} value={c.key}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">
-                {assignType === 'custom'
-                  ? '과제명'
-                  : assignType === 'vocab'
-                    ? '단어 시험지'
-                    : bundleMode
-                      ? '시험명 묶음'
-                      : '지문'}{' '}
-                {assignType === 'custom' ? '직접 입력' : '선택'}
-              </label>
-              {assignType === 'custom' ? (
-                <input
-                  type="text"
-                  value={customTitle}
-                  onChange={(e) => setCustomTitle(e.target.value)}
-                  placeholder="예: 학원 종이 시험지 3회, 모의고사 오답노트 등"
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                />
-              ) : assignType === 'reading' && bundleMode ? (
-                <select
-                  value={bundleCategory}
-                  onChange={(e) => setBundleCategory(e.target.value)}
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                >
-                  <option value="">— 선택 —</option>
-                  {readingCategories.map((g) => (
-                    <option key={g.category} value={g.category}>
-                      {g.category} ({g.list.length}개)
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <select
-                  value={assignRefId}
-                  onChange={(e) => setAssignRefId(e.target.value)}
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                >
-                  <option value="">— 선택 —</option>
-                  {assignOptions.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.title}
-                    </option>
-                  ))}
-                </select>
-              )}
-              {assignType === 'reading' && readingCategories.length > 0 && (
-                <label className="mt-1.5 flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={bundleMode}
-                    onChange={(e) => setBundleMode(e.target.checked)}
-                    className="accent-brand-600"
-                  />
-                  시험명 묶음(풀세트)으로 부여
-                </label>
-              )}
-              {assignType === 'custom' && (
-                <p className="text-[11px] text-slate-500 mt-1">
-                  학생이 직접 풀이 화면이 따로 없는 외부 과제. 완료 여부는
-                  관리자가 칩을 눌러 수동으로 표시합니다.
-                </p>
-              )}
-            </div>
+            ) : (
+              <select
+                value={assignRefId}
+                onChange={(e) => setAssignRefId(e.target.value)}
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                <option value="">— 선택 —</option>
+                {assignOptions.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.title}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {/* 3. 마감일 + 분류 — 핵심 옵션 두 줄 */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">
                 마감일 <span className="text-slate-400 font-normal">(선택)</span>
@@ -582,6 +589,28 @@ export function AdminStudentDetail() {
                 className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
             </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                과제 페이지 분류
+              </label>
+              <select
+                value={assignCategory}
+                onChange={(e) =>
+                  setAssignCategory(e.target.value as AssignmentCategory)
+                }
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                {categories.map((c) => (
+                  <option key={c.key} value={c.key}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* 4. 부가 옵션 — 메모 + vocab 완료 기준 */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">
                 메모 <span className="text-slate-400 font-normal">(선택)</span>
@@ -599,7 +628,7 @@ export function AdminStudentDetail() {
                 <label className="block text-xs font-medium text-slate-600 mb-1">
                   완료 기준{' '}
                   <span className="text-slate-400 font-normal">
-                    (최소 정답 개수, 선택)
+                    (최소 정답 수, 선택)
                   </span>
                 </label>
                 <input
@@ -610,15 +639,15 @@ export function AdminStudentDetail() {
                   placeholder="예: 25"
                   className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
-                <p className="text-[11px] text-slate-500 mt-1">
-                  비워두면 한 번이라도 응시하면 완료로 표시됩니다.
-                </p>
               </div>
             )}
           </div>
+
           {assignError && <p className="text-sm text-red-600">{assignError}</p>}
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
+
+          {/* 5. 푸시 + 부여 버튼 */}
+          <div className="flex items-center justify-between flex-wrap gap-2 pt-1 border-t border-brand-200">
+            <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer">
               <input
                 type="checkbox"
                 checked={pushOnAssign}
@@ -630,7 +659,7 @@ export function AdminStudentDetail() {
             <button
               type="submit"
               disabled={assigning}
-              className="rounded-md bg-slate-900 text-white text-sm font-medium px-4 py-2 hover:bg-slate-800 disabled:opacity-50"
+              className="rounded-md bg-slate-900 text-white text-sm font-semibold px-5 py-2 hover:bg-slate-800 disabled:opacity-50"
             >
               {assigning ? '부여 중…' : '과제 부여'}
             </button>
@@ -642,76 +671,76 @@ export function AdminStudentDetail() {
             아직 부여한 과제가 없습니다.
           </div>
         ) : (
-          <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
-            {assignments.map((a) => {
-              const done = isAssignmentDone(a, attempts)
-              return (
-                <li key={a.id} className="px-4 py-3 flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {(() => {
-                        const autoDone = done && !a.manualDone
-                        return (
-                          <button
-                            type="button"
-                            onClick={
-                              autoDone
-                                ? undefined
-                                : () => handleToggleAssignmentDone(a)
-                            }
-                            disabled={autoDone}
-                            title={
-                              autoDone
-                                ? '학생 응시 기록으로 완료 — 응시 기록을 삭제해야 변경 가능'
-                                : '클릭으로 완료 ↔ 미완료 전환'
-                            }
-                            className={`rounded-full px-2.5 py-0.5 text-xs font-medium border transition ${
-                              done
-                                ? 'bg-brand-100 text-brand-700 border-brand-200'
-                                : 'bg-slate-100 text-slate-600 border-slate-200'
-                            } ${
-                              autoDone
-                                ? 'cursor-default opacity-90'
-                                : done
-                                  ? 'hover:bg-brand-200 cursor-pointer'
-                                  : 'hover:bg-slate-200 cursor-pointer'
-                            }`}
-                          >
-                            {done ? '완료' : '미완료'}
-                          </button>
-                        )
-                      })()}
-                      <span className="text-xs text-slate-500">
-                        {a.type === 'vocab'
-                          ? '단어 시험지'
-                          : a.type === 'reading'
-                            ? '지문'
-                            : '외부 과제'}
-                      </span>
-                      <span className="text-sm font-semibold text-slate-900 truncate">
-                        {a.refTitle}
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500 mt-1">
-                      {a.dueAt && <span>마감: {fmtDate(a.dueAt)}</span>}
-                      <span>부여: {fmtDate(a.createdAt)}</span>
-                      {a.minCorrect && a.minCorrect > 0 && (
-                        <span className="text-slate-600">완료 기준: {a.minCorrect}개 이상 정답</span>
-                      )}
-                      {a.note && <span className="text-slate-600">· {a.note}</span>}
-                    </div>
+          (() => {
+            // 진행 중(미완료) — D-day 오름차순(지난 것 가장 위) → 마감 없음은 맨 뒤
+            // 완료 — 부여일 내림차순
+            const enriched = assignments.map((a) => ({
+              a,
+              status: getAssignmentStatusView(a, attempts),
+              dday: getDDay(a.dueAt),
+            }))
+            const pending = enriched
+              .filter((x) => x.status.status !== 'done')
+              .sort((x, y) => {
+                const xv = x.dday.days
+                const yv = y.dday.days
+                if (xv == null && yv == null) return 0
+                if (xv == null) return 1
+                if (yv == null) return -1
+                return xv - yv
+              })
+            const done = enriched
+              .filter((x) => x.status.status === 'done')
+              .sort((x, y) => {
+                const xt = x.a.createdAt?.toMillis?.() ?? 0
+                const yt = y.a.createdAt?.toMillis?.() ?? 0
+                return yt - xt
+              })
+            return (
+              <div className="space-y-4">
+                {pending.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                      진행 중 ({pending.length})
+                    </p>
+                    <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
+                      {pending.map((x) => (
+                        <AssignmentRow
+                          key={x.a.id}
+                          a={x.a}
+                          status={x.status}
+                          dday={x.dday}
+                          onToggleDone={() => handleToggleAssignmentDone(x.a)}
+                          onDelete={() => handleDeleteAssignment(x.a)}
+                          fmtDate={fmtDate}
+                        />
+                      ))}
+                    </ul>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteAssignment(a)}
-                    className="text-xs text-slate-400 hover:text-red-600 px-1 shrink-0"
-                  >
-                    삭제
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
+                )}
+                {done.length > 0 && (
+                  <details className="space-y-1.5" open={pending.length === 0}>
+                    <summary className="text-xs font-semibold text-slate-500 uppercase tracking-wider cursor-pointer hover:text-slate-700 select-none">
+                      완료 ({done.length})
+                    </summary>
+                    <ul className="mt-1.5 divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
+                      {done.map((x) => (
+                        <AssignmentRow
+                          key={x.a.id}
+                          a={x.a}
+                          status={x.status}
+                          dday={x.dday}
+                          onToggleDone={() => handleToggleAssignmentDone(x.a)}
+                          onDelete={() => handleDeleteAssignment(x.a)}
+                          fmtDate={fmtDate}
+                        />
+                      ))}
+                    </ul>
+                  </details>
+                )}
+              </div>
+            )
+          })()
         )}
       </section>
 
@@ -866,6 +895,99 @@ export function AdminStudentDetail() {
         )}
       </section>
     </div>
+  )
+}
+
+const STATUS_TONE_CLASS: Record<AssignmentStatusView['tone'], string> = {
+  brand: 'bg-brand-100 text-brand-700 border-brand-200',
+  amber: 'bg-amber-100 text-amber-800 border-amber-200',
+  red: 'bg-red-100 text-red-700 border-red-200',
+  slate: 'bg-slate-100 text-slate-600 border-slate-200',
+}
+
+const DDAY_TONE_CLASS: Record<DDayView['tone'], string> = {
+  overdue: 'bg-red-100 text-red-700 border-red-200',
+  today: 'bg-amber-100 text-amber-800 border-amber-200',
+  soon: 'bg-amber-50 text-amber-700 border-amber-200',
+  normal: 'bg-slate-100 text-slate-600 border-slate-200',
+  none: 'bg-slate-50 text-slate-500 border-slate-200',
+}
+
+const TYPE_SHORT: Record<Assignment['type'], string> = {
+  vocab: '단어',
+  reading: '지문',
+  custom: '외부',
+}
+
+function AssignmentRow({
+  a,
+  status,
+  dday,
+  onToggleDone,
+  onDelete,
+  fmtDate,
+}: {
+  a: Assignment
+  status: AssignmentStatusView
+  dday: DDayView
+  onToggleDone: () => void
+  onDelete: () => void
+  fmtDate: (ts: { toDate: () => Date } | null | undefined) => string
+}) {
+  const isDone = status.status === 'done'
+  const autoDone = isDone && !a.manualDone
+  return (
+    <li className="px-4 py-3 flex items-start justify-between gap-3">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+            {TYPE_SHORT[a.type]}
+          </span>
+          <button
+            type="button"
+            onClick={autoDone ? undefined : onToggleDone}
+            disabled={autoDone}
+            title={
+              autoDone
+                ? '학생 응시 기록으로 자동 완료 — 응시 기록 삭제 시 해제'
+                : '클릭으로 완료 ↔ 미완료 전환'
+            }
+            className={`rounded-full px-2 py-0.5 text-[11px] font-medium border transition ${
+              STATUS_TONE_CLASS[status.tone]
+            } ${autoDone ? 'cursor-default opacity-90' : 'cursor-pointer hover:brightness-95'}`}
+          >
+            {status.label}
+          </button>
+          {dday.tone !== 'none' && (
+            <span
+              className={`rounded-full px-2 py-0.5 text-[11px] font-medium border ${
+                DDAY_TONE_CLASS[dday.tone]
+              }`}
+            >
+              {dday.label}
+            </span>
+          )}
+        </div>
+        <p className="text-sm font-semibold text-slate-900 mt-1 truncate">
+          {a.refTitle}
+        </p>
+        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-500 mt-0.5">
+          {a.dueAt && <span>마감 {fmtDate(a.dueAt)}</span>}
+          <span>부여 {fmtDate(a.createdAt)}</span>
+          {a.minCorrect && a.minCorrect > 0 && (
+            <span className="text-slate-600">완료 기준 {a.minCorrect}개↑</span>
+          )}
+          {a.note && <span className="text-slate-600">· {a.note}</span>}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onDelete}
+        className="text-xs text-slate-400 hover:text-red-600 px-1 shrink-0"
+      >
+        삭제
+      </button>
+    </li>
   )
 }
 

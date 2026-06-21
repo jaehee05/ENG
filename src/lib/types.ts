@@ -332,6 +332,83 @@ export function isReadingAttemptComplete(a: Attempt): boolean {
   return !!a.wrongReviewedAt
 }
 
+/**
+ * 과제 진행 상태:
+ * - none: 시도 기록 없음
+ * - wrong_pending: (reading) 시도했지만 오답 검토 안 함
+ * - pending: (vocab) 시도했지만 minCorrect 미달
+ * - done: 완료 (manualDone 포함)
+ */
+export type AssignmentStatus = 'none' | 'wrong_pending' | 'pending' | 'done'
+
+export interface AssignmentStatusView {
+  status: AssignmentStatus
+  label: string
+  tone: 'slate' | 'amber' | 'red' | 'brand'
+}
+
+export function getAssignmentStatusView(
+  asn: Assignment,
+  atts: Attempt[],
+): AssignmentStatusView {
+  if (asn.manualDone) {
+    return { status: 'done', label: '완료', tone: 'brand' }
+  }
+  const matched = atts.filter(
+    (a) => a.type === asn.type && a.refId === asn.refId && !a.practice,
+  )
+  if (matched.length === 0) {
+    return { status: 'none', label: '미시작', tone: 'slate' }
+  }
+  if (asn.type === 'reading') {
+    const anyComplete = matched.some((a) => isReadingAttemptComplete(a))
+    if (anyComplete) return { status: 'done', label: '완료', tone: 'brand' }
+    return {
+      status: 'wrong_pending',
+      label: '오답 검토 미완료',
+      tone: 'amber',
+    }
+  }
+  if (asn.type === 'vocab') {
+    if (asn.minCorrect && asn.minCorrect > 0) {
+      const passed = matched.some((a) => (a.correct ?? 0) >= (asn.minCorrect ?? 0))
+      if (passed) return { status: 'done', label: '완료', tone: 'brand' }
+      return {
+        status: 'pending',
+        label: `기준 미달 (${asn.minCorrect}↑ 필요)`,
+        tone: 'amber',
+      }
+    }
+    return { status: 'done', label: '완료', tone: 'brand' }
+  }
+  return { status: 'none', label: '미시작', tone: 'slate' }
+}
+
+export interface DDayView {
+  /** 음수면 마감 지남, 0이면 오늘, 양수면 남은 일수. dueAt이 없으면 null. */
+  days: number | null
+  label: string
+  /** 'overdue' | 'today' | 'soon' (≤3일) | 'normal' | 'none'. */
+  tone: 'overdue' | 'today' | 'soon' | 'normal' | 'none'
+}
+
+export function getDDay(
+  dueAt: Timestamp | null | undefined,
+  now: Date = new Date(),
+): DDayView {
+  if (!dueAt) return { days: null, label: '마감 없음', tone: 'none' }
+  const due = dueAt.toDate()
+  // 날짜 단위 비교: 자정 기준.
+  const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate())
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const diffMs = dueDay.getTime() - today.getTime()
+  const days = Math.round(diffMs / (1000 * 60 * 60 * 24))
+  if (days < 0) return { days, label: `D+${-days} (지남)`, tone: 'overdue' }
+  if (days === 0) return { days, label: '오늘 마감', tone: 'today' }
+  if (days <= 3) return { days, label: `D-${days}`, tone: 'soon' }
+  return { days, label: `D-${days}`, tone: 'normal' }
+}
+
 export interface ReadingRef {
   id: string
   title: string
