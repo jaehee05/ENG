@@ -12,7 +12,6 @@ import {
   listReadings,
   listVocabSets,
   setAssignmentManualDone,
-  setAttemptPractice,
   updateAssignment,
 } from '../lib/firestore'
 import { sendPushNotification } from '../lib/ppurioApi'
@@ -369,18 +368,6 @@ export function AdminStudentDetail() {
       await setAssignmentManualDone(asn.id, next)
       setAssignments((prev) =>
         prev.map((x) => (x.id === asn.id ? { ...x, manualDone: next } : x)),
-      )
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '상태 변경 실패')
-    }
-  }
-
-  async function handleToggleAttemptPractice(att: Attempt) {
-    const next = !att.practice
-    try {
-      await setAttemptPractice(att.id, next)
-      setAttempts((prev) =>
-        prev.map((x) => (x.id === att.id ? { ...x, practice: next } : x)),
       )
     } catch (err) {
       setError(err instanceof Error ? err.message : '상태 변경 실패')
@@ -828,28 +815,12 @@ export function AdminStudentDetail() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-slate-900">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Link
-                            to={resultPath}
-                            className="text-slate-900 hover:text-brand-700 hover:underline"
-                          >
-                            {a.refTitle}
-                          </Link>
-                          {a.type === 'vocab' && (
-                            <button
-                              type="button"
-                              onClick={() => handleToggleAttemptPractice(a)}
-                              className={`rounded-full text-[10px] font-medium px-2 py-0.5 border transition ${
-                                a.practice
-                                  ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
-                                  : 'bg-brand-50 text-brand-700 border-brand-200 hover:bg-brand-100'
-                              }`}
-                              title="클릭으로 연습 ↔ 시험 전환"
-                            >
-                              {a.practice ? '연습' : '시험'}
-                            </button>
-                          )}
-                        </div>
+                        <Link
+                          to={resultPath}
+                          className="text-slate-900 hover:text-brand-700 hover:underline"
+                        >
+                          {a.refTitle}
+                        </Link>
                       </td>
                       <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
                         {a.correct} / {a.total}
