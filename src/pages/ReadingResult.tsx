@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import {
   getAttempt,
   getReading,
-  markAttemptWrongReviewed,
+  submitReadingRetry,
 } from '../lib/firestore'
 import { renderUnderlines } from '../lib/renderUnderlines'
 import {
@@ -102,9 +102,10 @@ export function ReadingResult() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // 재도전: 문항별로 선택된 인덱스 보관 (기록 X)
-  const [retry, setRetry] = useState<Record<number, number>>({})
-  const [reviewedLocal, setReviewedLocal] = useState(false)
+  // 문항별 로컬 재시도 상태. DB의 retryAnswers와 병합해서 화면에 표시.
+  const [localRetry, setLocalRetry] = useState<Record<number, number>>({})
+  // 사용자가 '다시 시도'를 눌러 선택 UI를 펼친 문항.
+  const [retryOpen, setRetryOpen] = useState<Record<number, boolean>>({})
 
   useEffect(() => {
     if (!attemptId) return
@@ -142,24 +143,55 @@ export function ReadingResult() {
       .filter((i) => i >= 0)
   }, [attempt])
 
-  const alreadyReviewed = !!attempt?.wrongReviewedAt || reviewedLocal
-  const allWrongRetriedCorrect =
-    wrongIndices.length > 0 &&
-    wrongIndices.every((i) => {
-      const r = attempt?.readingResults?.[i]
-      return r && retry[i] === r.correctAnswer
-    })
+  // DB의 retryAnswers와 로컬 retry 병합. DB가 우선(이미 제출된 건 못 바꿈).
+  function getRetryAnswer(i: number): number | undefined {
+    const fromDb = attempt?.retryAnswers?.[String(i)]
+    if (typeof fromDb === 'number') return fromDb
+    if (typeof localRetry[i] === 'number') return localRetry[i]
+    return undefined
+  }
 
-  useEffect(() => {
+  const alreadyReviewed = !!attempt?.wrongReviewedAt
+  // 검토 시작: 최소 한 문항이라도 재시도가 진행 중이거나 완료됨 → 한글 해석 표시.
+  const reviewStarted =
+    alreadyReviewed ||
+    wrongIndices.some(
+      (i) => retryOpen[i] || typeof getRetryAnswer(i) === 'number',
+    )
+
+  async function handleRetryChoice(qIdx: number, choice: number) {
     if (!attempt) return
-    if (alreadyReviewed) return
-    if (!allWrongRetriedCorrect) return
-    setReviewedLocal(true)
-    void markAttemptWrongReviewed(attempt.id, true).catch(() => {
-      // 비치명적: 다음 진입 시 다시 시도
-      setReviewedLocal(false)
+    // 이미 제출된 문항은 재선택 불가
+    if (typeof getRetryAnswer(qIdx) === 'number') return
+    const nextLocal = { ...localRetry, [qIdx]: choice }
+    setLocalRetry(nextLocal)
+    // 이번 클릭 포함해서 모든 오답이 재시도 제출됐는지 판정
+    const allDone = wrongIndices.every((i) => {
+      if (i === qIdx) return true
+      const v = attempt.retryAnswers?.[String(i)]
+      if (typeof v === 'number') return true
+      return typeof nextLocal[i] === 'number'
     })
-  }, [attempt, alreadyReviewed, allWrongRetriedCorrect])
+    try {
+      await submitReadingRetry(attempt.id, qIdx, choice, allDone)
+      if (allDone) {
+        // optimistic: 화면에 즉시 반영
+        setAttempt((prev) =>
+          prev
+            ? {
+                ...prev,
+                retryAnswers: { ...(prev.retryAnswers || {}), [String(qIdx)]: choice },
+              }
+            : prev,
+        )
+      }
+    } catch {
+      // 실패 시 로컬 상태 롤백
+      const rollback = { ...nextLocal }
+      delete rollback[qIdx]
+      setLocalRetry(rollback)
+    }
+  }
 
   if (loading) return <p className="text-slate-500 text-sm">불러오는 중...</p>
   if (error) return <p className="text-red-600 text-sm">{error}</p>
@@ -248,19 +280,24 @@ export function ReadingResult() {
 
       {hasWrong && !alreadyReviewed && (
         <div className="rounded-lg border border-amber-300 bg-amber-50/70 p-3 text-sm text-slate-800">
-          ⚠️ <span className="font-semibold">아직 완료가 아니에요.</span> 아래 오답을 모두 재도전해서 정답을 맞혀야 과제가 완료 처리됩니다.
+          ⚠️ <span className="font-semibold">아직 완료가 아니에요.</span> 아래 오답마다 [다시 시도]를 눌러 한 번씩 재도전하세요. 재도전 시 한글 해석이 같이 표시됩니다.
         </div>
       )}
 
       {hasWrong && (
         <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4 space-y-3">
-          <p className="text-sm font-semibold text-slate-900">
-            틀린 문제가 {wrongIndices.length}개 있어요. 지문과 한글 해석을 참고해서 다시 풀어보세요.
-          </p>
+          {!reviewStarted && (
+            <p className="text-sm font-semibold text-slate-900">
+              틀린 문제가 {wrongIndices.length}개 있어요. 아래에서 [다시 시도]를 눌러 보세요.
+            </p>
+          )}
           {(hasAnyKo || (reading && reading.questions.length > 0)) && (
-            <details className="rounded-md border border-amber-200 bg-white">
+            <details
+              className="rounded-md border border-amber-200 bg-white"
+              open={reviewStarted}
+            >
               <summary className="cursor-pointer text-sm font-medium text-slate-800 px-4 py-2 hover:bg-amber-50">
-                지문 + 한글 해석 보기
+                {reviewStarted ? '지문 + 한글 해석' : '지문 + 한글 해석 (재시도 시 자동 표시)'}
               </summary>
               <div className="px-4 py-3 border-t border-amber-100 space-y-4">
                 {reading && (() => {
@@ -369,9 +406,12 @@ export function ReadingResult() {
             ? inferQuestionNumbers(reading.title, reading.questions)[i]?.number
             : undefined
           const label = r.number ?? fromReading ?? i + 1
-          const retryAns = retry[i] ?? -1
-          const retried = retryAns >= 0
+          const retryAns = getRetryAnswer(i)
+          const retried = typeof retryAns === 'number'
           const retryCorrect = retried && retryAns === r.correctAnswer
+          const isRetryOpen = !!retryOpen[i]
+          // 답 공개 조건: 처음부터 맞혔거나, 재시도가 끝났거나(정답이든 오답이든)
+          const revealAnswer = r.correct || retried
           return (
             <div
               key={i}
@@ -397,8 +437,7 @@ export function ReadingResult() {
                 {r.choices.map((c, ci) => {
                   const isUser = ci === r.userAnswer
                   const isAnswer = ci === r.correctAnswer
-                  // 정답은 (a) 처음부터 맞혔거나 (b) 재도전에서 맞힌 경우에만 공개
-                  const revealAnswer = r.correct || retryCorrect
+                  const isRetryPick = retried && ci === retryAns
                   const showAsAnswer = isAnswer && revealAnswer
                   return (
                     <div
@@ -408,7 +447,9 @@ export function ReadingResult() {
                           ? 'bg-brand-100/70'
                           : isUser && !showAsAnswer
                             ? 'bg-red-100/70'
-                            : ''
+                            : isRetryPick
+                              ? 'bg-amber-100/70'
+                              : ''
                       }`}
                     >
                       <span className="text-slate-500 w-5">{CHOICE_MARKS[ci]}</span>
@@ -416,6 +457,9 @@ export function ReadingResult() {
                       {showAsAnswer && <span className="text-xs text-brand-700 font-medium">정답</span>}
                       {isUser && !showAsAnswer && (
                         <span className="text-xs text-red-800 font-medium">선택</span>
+                      )}
+                      {isRetryPick && !showAsAnswer && (
+                        <span className="text-xs text-amber-700 font-medium">재시도 선택</span>
                       )}
                     </div>
                   )
@@ -437,43 +481,54 @@ export function ReadingResult() {
                 )
               })()}
 
-              {!r.correct && (
+              {!r.correct && !retried && !isRetryOpen && (
+                <div className="mt-3 pt-3 border-t border-red-200/70">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setRetryOpen((prev) => ({ ...prev, [i]: true }))
+                    }
+                    className="rounded-md bg-amber-600 text-white text-sm font-semibold px-4 py-2 hover:bg-amber-700 transition"
+                  >
+                    다시 시도 (한 번만 가능)
+                  </button>
+                  <p className="mt-1.5 text-[11px] text-slate-500">
+                    한글 해석을 보고 한 번만 답을 골라요. 선택하면 정답이 공개됩니다.
+                  </p>
+                </div>
+              )}
+
+              {!r.correct && !retried && isRetryOpen && (
                 <div className="mt-3 pt-3 border-t border-red-200/70 space-y-2">
-                  <p className="text-xs font-medium text-slate-700">다시 풀어보기</p>
+                  <p className="text-xs font-medium text-slate-700">
+                    아래 선지 중 하나를 골라요 (한 번만 가능).
+                  </p>
                   <div className="flex flex-wrap gap-2">
-                    {r.choices.map((_, ci) => {
-                      const isSel = ci === retryAns
-                      const isCorrectChoice = ci === r.correctAnswer
-                      const color = isSel
-                        ? isCorrectChoice
-                          ? 'bg-brand-600 text-white border-brand-600'
-                          : 'bg-red-600 text-white border-red-600'
-                        : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
-                      return (
-                        <button
-                          key={ci}
-                          type="button"
-                          onClick={() =>
-                            setRetry((prev) => ({ ...prev, [i]: ci }))
-                          }
-                          className={`rounded-full w-9 h-9 inline-flex items-center justify-center border text-sm font-medium transition ${color}`}
-                        >
-                          {CHOICE_MARKS[ci]}
-                        </button>
-                      )
-                    })}
+                    {r.choices.map((_, ci) => (
+                      <button
+                        key={ci}
+                        type="button"
+                        onClick={() => handleRetryChoice(i, ci)}
+                        className="rounded-full w-10 h-10 inline-flex items-center justify-center border border-slate-300 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50"
+                      >
+                        {CHOICE_MARKS[ci]}
+                      </button>
+                    ))}
                   </div>
-                  {retried && (
-                    <p
-                      className={`text-xs font-medium ${
-                        retryCorrect ? 'text-brand-700' : 'text-red-700'
-                      }`}
-                    >
-                      {retryCorrect
-                        ? '잘 풀었어요! 다음에는 한 번에 맞혀 봐요.'
-                        : '아직 정답이 아니에요. 한글 해석을 더 살펴보세요.'}
-                    </p>
-                  )}
+                </div>
+              )}
+
+              {!r.correct && retried && (
+                <div className="mt-3 pt-3 border-t border-red-200/70">
+                  <p
+                    className={`text-sm font-semibold ${
+                      retryCorrect ? 'text-brand-700' : 'text-red-700'
+                    }`}
+                  >
+                    {retryCorrect
+                      ? '✅ 잘 풀었어요! 다음에는 한 번에 맞혀 봐요.'
+                      : `❌ 아쉬워요. 정답은 ${CHOICE_MARKS[r.correctAnswer]}번 입니다.`}
+                  </p>
                 </div>
               )}
             </div>

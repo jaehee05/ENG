@@ -317,8 +317,10 @@ export interface Attempt {
   practice?: boolean
   vocabResults?: VocabResult[]
   readingResults?: ReadingResult[]
-  /** reading 한정: 모든 오답을 재도전으로 맞혀 검토 완료한 시각. */
+  /** reading 한정: 오답 검토(재시도 1회) 완료 시각. */
   wrongReviewedAt?: Timestamp | null
+  /** reading 한정: 오답 문항별 재시도에서 고른 선지 인덱스. 키는 문항 인덱스 문자열. */
+  retryAnswers?: Record<string, number>
   createdAt: Timestamp | null
 }
 

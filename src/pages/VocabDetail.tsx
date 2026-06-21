@@ -12,12 +12,12 @@ function StartBox({
   total,
   testUsed,
   testLimit,
-  buildHref,
+  href,
 }: {
   total: number
   testUsed: number
   testLimit: number | null
-  buildHref: (mode: 'practice' | 'test') => string
+  href: string
 }) {
   const remaining = testLimit !== null ? Math.max(0, testLimit - testUsed) : null
   const testBlocked = remaining !== null && remaining === 0
@@ -25,12 +25,10 @@ function StartBox({
   return (
     <div className="rounded-lg border border-brand-200 bg-brand-50/40 p-4 space-y-3">
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
-        <p className="text-sm text-slate-600">
-          전체 {total}단어 · 연습은 무제한
-        </p>
+        <p className="text-sm text-slate-600">전체 {total}단어</p>
         {testLimit !== null && (
           <p className="text-sm">
-            <span className="text-slate-500">시험 응시:</span>{' '}
+            <span className="text-slate-500">응시:</span>{' '}
             <strong className="text-slate-900">{testUsed}회 사용</strong>
             {' · '}
             <strong className={remaining === 0 ? 'text-red-600' : 'text-brand-700'}>
@@ -41,12 +39,6 @@ function StartBox({
         )}
       </div>
       <div className="flex gap-2 flex-wrap">
-        <Link
-          to={buildHref('practice')}
-          className="rounded-md border border-brand-600 text-brand-700 text-sm font-semibold px-5 py-2.5 hover:bg-brand-50 transition"
-        >
-          연습하기
-        </Link>
         {testBlocked ? (
           <span
             className="rounded-md bg-slate-200 text-slate-500 text-sm font-medium px-5 py-2.5 cursor-not-allowed"
@@ -56,7 +48,7 @@ function StartBox({
           </span>
         ) : (
           <Link
-            to={buildHref('test')}
+            to={href}
             className="rounded-md bg-brand-600 text-white text-sm font-semibold px-5 py-2.5 hover:bg-brand-700 transition"
           >
             시험 보기
@@ -148,7 +140,7 @@ export function VocabDetail() {
         total={set.words.length}
         testUsed={myAttempts.filter((a) => !a.practice).length}
         testLimit={isAdmin ? null : (set.maxAttempts ?? null)}
-        buildHref={(mode) => `/vocab/${set.id}/take?mode=${mode}`}
+        href={`/vocab/${set.id}/take`}
       />
 
       <div className="flex justify-end">

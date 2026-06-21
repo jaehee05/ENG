@@ -54,7 +54,6 @@ export function VocabTake() {
 
   const fromRaw = Number.parseInt(search.get('from') ?? '', 10)
   const toRaw = Number.parseInt(search.get('to') ?? '', 10)
-  const isPractice = search.get('mode') === 'practice'
 
   useEffect(() => {
     if (!id || !profile) return
@@ -88,10 +87,7 @@ export function VocabTake() {
   }, [id, profile, fromRaw, toRaw])
 
   const blocked =
-    !isPractice &&
-    !!set?.maxAttempts &&
-    !isAdmin &&
-    usedAttempts >= (set.maxAttempts ?? 0)
+    !!set?.maxAttempts && !isAdmin && usedAttempts >= (set.maxAttempts ?? 0)
 
   const answered = useMemo(() => answers.filter((a) => a.trim()).length, [answers])
   const hasAnyHint = useMemo(
@@ -125,7 +121,6 @@ export function VocabTake() {
         refId: set.id,
         refTitle: set.title,
         vocabResults: results,
-        practice: isPractice,
       })
       navigate(`/vocab/${set.id}/result/${attemptId}`)
     } catch (err) {
@@ -163,20 +158,9 @@ export function VocabTake() {
     <div className="space-y-5 max-w-3xl">
       <header className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-              단어 시험
-            </p>
-            <span
-              className={`inline-block rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
-                isPractice
-                  ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                  : 'bg-brand-50 text-brand-700 border border-brand-200'
-              }`}
-            >
-              {isPractice ? '연습' : '시험'}
-            </span>
-          </div>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+            단어 시험
+          </p>
           <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
             {set.title}
           </h1>
@@ -184,7 +168,6 @@ export function VocabTake() {
             총 {order.length}문항
             {order.length !== set.words.length &&
               ` · ${(order.length > 0 ? Math.min(...order) : 0) + 1}~${(order.length > 0 ? Math.max(...order) : 0) + 1}번`}
-            {isPractice && ' · 횟수 미차감'}
           </p>
         </div>
         {hasAnyHint && (
@@ -278,11 +261,7 @@ export function VocabTake() {
               disabled={submitting}
               className="rounded-md bg-white text-slate-900 text-sm font-medium px-4 py-1.5 hover:bg-slate-100 disabled:opacity-60"
             >
-              {submitting
-                ? '채점 중…'
-                : isPractice
-                  ? '연습 제출'
-                  : '제출'}
+              {submitting ? '채점 중…' : '제출'}
             </button>
           </div>
         </div>

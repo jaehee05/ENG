@@ -519,6 +519,25 @@ export async function markAttemptWrongReviewed(
   })
 }
 
+/**
+ * 지문 문제풀이의 오답 재시도 결과를 저장.
+ * - 모든 오답에 대해 재시도가 완료되면 wrongReviewedAt도 함께 설정.
+ */
+export async function submitReadingRetry(
+  attemptId: string,
+  questionIndex: number,
+  answer: number,
+  allWrongRetried: boolean,
+): Promise<void> {
+  const update: Record<string, unknown> = {
+    [`retryAnswers.${questionIndex}`]: answer,
+  }
+  if (allWrongRetried) {
+    update.wrongReviewedAt = serverTimestamp()
+  }
+  await updateDoc(doc(db, 'attempts', attemptId), update)
+}
+
 export async function setAttemptPractice(
   id: string,
   value: boolean,
