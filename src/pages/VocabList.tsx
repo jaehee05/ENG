@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import {
+  clearAllVocabAttemptLimits,
   deleteVocabSet,
   formatDate,
   listVocabSets,
@@ -60,6 +61,38 @@ export function VocabList({ manage = false }: { manage?: boolean }) {
 
   const [reprocessing, setReprocessing] = useState(false)
   const [reprocessNotice, setReprocessNotice] = useState<string | null>(null)
+  const [clearingLimits, setClearingLimits] = useState(false)
+
+  async function handleClearAllLimits() {
+    if (!isAdmin) return
+    if (
+      !window.confirm(
+        '모든 단어 시험지·교재의 응시 횟수 제한을 해제합니다. 이후 시험지/교재 편집 페이지에서 다시 설정할 수 있습니다. 계속할까요?',
+      )
+    )
+      return
+    setClearingLimits(true)
+    setReprocessNotice(null)
+    try {
+      const { vocabSets, vocabSeries } = await clearAllVocabAttemptLimits()
+      setReprocessNotice(
+        `응시 횟수 제한 해제: 시험지 ${vocabSets}개 · 교재 ${vocabSeries}개`,
+      )
+      // 로컬 상태도 즉시 반영 (sets에서 maxAttempts 제거)
+      setSets((prev) =>
+        prev.map((s) => {
+          if (s.maxAttempts === undefined) return s
+          const { maxAttempts: _omit, ...rest } = s
+          void _omit
+          return rest
+        }),
+      )
+    } catch (err) {
+      setReprocessNotice(err instanceof Error ? err.message : '해제 실패')
+    } finally {
+      setClearingLimits(false)
+    }
+  }
 
   async function handleReprocessAll() {
     if (!isAdmin) return
@@ -115,6 +148,14 @@ export function VocabList({ manage = false }: { manage?: boolean }) {
         </div>
         {canManage && (
           <div className="flex gap-1.5 flex-wrap">
+            <button
+              type="button"
+              onClick={handleClearAllLimits}
+              disabled={clearingLimits}
+              className="rounded-md border border-amber-200 text-amber-700 text-xs font-medium px-3 py-1.5 hover:bg-amber-50 disabled:opacity-50"
+            >
+              {clearingLimits ? '해제 중…' : '응시 횟수 제한 전부 해제'}
+            </button>
             <button
               type="button"
               onClick={handleReprocessAll}

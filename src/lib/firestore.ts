@@ -2,6 +2,7 @@ import {
   addDoc,
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -12,6 +13,7 @@ import {
   Timestamp,
   updateDoc,
   where,
+  writeBatch,
 } from 'firebase/firestore'
 import { db } from './firebase'
 import type {
@@ -517,6 +519,34 @@ export async function markAttemptWrongReviewed(
   await updateDoc(doc(db, 'attempts', id), {
     wrongReviewedAt: value ? serverTimestamp() : null,
   })
+}
+
+/** 모든 vocabSets + vocabSeries의 maxAttempts 필드를 일괄 삭제. 관리자 전용. */
+export async function clearAllVocabAttemptLimits(): Promise<{
+  vocabSets: number
+  vocabSeries: number
+}> {
+  const [setsSnap, seriesSnap] = await Promise.all([
+    getDocs(collection(db, 'vocabSets')),
+    getDocs(collection(db, 'vocabSeries')),
+  ])
+  const batch = writeBatch(db)
+  let vocabSets = 0
+  let vocabSeries = 0
+  setsSnap.forEach((d) => {
+    if (d.data().maxAttempts !== undefined) {
+      batch.update(d.ref, { maxAttempts: deleteField() })
+      vocabSets++
+    }
+  })
+  seriesSnap.forEach((d) => {
+    if (d.data().maxAttempts !== undefined) {
+      batch.update(d.ref, { maxAttempts: deleteField() })
+      vocabSeries++
+    }
+  })
+  if (vocabSets + vocabSeries > 0) await batch.commit()
+  return { vocabSets, vocabSeries }
 }
 
 /**
