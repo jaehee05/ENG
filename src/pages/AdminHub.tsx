@@ -90,7 +90,7 @@ const tools: AdminTool[] = [
   },
   {
     to: '/admin/korean-mocks',
-    title: '국어 모의고사',
+    title: '모의고사 (국어/영어)',
     desc: '답안 등록 / 학생 OMR 채점 결과 확인',
     icon: (
       <svg {...iconProps}>

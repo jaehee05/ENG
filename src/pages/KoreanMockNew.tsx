@@ -1,17 +1,17 @@
-import { useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import { createKoreanMock } from '../lib/firestore'
-import type { KoreanMockQuestion } from '../lib/types'
+import type { KoreanMockQuestion, MockSubject } from '../lib/types'
 
 /**
  * 답안 일괄 입력 텍스트 파싱.
  * 허용 포맷:
- *   - "3 5 1 2 4 ..." (공백/줄바꿈 구분, 1번부터 순서대로)
+ *   - "3 5 1 2 4 ..." (공백/줄바꿈 구분, startNumber부터 순서대로 번호 매김)
  *   - "1:3, 2:5, 3:1" 또는 "1.3 2.5" 등 (번호 명시)
  *   - 1~5 외의 문자는 무시
  */
-function parseAnswerKey(raw: string): KoreanMockQuestion[] {
+function parseAnswerKey(raw: string, startNumber: number): KoreanMockQuestion[] {
   const lines = raw
     .split(/[\n,]/)
     .map((s) => s.trim())
@@ -32,20 +32,44 @@ function parseAnswerKey(raw: string): KoreanMockQuestion[] {
     explicit.sort((a, b) => a.number - b.number)
     return explicit
   }
-  // 순서형: 1~5 숫자만 추출
+  // 순서형: 1~5 숫자만 추출. 첫 항목은 startNumber로 매김.
   const digits = raw.match(/[1-5]/g) ?? []
-  return digits.map((d, i) => ({ number: i + 1, answer: Number.parseInt(d, 10) }))
+  return digits.map((d, i) => ({
+    number: startNumber + i,
+    answer: Number.parseInt(d, 10),
+  }))
 }
 
 export function KoreanMockNew() {
   const { profile } = useAuth()
   const navigate = useNavigate()
   const [title, setTitle] = useState('')
+  const [subject, setSubject] = useState<MockSubject>('korean')
+  const [startNumberRaw, setStartNumberRaw] = useState('1')
   const [rawAnswers, setRawAnswers] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const parsed = parseAnswerKey(rawAnswers)
+  function setSubjectAndDefaults(s: MockSubject) {
+    setSubject(s)
+    // 영어 모의고사는 일반적으로 18번부터 시작 (1~17은 듣기평가).
+    if (s === 'english' && (startNumberRaw === '1' || startNumberRaw === '')) {
+      setStartNumberRaw('18')
+    }
+    if (s === 'korean' && startNumberRaw === '18') {
+      setStartNumberRaw('1')
+    }
+  }
+
+  const startNumber = useMemo(() => {
+    const n = Number.parseInt(startNumberRaw, 10)
+    return Number.isFinite(n) && n > 0 ? n : 1
+  }, [startNumberRaw])
+
+  const parsed = useMemo(
+    () => parseAnswerKey(rawAnswers, startNumber),
+    [rawAnswers, startNumber],
+  )
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -63,6 +87,8 @@ export function KoreanMockNew() {
     try {
       const id = await createKoreanMock({
         title: title.trim(),
+        subject,
+        startNumber,
         questions: parsed,
         createdBy: profile.id,
         createdByName: profile.displayName,
@@ -81,22 +107,73 @@ export function KoreanMockNew() {
           관리
         </p>
         <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
-          국어 모의고사 등록
+          모의고사 등록
         </h1>
       </header>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
-            제목
-          </label>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="예: 2026 6월 모의평가 국어"
-            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-          />
+          <p className="text-sm font-medium text-slate-700 mb-1.5">과목</p>
+          <div className="grid grid-cols-2 gap-1 rounded-md border border-slate-200 bg-white p-1 max-w-xs">
+            {(
+              [
+                { key: 'korean', label: '국어' },
+                { key: 'english', label: '영어' },
+              ] as { key: MockSubject; label: string }[]
+            ).map((opt) => {
+              const active = subject === opt.key
+              return (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => setSubjectAndDefaults(opt.key)}
+                  className={`rounded px-3 py-1.5 text-sm font-medium transition ${
+                    active
+                      ? 'bg-slate-900 text-white'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px] gap-3">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              제목
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder={
+                subject === 'english'
+                  ? '예: 2026 6월 모의평가 영어'
+                  : '예: 2026 6월 모의평가 국어'
+              }
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              시작 번호
+            </label>
+            <input
+              type="number"
+              min={1}
+              value={startNumberRaw}
+              onChange={(e) => setStartNumberRaw(e.target.value)}
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+            <p className="text-[11px] text-slate-500 mt-1">
+              {subject === 'english'
+                ? '영어는 보통 18번부터'
+                : '국어는 보통 1번부터'}
+            </p>
+          </div>
         </div>
 
         <div>

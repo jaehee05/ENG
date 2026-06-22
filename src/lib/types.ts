@@ -311,13 +311,33 @@ export interface KoreanMockQuestion {
   answer: number
 }
 
+/** 모의고사 과목. 기존 레코드는 'korean'으로 간주. */
+export type MockSubject = 'korean' | 'english'
+
 export interface KoreanMock {
   id: string
   title: string
+  /** 'korean' | 'english'. 미설정이면 'korean'으로 간주 (레거시 호환). */
+  subject?: MockSubject
+  /** 답안 일괄 입력 시 첫 문항 번호. 영어는 보통 18. 미설정이면 1. */
+  startNumber?: number
   questions: KoreanMockQuestion[]
   createdAt: Timestamp | null
   createdBy: string
   createdByName: string
+}
+
+export function getMockSubject(m: KoreanMock): MockSubject {
+  return m.subject ?? 'korean'
+}
+
+export function getMockStartNumber(m: KoreanMock): number {
+  return m.startNumber && m.startNumber > 0 ? m.startNumber : 1
+}
+
+export const MOCK_SUBJECT_LABEL: Record<MockSubject, string> = {
+  korean: '국어',
+  english: '영어',
 }
 
 export interface KoreanMockResult {

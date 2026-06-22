@@ -39,7 +39,7 @@ export function Login() {
           로그인
         </h1>
         <p className="text-sm text-slate-500 mb-8">
-          학습 도구에 다시 오신 걸 환영해요.
+          다시 오신 걸 환영해요.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">

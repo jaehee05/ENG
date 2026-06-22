@@ -7,7 +7,20 @@ import {
   listAttemptsForUser,
   listKoreanMocks,
 } from '../lib/firestore'
-import type { Attempt, KoreanMock } from '../lib/types'
+import {
+  getMockSubject,
+  MOCK_SUBJECT_LABEL,
+  type Attempt,
+  type KoreanMock,
+  type MockSubject,
+} from '../lib/types'
+
+type SubjectFilter = 'all' | MockSubject
+
+const SUBJECT_BADGE_CLASS: Record<MockSubject, string> = {
+  korean: 'bg-rose-50 text-rose-700 border-rose-200',
+  english: 'bg-sky-50 text-sky-700 border-sky-200',
+}
 
 export function KoreanMockList({ manage = false }: { manage?: boolean }) {
   const { profile } = useAuth()
@@ -18,6 +31,7 @@ export function KoreanMockList({ manage = false }: { manage?: boolean }) {
   const [error, setError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [myAttempts, setMyAttempts] = useState<Attempt[]>([])
+  const [subjectFilter, setSubjectFilter] = useState<SubjectFilter>('all')
 
   useEffect(() => {
     listKoreanMocks()
@@ -39,6 +53,11 @@ export function KoreanMockList({ manage = false }: { manage?: boolean }) {
     )
   }, [myAttempts])
 
+  const visibleMocks = useMemo(() => {
+    if (subjectFilter === 'all') return mocks
+    return mocks.filter((m) => getMockSubject(m) === subjectFilter)
+  }, [mocks, subjectFilter])
+
   async function handleDelete(e: React.MouseEvent, m: KoreanMock) {
     e.preventDefault()
     e.stopPropagation()
@@ -59,10 +78,10 @@ export function KoreanMockList({ manage = false }: { manage?: boolean }) {
       <header className="flex items-end justify-between gap-2 flex-wrap">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-            {manage ? '관리' : '국어'}
+            {manage ? '관리' : '모의고사'}
           </p>
           <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
-            국어 모의고사
+            모의고사
           </h1>
           <p className="text-xs text-slate-500 mt-1">
             답안을 OMR 방식으로 입력하여 채점받을 수 있습니다.
@@ -78,27 +97,54 @@ export function KoreanMockList({ manage = false }: { manage?: boolean }) {
         )}
       </header>
 
+      <div className="flex items-center gap-1 text-xs">
+        {(['all', 'korean', 'english'] as const).map((k) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => setSubjectFilter(k)}
+            className={`px-3 py-1.5 rounded-full transition ${
+              subjectFilter === k
+                ? 'bg-slate-900 text-white'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            {k === 'all' ? '전체' : MOCK_SUBJECT_LABEL[k]}
+          </button>
+        ))}
+      </div>
+
       {loading && <p className="text-slate-500 text-sm">불러오는 중…</p>}
       {error && <p className="text-red-600 text-sm">{error}</p>}
-      {!loading && mocks.length === 0 && (
+      {!loading && visibleMocks.length === 0 && (
         <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
-          등록된 모의고사가 없어요.
+          {subjectFilter === 'all'
+            ? '등록된 모의고사가 없어요.'
+            : `${MOCK_SUBJECT_LABEL[subjectFilter]} 모의고사가 없어요.`}
         </div>
       )}
 
       <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white overflow-hidden">
-        {mocks.map((m) => {
+        {visibleMocks.map((m) => {
           const attempted = attemptedRefIds.has(m.id)
+          const subj = getMockSubject(m)
           return (
             <li key={m.id} className="relative">
               <Link
                 to={`/korean-mocks/${m.id}`}
                 className="flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-slate-50 active:bg-slate-100"
               >
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-slate-900 truncate">
-                    {m.title}
-                  </p>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span
+                      className={`inline-block rounded-full text-[10px] font-medium px-2 py-0.5 border ${SUBJECT_BADGE_CLASS[subj]}`}
+                    >
+                      {MOCK_SUBJECT_LABEL[subj]}
+                    </span>
+                    <p className="text-sm font-semibold text-slate-900 truncate">
+                      {m.title}
+                    </p>
+                  </div>
                   <p className="text-xs text-slate-500 mt-0.5">
                     문항 {m.questions.length}개 · 등록 {formatDate(m.createdAt)}
                   </p>

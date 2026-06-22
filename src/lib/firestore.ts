@@ -427,26 +427,35 @@ export async function getKoreanMock(id: string): Promise<KoreanMock | null> {
 
 export async function createKoreanMock(input: {
   title: string
+  subject?: 'korean' | 'english'
+  startNumber?: number
   questions: KoreanMockQuestion[]
   createdBy: string
   createdByName: string
 }): Promise<string> {
-  const ref = await addDoc(collection(db, 'koreanMocks'), {
+  const payload: Record<string, unknown> = {
     title: input.title,
+    subject: input.subject ?? 'korean',
+    startNumber: input.startNumber && input.startNumber > 0 ? input.startNumber : 1,
     questions: input.questions,
     createdBy: input.createdBy,
     createdByName: input.createdByName,
     createdAt: serverTimestamp(),
-  })
+  }
+  const ref = await addDoc(collection(db, 'koreanMocks'), payload)
   return ref.id
 }
 
 export async function updateKoreanMock(
   id: string,
-  patch: Partial<Pick<KoreanMock, 'title' | 'questions'>>,
+  patch: Partial<Pick<KoreanMock, 'title' | 'subject' | 'startNumber' | 'questions'>>,
 ): Promise<void> {
   const update: Record<string, unknown> = {}
   if (patch.title !== undefined) update.title = patch.title
+  if (patch.subject !== undefined) update.subject = patch.subject
+  if (patch.startNumber !== undefined) {
+    update.startNumber = patch.startNumber && patch.startNumber > 0 ? patch.startNumber : 1
+  }
   if (patch.questions !== undefined) update.questions = patch.questions
   if (Object.keys(update).length === 0) return
   await updateDoc(doc(db, 'koreanMocks', id), update)

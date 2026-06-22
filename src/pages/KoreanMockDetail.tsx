@@ -10,7 +10,19 @@ import {
   updateKoreanMock,
 } from '../lib/firestore'
 import { MyAttemptsBox } from '../components/MyAttemptsBox'
-import type { Attempt, KoreanMock, KoreanMockQuestion } from '../lib/types'
+import {
+  getMockSubject,
+  MOCK_SUBJECT_LABEL,
+  type Attempt,
+  type KoreanMock,
+  type KoreanMockQuestion,
+  type MockSubject,
+} from '../lib/types'
+
+const SUBJECT_BADGE_CLASS: Record<MockSubject, string> = {
+  korean: 'bg-rose-50 text-rose-700 border-rose-200',
+  english: 'bg-sky-50 text-sky-700 border-sky-200',
+}
 
 export function KoreanMockDetail() {
   const { id } = useParams<{ id: string }>()
@@ -116,11 +128,18 @@ export function KoreanMockDetail() {
       <header className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-            국어 모의고사
+            모의고사
           </p>
-          <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
-            {mock.title}
-          </h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span
+              className={`inline-block rounded-full text-[11px] font-medium px-2 py-0.5 border ${SUBJECT_BADGE_CLASS[getMockSubject(mock)]}`}
+            >
+              {MOCK_SUBJECT_LABEL[getMockSubject(mock)]}
+            </span>
+            <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
+              {mock.title}
+            </h1>
+          </div>
           <p className="text-xs text-slate-500 mt-1">
             문항 {mock.questions.length}개 · 등록 {formatDate(mock.createdAt)} ·{' '}
             {mock.createdByName}

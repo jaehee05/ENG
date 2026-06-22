@@ -29,6 +29,8 @@ import {
   type CategoryConfig,
   type DDayView,
   type KoreanMock,
+  type MockSubject,
+  MOCK_SUBJECT_LABEL,
   type Reading,
   type UserAccount,
   type VocabSet,
@@ -533,7 +535,7 @@ export function AdminStudentDetail() {
                 [
                   { key: 'reading', label: '지문 문제풀이' },
                   { key: 'vocab', label: '단어 시험지' },
-                  { key: 'korean_mock', label: '국어 모의고사' },
+                  { key: 'korean_mock', label: '모의고사' },
                   { key: 'custom', label: '외부 과제' },
                 ] as { key: AssignmentType; label: string }[]
               ).map((opt) => {
@@ -588,7 +590,7 @@ export function AdminStudentDetail() {
                 : assignType === 'vocab'
                   ? '단어 시험지'
                   : assignType === 'korean_mock'
-                    ? '국어 모의고사'
+                    ? '모의고사'
                     : bundleMode
                       ? '시험명 묶음'
                       : '지문'}
@@ -621,11 +623,18 @@ export function AdminStudentDetail() {
                 className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               >
                 <option value="">— 선택 —</option>
-                {assignOptions.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.title}
-                  </option>
-                ))}
+                {assignOptions.map((o) => {
+                  const m = assignType === 'korean_mock' ? (o as KoreanMock) : null
+                  const prefix = m
+                    ? `[${MOCK_SUBJECT_LABEL[(m.subject ?? 'korean') as MockSubject]}] `
+                    : ''
+                  return (
+                    <option key={o.id} value={o.id}>
+                      {prefix}
+                      {o.title}
+                    </option>
+                  )
+                })}
               </select>
             )}
           </div>
