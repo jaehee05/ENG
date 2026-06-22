@@ -27,6 +27,7 @@ import type {
   KoreanMock,
   KoreanMockQuestion,
   KoreanMockResult,
+  MockSubject,
   NotificationKind,
   PersonalTodo,
   PushSchedule,
@@ -471,10 +472,11 @@ export async function createKoreanMockAttempt(input: {
   refId: string
   refTitle: string
   koreanMockResults: KoreanMockResult[]
+  mockSubject?: MockSubject
 }): Promise<string> {
   const total = input.koreanMockResults.length
   const correct = input.koreanMockResults.filter((r) => r.correct).length
-  const ref = await addDoc(collection(db, 'attempts'), {
+  const payload: Record<string, unknown> = {
     studentUid: input.studentUid,
     studentName: input.studentName,
     type: 'korean_mock',
@@ -484,7 +486,9 @@ export async function createKoreanMockAttempt(input: {
     correct,
     koreanMockResults: input.koreanMockResults,
     createdAt: serverTimestamp(),
-  })
+  }
+  if (input.mockSubject) payload.mockSubject = input.mockSubject
+  const ref = await addDoc(collection(db, 'attempts'), payload)
   return ref.id
 }
 

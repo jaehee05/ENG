@@ -10,17 +10,27 @@ import {
   isAssignmentDone,
   listAssignmentsForStudent,
   listAttemptsForUser,
+  listKoreanMocks,
   listTodosForStudent,
   setTodoDone,
 } from '../lib/firestore'
 import {
   assignmentCategory,
+  getMockSubject,
   isAssignmentVisibleToStudent,
+  MOCK_SUBJECT_LABEL,
   type Assignment,
   type Attempt,
   type CategoryConfig,
+  type KoreanMock,
+  type MockSubject,
   type PersonalTodo,
 } from '../lib/types'
+
+const SUBJECT_BADGE_CLASS: Record<MockSubject, string> = {
+  korean: 'bg-rose-50 text-rose-700 border-rose-200',
+  english: 'bg-sky-50 text-sky-700 border-sky-200',
+}
 
 function assignmentPath(a: Assignment): string | null {
   if (a.type === 'vocab') return `/vocab/${a.refId}`
@@ -40,6 +50,7 @@ export function Assignments() {
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [attempts, setAttempts] = useState<Attempt[]>([])
   const [todos, setTodos] = useState<PersonalTodo[]>([])
+  const [mocks, setMocks] = useState<KoreanMock[]>([])
   const [loading, setLoading] = useState(true)
   const [newTodo, setNewTodo] = useState('')
   const [adding, setAdding] = useState(false)
@@ -52,14 +63,16 @@ export function Assignments() {
       listAttemptsForUser(profile.id),
       listTodosForStudent(profile.id),
       ensureDefaultCategories(),
+      listKoreanMocks().catch(() => [] as KoreanMock[]),
     ])
-      .then(([asn, atts, tds, cats]) => {
+      .then(([asn, atts, tds, cats, mks]) => {
         if (cancelled) return
         // 시작일이 미래인 과제는 아직 학생에게 숨김
         setAssignments(asn.filter((a) => isAssignmentVisibleToStudent(a)))
         setAttempts(atts)
         setTodos(tds)
         setCategories(cats)
+        setMocks(mks)
       })
       .catch(() => {})
       .finally(() => {
@@ -69,6 +82,12 @@ export function Assignments() {
       cancelled = true
     }
   }, [profile])
+
+  const mockSubjectById = useMemo(() => {
+    const map: Record<string, MockSubject> = {}
+    for (const m of mocks) map[m.id] = getMockSubject(m)
+    return map
+  }, [mocks])
 
   /** 카테고리 키 → 설정 lookup. 어떤 과제가 알 수 없는 키를 갖고 있으면 'etc'로 폴백. */
   const catByKey = useMemo(() => {
@@ -201,12 +220,15 @@ export function Assignments() {
             items.filter((a) => isAssignmentDone(a, attempts)).length +
             (isEtc ? todos.filter((t) => t.done).length : 0)
           const totalCount = items.length + (isEtc ? todos.length : 0)
-          const leaves = progressToLeaves(doneCount, totalCount)
 
           return (
             <section key={cat.key} className="space-y-2">
               <div className="flex items-center gap-2">
-                <Clover filled={leaves} color={cat.color} size={22} />
+                <span
+                  className="inline-block h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: cat.color }}
+                  aria-hidden
+                />
                 <h2 className="text-sm font-semibold text-slate-800">{cat.label}</h2>
                 <span className="text-xs text-slate-400">
                   {doneCount}/{totalCount}
@@ -218,17 +240,28 @@ export function Assignments() {
                   const done = isAssignmentDone(a, attempts)
                   const overdue = isOverdue(a) && !done
                   const path = assignmentPath(a)
+                  const mockSubj =
+                    a.type === 'korean_mock' ? mockSubjectById[a.refId] : undefined
                   const inner = (
                     <>
                       <CloverCheck done={done} color={cat.color} size={26} />
                       <div className="min-w-0 flex-1">
-                        <p
-                          className={`text-sm truncate ${
-                            done ? 'text-slate-400 line-through' : 'text-slate-900'
-                          }`}
-                        >
-                          {a.refTitle}
-                        </p>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          {mockSubj && (
+                            <span
+                              className={`shrink-0 inline-block rounded-full text-[10px] font-medium px-1.5 py-0.5 border ${SUBJECT_BADGE_CLASS[mockSubj]}`}
+                            >
+                              {MOCK_SUBJECT_LABEL[mockSubj]}
+                            </span>
+                          )}
+                          <p
+                            className={`text-sm truncate ${
+                              done ? 'text-slate-400 line-through' : 'text-slate-900'
+                            }`}
+                          >
+                            {a.refTitle}
+                          </p>
+                        </div>
                         {(a.dueAt || a.note) && (
                           <p className="text-[11px] text-slate-500 mt-0.5 truncate">
                             {a.dueAt && (

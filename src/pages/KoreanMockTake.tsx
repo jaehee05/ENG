@@ -5,7 +5,18 @@ import {
   createKoreanMockAttempt,
   getKoreanMock,
 } from '../lib/firestore'
-import type { KoreanMock, KoreanMockResult } from '../lib/types'
+import {
+  getMockSubject,
+  MOCK_SUBJECT_LABEL,
+  type KoreanMock,
+  type KoreanMockResult,
+  type MockSubject,
+} from '../lib/types'
+
+const SUBJECT_BADGE_CLASS: Record<MockSubject, string> = {
+  korean: 'bg-rose-50 text-rose-700 border-rose-200',
+  english: 'bg-sky-50 text-sky-700 border-sky-200',
+}
 
 export function KoreanMockTake() {
   const { id } = useParams<{ id: string }>()
@@ -72,6 +83,7 @@ export function KoreanMockTake() {
         refId: mock.id,
         refTitle: mock.title,
         koreanMockResults: results,
+        mockSubject: getMockSubject(mock),
       })
       navigate(`/korean-mocks/${mock.id}/result/${attemptId}`)
     } catch (err) {
@@ -85,6 +97,7 @@ export function KoreanMockTake() {
   if (!mock) return null
 
   const answeredCount = answers.filter((a) => a > 0).length
+  const subj = getMockSubject(mock)
 
   return (
     <div className="space-y-5 max-w-3xl">
@@ -92,9 +105,16 @@ export function KoreanMockTake() {
         <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
           OMR 답안 입력
         </p>
-        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
-          {mock.title}
-        </h1>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span
+            className={`inline-block rounded-full text-[11px] font-medium px-2 py-0.5 border ${SUBJECT_BADGE_CLASS[subj]}`}
+          >
+            {MOCK_SUBJECT_LABEL[subj]}
+          </span>
+          <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
+            {mock.title}
+          </h1>
+        </div>
         <p className="text-xs text-slate-500 mt-1">
           총 {mock.questions.length}문항. 같은 답을 다시 누르면 해제됩니다.
         </p>

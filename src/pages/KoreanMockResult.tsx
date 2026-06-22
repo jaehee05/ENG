@@ -1,7 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getAttempt } from '../lib/firestore'
-import type { Attempt } from '../lib/types'
+import {
+  MOCK_SUBJECT_LABEL,
+  type Attempt,
+  type MockSubject,
+} from '../lib/types'
+
+const SUBJECT_BADGE_CLASS: Record<MockSubject, string> = {
+  korean: 'bg-rose-50 text-rose-700 border-rose-200',
+  english: 'bg-sky-50 text-sky-700 border-sky-200',
+}
 
 export function KoreanMockResult() {
   const { id, attemptId } = useParams<{ id: string; attemptId: string }>()
@@ -26,6 +35,7 @@ export function KoreanMockResult() {
 
   const results = attempt.koreanMockResults
   const ratio = attempt.total > 0 ? Math.round((attempt.correct / attempt.total) * 100) : 0
+  const subj: MockSubject = attempt.mockSubject ?? 'korean'
 
   return (
     <div className="space-y-5 max-w-3xl">
@@ -33,9 +43,16 @@ export function KoreanMockResult() {
         <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
           채점 결과
         </p>
-        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
-          {attempt.refTitle}
-        </h1>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span
+            className={`inline-block rounded-full text-[11px] font-medium px-2 py-0.5 border ${SUBJECT_BADGE_CLASS[subj]}`}
+          >
+            {MOCK_SUBJECT_LABEL[subj]}
+          </span>
+          <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
+            {attempt.refTitle}
+          </h1>
+        </div>
         <p className="text-xs text-slate-500 mt-1">{attempt.studentName}</p>
       </header>
 

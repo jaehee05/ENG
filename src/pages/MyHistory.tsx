@@ -2,13 +2,18 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import { listAttemptsForUser } from '../lib/firestore'
-import type { Attempt } from '../lib/types'
+import { MOCK_SUBJECT_LABEL, type Attempt, type MockSubject } from '../lib/types'
 
 const TYPE_LABEL: Record<Attempt['type'], string> = {
   vocab: '단어 시험지',
   reading: '지문 문제풀이',
   wordbook: '내 단어장 시험',
-  korean_mock: '국어 모의고사',
+  korean_mock: '모의고사',
+}
+
+const SUBJECT_BADGE_CLASS: Record<MockSubject, string> = {
+  korean: 'bg-rose-50 text-rose-700 border-rose-200',
+  english: 'bg-sky-50 text-sky-700 border-sky-200',
 }
 
 type Filter = 'all' | Attempt['type']
@@ -22,7 +27,16 @@ function fmtDate(ts: Attempt['createdAt']): string {
 function resultPath(a: Attempt): string {
   if (a.type === 'vocab') return `/vocab/${a.refId}/result/${a.id}`
   if (a.type === 'reading') return `/reading/${a.refId}/result/${a.id}`
+  if (a.type === 'korean_mock') return `/korean-mocks/${a.refId}/result/${a.id}`
   return `/wordbook/result/${a.id}`
+}
+
+function bucketLabel(b: Bucket): string {
+  if (b.type === 'korean_mock') {
+    const subj = b.mockSubject ?? 'korean'
+    return `${MOCK_SUBJECT_LABEL[subj]} 모의고사`
+  }
+  return TYPE_LABEL[b.type]
 }
 
 interface Bucket {
@@ -30,6 +44,7 @@ interface Bucket {
   type: Attempt['type']
   refId: string
   refTitle: string
+  mockSubject?: MockSubject
   attempts: Attempt[]
 }
 
@@ -59,13 +74,16 @@ export function MyHistory() {
     for (const a of filtered) {
       const key = `${a.type}:${a.refId || a.refTitle}`
       const existing = map.get(key)
-      if (existing) existing.attempts.push(a)
-      else
+      if (existing) {
+        existing.attempts.push(a)
+        if (!existing.mockSubject && a.mockSubject) existing.mockSubject = a.mockSubject
+      } else
         map.set(key, {
           key,
           type: a.type,
           refId: a.refId,
           refTitle: a.refTitle,
+          mockSubject: a.mockSubject,
           attempts: [a],
         })
     }
@@ -101,8 +119,8 @@ export function MyHistory() {
 
       {!loading && (
         <>
-          <div className="flex items-center gap-1 text-xs">
-            {(['all', 'vocab', 'reading', 'wordbook'] as const).map((k) => (
+          <div className="flex items-center gap-1 text-xs flex-wrap">
+            {(['all', 'vocab', 'reading', 'wordbook', 'korean_mock'] as const).map((k) => (
               <button
                 key={k}
                 onClick={() => setFilter(k)}
@@ -144,8 +162,14 @@ export function MyHistory() {
                     >
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="inline-block rounded bg-brand-50 text-brand-700 text-xs font-medium px-2 py-0.5">
-                            {TYPE_LABEL[b.type]}
+                          <span
+                            className={`inline-block rounded text-xs font-medium px-2 py-0.5 ${
+                              b.type === 'korean_mock'
+                                ? `border ${SUBJECT_BADGE_CLASS[b.mockSubject ?? 'korean']}`
+                                : 'bg-brand-50 text-brand-700'
+                            }`}
+                          >
+                            {bucketLabel(b)}
                           </span>
                           <span className="text-base font-semibold text-slate-900 truncate">
                             {b.refTitle}
