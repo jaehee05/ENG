@@ -351,8 +351,12 @@ export function getAssignmentStatusView(
   asn: Assignment,
   atts: Attempt[],
 ): AssignmentStatusView {
-  if (asn.manualDone) {
+  const override = assignmentManualOverride(asn)
+  if (override === 'done') {
     return { status: 'done', label: '완료', tone: 'brand' }
+  }
+  if (override === 'undone') {
+    return { status: 'none', label: '미완료(수동)', tone: 'slate' }
   }
   const matched = atts.filter(
     (a) => a.type === asn.type && a.refId === asn.refId && !a.practice,
@@ -457,10 +461,27 @@ export interface Assignment {
   note?: string
   /** For vocab: minimum correct count required to consider done. */
   minCorrect?: number
-  /** Admin-toggled completion. When true, considered done regardless of attempts. */
+  /** Admin-toggled completion (legacy). When true, considered done regardless of attempts. */
   manualDone?: boolean
+  /**
+   * 관리자 수동 완료 오버라이드. 학생 응시 기록과 무관하게 강제.
+   * 'done' = 강제 완료, 'undone' = 강제 미완료, 없으면 응시 기록으로 자동 판정.
+   */
+  manualStatus?: 'done' | 'undone'
   dueAt: Timestamp | null
   createdAt: Timestamp | null
+}
+
+/**
+ * 관리자 수동 오버라이드 해석. 신규 manualStatus 우선, 없으면 legacy manualDone 호환.
+ * 반환: 'done' = 강제 완료, 'undone' = 강제 미완료, null = 자동(응시 기록) 판정.
+ */
+export function assignmentManualOverride(
+  a: Pick<Assignment, 'manualStatus' | 'manualDone'>,
+): 'done' | 'undone' | null {
+  if (a.manualStatus === 'done' || a.manualStatus === 'undone') return a.manualStatus
+  if (a.manualDone) return 'done'
+  return null
 }
 
 /** type에서 기본 분류 키를 유추 (category 필드가 없는 기존 과제 호환). */

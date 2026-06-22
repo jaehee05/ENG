@@ -36,7 +36,11 @@ import type {
   WordEntry,
   ReadingQuestion,
 } from './types'
-import { DEFAULT_CATEGORIES, isReadingAttemptComplete } from './types'
+import {
+  DEFAULT_CATEGORIES,
+  assignmentManualOverride,
+  isReadingAttemptComplete,
+} from './types'
 
 export async function listVocabSets(): Promise<VocabSet[]> {
   const snap = await getDocs(query(collection(db, 'vocabSets'), orderBy('createdAt', 'desc')))
@@ -490,7 +494,9 @@ export async function createAssignment(input: {
 }
 
 export function isAssignmentDone(asn: Assignment, atts: Attempt[]): boolean {
-  if (asn.manualDone) return true
+  const override = assignmentManualOverride(asn)
+  if (override === 'done') return true
+  if (override === 'undone') return false
   const matched = atts.filter(
     (a) => a.type === asn.type && a.refId === asn.refId && !a.practice,
   )
@@ -510,6 +516,21 @@ export async function setAssignmentManualDone(
   value: boolean,
 ): Promise<void> {
   await updateDoc(doc(db, 'assignments', id), { manualDone: value })
+}
+
+/**
+ * 관리자 수동 완료 오버라이드 설정.
+ * 'done'/'undone' 강제, null이면 오버라이드 제거하고 자동(응시 기록) 판정으로 복귀.
+ */
+export async function setAssignmentManualStatus(
+  id: string,
+  status: 'done' | 'undone' | null,
+): Promise<void> {
+  await updateDoc(doc(db, 'assignments', id), {
+    manualStatus: status ?? deleteField(),
+    // legacy 필드 제거 — manualStatus로 일원화
+    manualDone: deleteField(),
+  })
 }
 
 /**

@@ -11,7 +11,7 @@ import {
   listAttemptsForUser,
   listReadings,
   listVocabSets,
-  setAssignmentManualDone,
+  setAssignmentManualStatus,
   updateAssignment,
 } from '../lib/firestore'
 import { sendPushNotification } from '../lib/ppurioApi'
@@ -363,11 +363,17 @@ export function AdminStudentDetail() {
   }
 
   async function handleToggleAssignmentDone(asn: Assignment) {
-    const next = !asn.manualDone
+    // 학생 응시로 자동 완료된 과제도 관리자가 강제로 토글할 수 있게 manualStatus 사용.
+    const currentlyDone = getAssignmentStatusView(asn, attempts).status === 'done'
+    const next: 'done' | 'undone' = currentlyDone ? 'undone' : 'done'
     try {
-      await setAssignmentManualDone(asn.id, next)
+      await setAssignmentManualStatus(asn.id, next)
       setAssignments((prev) =>
-        prev.map((x) => (x.id === asn.id ? { ...x, manualDone: next } : x)),
+        prev.map((x) =>
+          x.id === asn.id
+            ? { ...x, manualStatus: next, manualDone: next === 'done' }
+            : x,
+        ),
       )
     } catch (err) {
       setError(err instanceof Error ? err.message : '상태 변경 실패')
@@ -954,8 +960,6 @@ function AssignmentRow({
   }) => Promise<void>
   fmtDate: (ts: { toDate: () => Date } | null | undefined) => string
 }) {
-  const isDone = status.status === 'done'
-  const autoDone = isDone && !a.manualDone
 
   const [editing, setEditing] = useState(false)
   const [eDue, setEDue] = useState('')
@@ -1017,16 +1021,11 @@ function AssignmentRow({
             </span>
             <button
               type="button"
-              onClick={autoDone ? undefined : onToggleDone}
-              disabled={autoDone}
-              title={
-                autoDone
-                  ? '학생 응시 기록으로 자동 완료 — 응시 기록 삭제 시 해제'
-                  : '클릭으로 완료 ↔ 미완료 전환'
-              }
-              className={`rounded-full px-2 py-0.5 text-[11px] font-medium border transition ${
+              onClick={onToggleDone}
+              title="클릭으로 완료 ↔ 미완료 전환 (학생이 완료한 과제도 강제 변경 가능)"
+              className={`rounded-full px-2 py-0.5 text-[11px] font-medium border transition cursor-pointer hover:brightness-95 ${
                 STATUS_TONE_CLASS[status.tone]
-              } ${autoDone ? 'cursor-default opacity-90' : 'cursor-pointer hover:brightness-95'}`}
+              }`}
             >
               {status.label}
             </button>

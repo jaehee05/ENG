@@ -522,7 +522,28 @@ function isReadingAttemptCompleteSrv(a) {
   return !!a.wrongReviewedAt;
 }
 
+// 한 지문 응시에서 '실제로 푼 문항'만 집계 (안 푼 문항은 분모 제외).
+function answeredStatsSrv(a) {
+  const rr = a.readingResults;
+  if (Array.isArray(rr) && rr.length > 0) {
+    let answered = 0;
+    let correct = 0;
+    for (const r of rr) {
+      const ua = typeof r.userAnswer === "number" ? r.userAnswer : -1;
+      if (ua >= 0) {
+        answered++;
+        if (r.correct) correct++;
+      }
+    }
+    return { answered, correct };
+  }
+  return { answered: a.total || 0, correct: a.correct || 0 };
+}
+
 function isAssignmentDoneSrv(asn, attempts) {
+  // 관리자 수동 오버라이드 우선 (manualStatus), 없으면 legacy manualDone.
+  if (asn.manualStatus === "done") return true;
+  if (asn.manualStatus === "undone") return false;
   if (asn.manualDone) return true;
   const matched = attempts.filter(
     (a) => a.type === asn.type && a.refId === asn.refId && !a.practice,
@@ -580,23 +601,26 @@ function buildWeeklyReportVarsSrv(assignments, attempts, windowStartMs) {
   const passCount = vocabAttempts.filter((a) => (a.correct || 0) >= VOCAB_PASS_THRESHOLD).length;
   const sessionCount = vocabAttempts.length;
 
-  // 지문 통계는 '완료된' attempt(만점이거나 오답 검토 완료)만 집계.
-  // 미완료 attempt까지 합치면 "지문 0개 완료, 정답률 X%" 같은 정합성 깨짐이 생김.
-  const completedReadingAttempts = recentAttempts.filter(
-    (a) => a.type === "reading" && !a.practice && isReadingAttemptCompleteSrv(a),
-  );
-  const uniqueDoneReadingIds = new Set(
-    completedReadingAttempts.map((a) => a.refId),
-  );
-  const doneReadingCount = uniqueDoneReadingIds.size;
-  const totalR = completedReadingAttempts.reduce(
-    (s, a) => s + (a.total || 0),
-    0,
-  );
-  const totalCorrectR = completedReadingAttempts.reduce(
-    (s, a) => s + (a.correct || 0),
-    0,
-  );
+  // 문제풀이 정답률: 지난주 '푼' 지문 문항만 집계 (안 푼 문항은 분모에서 제외).
+  // 지문별로 가장 최근 응시 1개만 사용해 재시도가 중복 집계되지 않게 한다.
+  const readingByLatest = new Map();
+  for (const a of recentAttempts) {
+    if (a.type !== "reading" || a.practice) continue;
+    const cur = tsToMillis(a.createdAt) || 0;
+    const prev = readingByLatest.get(a.refId);
+    if (!prev || cur >= (tsToMillis(prev.createdAt) || 0)) {
+      readingByLatest.set(a.refId, a);
+    }
+  }
+  const solvedReadingAttempts = [...readingByLatest.values()];
+  const doneReadingCount = solvedReadingAttempts.length;
+  let totalR = 0;
+  let totalCorrectR = 0;
+  for (const a of solvedReadingAttempts) {
+    const { answered, correct } = answeredStatsSrv(a);
+    totalR += answered;
+    totalCorrectR += correct;
+  }
   const ratio = totalR > 0 ? Math.round((totalCorrectR / totalR) * 100) : null;
 
   const vocabPctLine =
@@ -606,9 +630,9 @@ function buildWeeklyReportVarsSrv(assignments, attempts, windowStartMs) {
   const vocabBody = sessionCount === 0
     ? "▫️ 지난주 응시 기록 없음"
     : `▫️ 학습 ${vocabAsn.length}회분 · 단어 ${totalWords}개\n▫️ 통과 ${passCount}/${sessionCount}회 (암기 ${totalCorrectV}개)`;
-  const readingBody = completedReadingAttempts.length === 0
-    ? "▫️ 지난주 완료한 지문 없음"
-    : `▫️ 지문 ${doneReadingCount}개 완료\n▫️ 📈 정답률 ${ratio}% (${totalCorrectR}/${totalR}문항)`;
+  const readingBody = solvedReadingAttempts.length === 0
+    ? "▫️ 지난주 푼 지문 없음"
+    : `▫️ 지문 ${doneReadingCount}개 풀이\n▫️ 📈 정답률 ${ratio}% (${totalCorrectR}/${totalR}문항)`;
 
   return {
     var1: ["📊 지난주 과제 성취도", vocabPctLine, readingPctLine].join("\n"),
