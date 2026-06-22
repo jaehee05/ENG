@@ -33,6 +33,11 @@ import {
   type WordLookup,
 } from '../lib/types'
 
+function isNotYetStarted(a: Assignment): boolean {
+  if (!a.startAt) return false
+  return a.startAt.toMillis() > Date.now()
+}
+
 function defaultCategoryKey(type: AssignmentType): AssignmentCategory {
   if (type === 'vocab') return 'vocab'
   if (type === 'reading') return 'problem'
@@ -81,6 +86,7 @@ export function AdminStudentDetail() {
   const [assignCategory, setAssignCategory] = useState<AssignmentCategory>('problem')
   const [categories, setCategories] = useState<CategoryConfig[]>([])
   const [assignRefId, setAssignRefId] = useState('')
+  const [assignStart, setAssignStart] = useState('')
   const [assignDue, setAssignDue] = useState('')
   const [assignNote, setAssignNote] = useState('')
   const [assignMinCorrect, setAssignMinCorrect] = useState('')
@@ -230,6 +236,11 @@ export function AdminStudentDetail() {
       setAssignError('마감일이 올바르지 않습니다.')
       return
     }
+    const startDate = assignStart ? new Date(`${assignStart}T00:00`) : null
+    if (startDate && Number.isNaN(startDate.getTime())) {
+      setAssignError('시작일이 올바르지 않습니다.')
+      return
+    }
 
     if (assignType === 'custom') {
       const title = customTitle.trim()
@@ -249,9 +260,11 @@ export function AdminStudentDetail() {
           refId: '',
           refTitle: title,
           note: assignNote,
+          startAt: startDate,
           dueAt: dueDate,
         })
         setCustomTitle('')
+        setAssignStart('')
         setAssignDue('')
         setAssignNote('')
         await maybePushAssignment([title])
@@ -283,10 +296,12 @@ export function AdminStudentDetail() {
             refId: r.id,
             refTitle: r.title,
             note: assignNote,
+            startAt: startDate,
             dueAt: dueDate,
           })
         }
         setBundleCategory('')
+        setAssignStart('')
         setAssignDue('')
         setAssignNote('')
         await maybePushAssignment(group.list.map((r) => r.title))
@@ -327,9 +342,11 @@ export function AdminStudentDetail() {
         refTitle: target.title,
         note: assignNote,
         minCorrect,
+        startAt: startDate,
         dueAt: dueDate,
       })
       setAssignRefId('')
+      setAssignStart('')
       setAssignDue('')
       setAssignNote('')
       setAssignMinCorrect('')
@@ -351,6 +368,7 @@ export function AdminStudentDetail() {
   async function handleSaveAssignmentEdit(
     asn: Assignment,
     input: {
+      startAt?: Date | null
       dueAt?: Date | null
       note?: string
       minCorrect?: number | null
@@ -593,6 +611,17 @@ export function AdminStudentDetail() {
 
           {/* 3. 마감일 + 분류 — 핵심 옵션 두 줄 */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                시작일 <span className="text-slate-400 font-normal">(선택 · 이 날부터 학생에게 노출)</span>
+              </label>
+              <input
+                type="date"
+                value={assignStart}
+                onChange={(e) => setAssignStart(e.target.value)}
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">
                 마감일 <span className="text-slate-400 font-normal">(선택)</span>
@@ -952,6 +981,7 @@ function AssignmentRow({
   onToggleDone: () => void
   onDelete: () => void
   onSave: (input: {
+    startAt?: Date | null
     dueAt?: Date | null
     note?: string
     minCorrect?: number | null
@@ -962,6 +992,7 @@ function AssignmentRow({
 }) {
 
   const [editing, setEditing] = useState(false)
+  const [eStart, setEStart] = useState('')
   const [eDue, setEDue] = useState('')
   const [eNote, setENote] = useState('')
   const [eMinCorrect, setEMinCorrect] = useState('')
@@ -971,6 +1002,7 @@ function AssignmentRow({
   const [editError, setEditError] = useState<string | null>(null)
 
   function startEdit() {
+    setEStart(tsToDateInput(a.startAt))
     setEDue(tsToDateInput(a.dueAt))
     setENote(a.note ?? '')
     setEMinCorrect(a.minCorrect ? String(a.minCorrect) : '')
@@ -988,6 +1020,7 @@ function AssignmentRow({
         category: eCategory,
         note: eNote,
       }
+      input.startAt = eStart ? new Date(`${eStart}T00:00`) : null
       input.dueAt = eDue ? new Date(`${eDue}T00:00`) : null
       if (a.type === 'vocab') {
         const n = Number.parseInt(eMinCorrect, 10)
@@ -1043,6 +1076,11 @@ function AssignmentRow({
             {a.refTitle}
           </p>
           <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-500 mt-0.5">
+            {isNotYetStarted(a) && (
+              <span className="text-amber-600 font-medium">
+                {fmtDate(a.startAt)}부터 노출 (예정)
+              </span>
+            )}
             {a.dueAt && <span>마감 {fmtDate(a.dueAt)}</span>}
             <span>부여 {fmtDate(a.createdAt)}</span>
             {a.minCorrect && a.minCorrect > 0 && (
@@ -1085,6 +1123,17 @@ function AssignmentRow({
             </div>
           )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                시작일 <span className="text-slate-400 font-normal">(비우면 즉시 노출)</span>
+              </label>
+              <input
+                type="date"
+                value={eStart}
+                onChange={(e) => setEStart(e.target.value)}
+                className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
             <div>
               <label className="block text-[11px] font-medium text-slate-600 mb-1">
                 마감일 <span className="text-slate-400 font-normal">(비우면 제거)</span>

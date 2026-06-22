@@ -471,6 +471,7 @@ export async function createAssignment(input: {
   refTitle: string
   note?: string
   minCorrect?: number
+  startAt?: Date | null
   dueAt?: Date | null
 }): Promise<string> {
   const payload: Record<string, unknown> = {
@@ -482,6 +483,7 @@ export async function createAssignment(input: {
     refId: input.refId,
     refTitle: input.refTitle,
     createdAt: serverTimestamp(),
+    startAt: input.startAt ? Timestamp.fromDate(input.startAt) : null,
     dueAt: input.dueAt ? Timestamp.fromDate(input.dueAt) : null,
   }
   if (input.category) payload.category = input.category
@@ -542,6 +544,7 @@ export async function setAssignmentManualStatus(
 export async function updateAssignment(
   id: string,
   input: {
+    startAt?: Date | null
     dueAt?: Date | null
     note?: string
     minCorrect?: number | null
@@ -550,6 +553,9 @@ export async function updateAssignment(
   },
 ): Promise<void> {
   const update: Record<string, unknown> = {}
+  if (input.startAt !== undefined) {
+    update.startAt = input.startAt ? Timestamp.fromDate(input.startAt) : null
+  }
   if (input.dueAt !== undefined) {
     update.dueAt = input.dueAt ? Timestamp.fromDate(input.dueAt) : null
   }

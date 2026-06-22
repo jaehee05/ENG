@@ -15,6 +15,7 @@ import {
 } from '../lib/firestore'
 import {
   assignmentCategory,
+  isAssignmentVisibleToStudent,
   type Assignment,
   type Attempt,
   type CategoryConfig,
@@ -53,7 +54,8 @@ export function Assignments() {
     ])
       .then(([asn, atts, tds, cats]) => {
         if (cancelled) return
-        setAssignments(asn)
+        // 시작일이 미래인 과제는 아직 학생에게 숨김
+        setAssignments(asn.filter((a) => isAssignmentVisibleToStudent(a)))
         setAttempts(atts)
         setTodos(tds)
         setCategories(cats)

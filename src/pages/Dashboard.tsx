@@ -8,6 +8,7 @@ import {
   listAssignmentsForStudent,
   listAttemptsForUser,
 } from '../lib/firestore'
+import { isAssignmentVisibleToStudent } from '../lib/types'
 import type { Announcement, Assignment, Attempt } from '../lib/types'
 
 interface ShortcutCard {
@@ -120,7 +121,7 @@ export function Dashboard() {
       listAnnouncements(),
     ])
       .then(([asn, atts, ann]) => {
-        setAssignments(asn)
+        setAssignments(asn.filter((a) => isAssignmentVisibleToStudent(a)))
         setAttempts(atts)
         const sorted = [...ann].sort((a, b) => {
           if (!!b.pinned !== !!a.pinned) return b.pinned ? 1 : -1

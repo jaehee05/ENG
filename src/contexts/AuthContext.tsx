@@ -61,6 +61,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (cancelled) return
         if (acc) {
           setProfile(stripPassword(acc))
+          // 로그인 유지(앱 재시작) 시 sessionStorage의 관리자 비밀키가 사라지므로,
+          // 복원된 계정의 비밀번호로 관리자 비밀키를 자동 재발급한다.
+          if (acc.password) void tryBootstrapAdminSecret(acc, acc.password)
           void import('../lib/pushSetup').then((m) =>
             m.registerPushTokenForUser(acc.id),
           )

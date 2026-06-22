@@ -459,6 +459,8 @@ export interface Assignment {
   refId: string
   refTitle: string
   note?: string
+  /** 학생 과제창 노출 시작일. 없으면 즉시 노출. 미래면 그 날짜까지 학생에게 숨김. */
+  startAt?: Timestamp | null
   /** For vocab: minimum correct count required to consider done. */
   minCorrect?: number
   /** Admin-toggled completion (legacy). When true, considered done regardless of attempts. */
@@ -482,6 +484,15 @@ export function assignmentManualOverride(
   if (a.manualStatus === 'done' || a.manualStatus === 'undone') return a.manualStatus
   if (a.manualDone) return 'done'
   return null
+}
+
+/** 학생 과제창 노출 여부. startAt이 미래면 아직 숨김. */
+export function isAssignmentVisibleToStudent(
+  a: Assignment,
+  now: Date = new Date(),
+): boolean {
+  if (!a.startAt) return true
+  return a.startAt.toMillis() <= now.getTime()
 }
 
 /** type에서 기본 분류 키를 유추 (category 필드가 없는 기존 과제 호환). */
