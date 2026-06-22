@@ -25,6 +25,7 @@ import {
 function assignmentPath(a: Assignment): string | null {
   if (a.type === 'vocab') return `/vocab/${a.refId}`
   if (a.type === 'reading') return `/reading/${a.refId}`
+  if (a.type === 'korean_mock') return `/korean-mocks/${a.refId}`
   return null
 }
 

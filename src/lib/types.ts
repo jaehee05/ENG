@@ -304,11 +304,35 @@ export interface ReadingResult {
   number?: number
 }
 
+export interface KoreanMockQuestion {
+  /** 문항 번호 (1-base). */
+  number: number
+  /** 정답 (1-5). */
+  answer: number
+}
+
+export interface KoreanMock {
+  id: string
+  title: string
+  questions: KoreanMockQuestion[]
+  createdAt: Timestamp | null
+  createdBy: string
+  createdByName: string
+}
+
+export interface KoreanMockResult {
+  number: number
+  /** 학생이 고른 답 (0 = 미응답, 1-5). */
+  userAnswer: number
+  correctAnswer: number
+  correct: boolean
+}
+
 export interface Attempt {
   id: string
   studentUid: string
   studentName: string
-  type: 'vocab' | 'reading' | 'wordbook'
+  type: 'vocab' | 'reading' | 'wordbook' | 'korean_mock'
   refId: string
   refTitle: string
   total: number
@@ -317,6 +341,7 @@ export interface Attempt {
   practice?: boolean
   vocabResults?: VocabResult[]
   readingResults?: ReadingResult[]
+  koreanMockResults?: KoreanMockResult[]
   /** reading 한정: 오답 검토(재시도 1회) 완료 시각. */
   wrongReviewedAt?: Timestamp | null
   /** reading 한정: 오답 문항별 재시도에서 고른 선지 인덱스. 키는 문항 인덱스 문자열. */
@@ -385,6 +410,9 @@ export function getAssignmentStatusView(
     }
     return { status: 'done', label: '완료', tone: 'brand' }
   }
+  if (asn.type === 'korean_mock') {
+    return { status: 'done', label: '완료', tone: 'brand' }
+  }
   return { status: 'none', label: '미시작', tone: 'slate' }
 }
 
@@ -418,7 +446,7 @@ export interface ReadingRef {
   title: string
 }
 
-export type AssignmentType = 'vocab' | 'reading' | 'custom'
+export type AssignmentType = 'vocab' | 'reading' | 'custom' | 'korean_mock'
 
 /** 학생 과제 페이지의 분류 키. 관리자가 Firestore에서 자유롭게 추가/수정. */
 export type AssignmentCategory = string

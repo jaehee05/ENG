@@ -9,6 +9,7 @@ import {
   ensureDefaultCategories,
   listAssignmentsForStudent,
   listAttemptsForUser,
+  listKoreanMocks,
   listReadings,
   listVocabSets,
   setAssignmentManualStatus,
@@ -27,6 +28,7 @@ import {
   type Attempt,
   type CategoryConfig,
   type DDayView,
+  type KoreanMock,
   type Reading,
   type UserAccount,
   type VocabSet,
@@ -41,6 +43,7 @@ function isNotYetStarted(a: Assignment): boolean {
 function defaultCategoryKey(type: AssignmentType): AssignmentCategory {
   if (type === 'vocab') return 'vocab'
   if (type === 'reading') return 'problem'
+  if (type === 'korean_mock') return 'mock'
   return 'etc'
 }
 
@@ -59,12 +62,14 @@ const TYPE_LABEL: Record<Attempt['type'], string> = {
   vocab: '단어 시험지',
   reading: '지문 문제풀이',
   wordbook: '내 단어장 시험',
+  korean_mock: '국어 모의고사',
 }
 
 const TYPE_CLASS: Record<Attempt['type'], string> = {
   vocab: 'bg-brand-50 text-brand-700',
   reading: 'bg-brand-50 text-brand-800',
   wordbook: 'bg-brand-50 text-brand-700',
+  korean_mock: 'bg-rose-50 text-rose-700',
 }
 
 type TypeFilter = 'all' | Attempt['type']
@@ -77,6 +82,7 @@ export function AdminStudentDetail() {
   const [wordbook, setWordbook] = useState<WordLookup[]>([])
   const [vocabSets, setVocabSets] = useState<VocabSet[]>([])
   const [readings, setReadings] = useState<Reading[]>([])
+  const [koreanMocks, setKoreanMocks] = useState<KoreanMock[]>([])
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -107,10 +113,11 @@ export function AdminStudentDetail() {
       listMyWordbook(id),
       listVocabSets(),
       listReadings(),
+      listKoreanMocks(),
       listAssignmentsForStudent(id),
       ensureDefaultCategories(),
     ])
-      .then(([acc, atts, wb, vs, rd, asn, cats]) => {
+      .then(([acc, atts, wb, vs, rd, km, asn, cats]) => {
         if (cancelled) return
         if (!acc) {
           setError('학생을 찾을 수 없습니다.')
@@ -121,6 +128,7 @@ export function AdminStudentDetail() {
         setWordbook(wb)
         setVocabSets(vs)
         setReadings(rd)
+        setKoreanMocks(km)
         setAssignments(asn)
         setCategories(cats)
       })
@@ -198,7 +206,12 @@ export function AdminStudentDetail() {
       )
   }, [readings])
 
-  const assignOptions = assignType === 'vocab' ? vocabSets : readings
+  const assignOptions =
+    assignType === 'vocab'
+      ? vocabSets
+      : assignType === 'korean_mock'
+        ? koreanMocks
+        : readings
   const [customTitle, setCustomTitle] = useState('')
   const [pushOnAssign, setPushOnAssign] = useState(true)
 
@@ -318,7 +331,12 @@ export function AdminStudentDetail() {
       setAssignError('과제로 부여할 항목을 선택하세요.')
       return
     }
-    const source = assignType === 'vocab' ? vocabSets : readings
+    const source =
+      assignType === 'vocab'
+        ? vocabSets
+        : assignType === 'korean_mock'
+          ? koreanMocks
+          : readings
     const target = source.find((s) => s.id === assignRefId)
     if (!target) {
       setAssignError('선택한 항목을 찾을 수 없습니다.')
@@ -510,11 +528,12 @@ export function AdminStudentDetail() {
           {/* 1. 유형 — 세그먼트 컨트롤 */}
           <div>
             <p className="text-xs font-medium text-slate-600 mb-1.5">유형</p>
-            <div className="grid grid-cols-3 gap-1 rounded-md border border-slate-200 bg-white p-1">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 rounded-md border border-slate-200 bg-white p-1">
               {(
                 [
                   { key: 'reading', label: '지문 문제풀이' },
                   { key: 'vocab', label: '단어 시험지' },
+                  { key: 'korean_mock', label: '국어 모의고사' },
                   { key: 'custom', label: '외부 과제' },
                 ] as { key: AssignmentType; label: string }[]
               ).map((opt) => {
@@ -568,9 +587,11 @@ export function AdminStudentDetail() {
                 ? '과제명'
                 : assignType === 'vocab'
                   ? '단어 시험지'
-                  : bundleMode
-                    ? '시험명 묶음'
-                    : '지문'}
+                  : assignType === 'korean_mock'
+                    ? '국어 모의고사'
+                    : bundleMode
+                      ? '시험명 묶음'
+                      : '지문'}
             </label>
             {assignType === 'custom' ? (
               <input
@@ -800,7 +821,7 @@ export function AdminStudentDetail() {
         <div className="flex items-center justify-between flex-wrap gap-2">
           <h2 className="text-base font-semibold text-slate-900">시험 이력</h2>
           <div className="flex items-center gap-1 text-xs">
-            {(['all', 'vocab', 'reading', 'wordbook'] as const).map((k) => (
+            {(['all', 'vocab', 'reading', 'korean_mock', 'wordbook'] as const).map((k) => (
               <button
                 key={k}
                 onClick={() => setTypeFilter(k)}
@@ -841,7 +862,9 @@ export function AdminStudentDetail() {
                       ? `/vocab/${a.refId}/result/${a.id}`
                       : a.type === 'reading'
                         ? `/reading/${a.refId}/result/${a.id}`
-                        : `/wordbook/result/${a.id}`
+                        : a.type === 'korean_mock'
+                          ? `/korean-mocks/${a.refId}/result/${a.id}`
+                          : `/wordbook/result/${a.id}`
                   return (
                     <tr key={a.id}>
                       <td className="px-4 py-3 whitespace-nowrap">
@@ -952,6 +975,7 @@ const DDAY_TONE_CLASS: Record<DDayView['tone'], string> = {
 const TYPE_SHORT: Record<Assignment['type'], string> = {
   vocab: '단어',
   reading: '지문',
+  korean_mock: '국어',
   custom: '외부',
 }
 

@@ -38,6 +38,11 @@ import { Assignments } from './pages/Assignments'
 import { CorporaList } from './pages/CorporaList'
 import { CorpusNew } from './pages/CorpusNew'
 import { CorpusDetail } from './pages/CorpusDetail'
+import { KoreanMockList } from './pages/KoreanMockList'
+import { KoreanMockNew } from './pages/KoreanMockNew'
+import { KoreanMockDetail } from './pages/KoreanMockDetail'
+import { KoreanMockTake } from './pages/KoreanMockTake'
+import { KoreanMockResult } from './pages/KoreanMockResult'
 
 function App() {
   return (
@@ -69,6 +74,11 @@ function App() {
               <Route path="/wordbook/take" element={<WordbookTake />} />
               <Route path="/wordbook/result/:attemptId" element={<WordbookResult />} />
 
+              <Route path="/korean-mocks" element={<KoreanMockList />} />
+              <Route path="/korean-mocks/:id" element={<KoreanMockDetail />} />
+              <Route path="/korean-mocks/:id/take" element={<KoreanMockTake />} />
+              <Route path="/korean-mocks/:id/result/:attemptId" element={<KoreanMockResult />} />
+
               <Route path="/history" element={<MyHistory />} />
               <Route path="/assignments" element={<Assignments />} />
               <Route path="/notifications" element={<Notifications />} />
@@ -88,6 +98,8 @@ function App() {
               <Route path="/admin" element={<AdminHub />} />
               <Route path="/admin/readings" element={<ReadingList manage />} />
               <Route path="/admin/vocab" element={<VocabList manage />} />
+              <Route path="/admin/korean-mocks" element={<KoreanMockList manage />} />
+              <Route path="/admin/korean-mocks/new" element={<KoreanMockNew />} />
               <Route path="/admin/students" element={<AdminStudents />} />
               <Route path="/admin/students/:id" element={<AdminStudentDetail />} />
               <Route path="/admin/notify" element={<AdminNotify />} />

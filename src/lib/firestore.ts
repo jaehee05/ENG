@@ -24,6 +24,9 @@ import type {
   Attempt,
   CategoryConfig,
   ClassSchedule,
+  KoreanMock,
+  KoreanMockQuestion,
+  KoreanMockResult,
   NotificationKind,
   PersonalTodo,
   PushSchedule,
@@ -403,6 +406,90 @@ export async function createWordbookAttempt(input: {
   })
   return ref.id
 }
+
+/* ========== KoreanMock CRUD ========== */
+
+export async function listKoreanMocks(): Promise<KoreanMock[]> {
+  const snap = await getDocs(
+    query(collection(db, 'koreanMocks'), orderBy('createdAt', 'desc')),
+  )
+  return snap.docs.map((d) => ({
+    id: d.id,
+    ...(d.data() as Omit<KoreanMock, 'id'>),
+  }))
+}
+
+export async function getKoreanMock(id: string): Promise<KoreanMock | null> {
+  const snap = await getDoc(doc(db, 'koreanMocks', id))
+  if (!snap.exists()) return null
+  return { id: snap.id, ...(snap.data() as Omit<KoreanMock, 'id'>) }
+}
+
+export async function createKoreanMock(input: {
+  title: string
+  questions: KoreanMockQuestion[]
+  createdBy: string
+  createdByName: string
+}): Promise<string> {
+  const ref = await addDoc(collection(db, 'koreanMocks'), {
+    title: input.title,
+    questions: input.questions,
+    createdBy: input.createdBy,
+    createdByName: input.createdByName,
+    createdAt: serverTimestamp(),
+  })
+  return ref.id
+}
+
+export async function updateKoreanMock(
+  id: string,
+  patch: Partial<Pick<KoreanMock, 'title' | 'questions'>>,
+): Promise<void> {
+  const update: Record<string, unknown> = {}
+  if (patch.title !== undefined) update.title = patch.title
+  if (patch.questions !== undefined) update.questions = patch.questions
+  if (Object.keys(update).length === 0) return
+  await updateDoc(doc(db, 'koreanMocks', id), update)
+}
+
+export async function deleteKoreanMock(id: string): Promise<void> {
+  await deleteDoc(doc(db, 'koreanMocks', id))
+}
+
+export async function createKoreanMockAttempt(input: {
+  studentUid: string
+  studentName: string
+  refId: string
+  refTitle: string
+  koreanMockResults: KoreanMockResult[]
+}): Promise<string> {
+  const total = input.koreanMockResults.length
+  const correct = input.koreanMockResults.filter((r) => r.correct).length
+  const ref = await addDoc(collection(db, 'attempts'), {
+    studentUid: input.studentUid,
+    studentName: input.studentName,
+    type: 'korean_mock',
+    refId: input.refId,
+    refTitle: input.refTitle,
+    total,
+    correct,
+    koreanMockResults: input.koreanMockResults,
+    createdAt: serverTimestamp(),
+  })
+  return ref.id
+}
+
+/** 특정 국어 모의고사의 모든 응시 기록을 가져옴 (관리자 전용). */
+export async function listKoreanMockAttempts(refId: string): Promise<Attempt[]> {
+  const snap = await getDocs(
+    query(collection(db, 'attempts'), where('refId', '==', refId)),
+  )
+  return snap.docs
+    .map((d) => ({ id: d.id, ...(d.data() as Omit<Attempt, 'id'>) }))
+    .filter((a) => a.type === 'korean_mock')
+}
+
+/* ========== End KoreanMock CRUD ========== */
 
 export async function createReadingAttempt(input: {
   studentUid: string

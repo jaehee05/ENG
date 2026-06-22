@@ -89,6 +89,17 @@ const tools: AdminTool[] = [
     ),
   },
   {
+    to: '/admin/korean-mocks',
+    title: '국어 모의고사',
+    desc: '답안 등록 / 학생 OMR 채점 결과 확인',
+    icon: (
+      <svg {...iconProps}>
+        <rect x="4" y="3" width="16" height="18" rx="2" />
+        <path d="M8 8h8M8 12h8M8 16h5" />
+      </svg>
+    ),
+  },
+  {
     to: '/admin/categories',
     title: '과제 카테고리',
     desc: '학생 과제 분류 이름·색상 추가/수정',

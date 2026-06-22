@@ -8,6 +8,7 @@ const TYPE_LABEL: Record<Attempt['type'], string> = {
   vocab: '단어 시험지',
   reading: '지문 문제풀이',
   wordbook: '내 단어장 시험',
+  korean_mock: '국어 모의고사',
 }
 
 type Filter = 'all' | Attempt['type']
