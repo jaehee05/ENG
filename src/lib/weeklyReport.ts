@@ -80,12 +80,7 @@ export function buildWeeklyReportVars(
   const vocabAttempts = recentAttempts.filter(
     (a) => a.type === 'vocab' && !a.practice,
   )
-  const totalWords = vocabAttempts.reduce((s, a) => s + (a.total || 0), 0)
   const totalCorrectV = vocabAttempts.reduce((s, a) => s + (a.correct || 0), 0)
-  const passCount = vocabAttempts.filter(
-    (a) => (a.correct || 0) >= VOCAB_PASS_THRESHOLD,
-  ).length
-  const sessionCount = vocabAttempts.length
 
   // 문제풀이 정답률: 지난주 '푼' 지문 문항만 집계 (안 푼 문항은 분모에서 제외).
   // 지문별로 가장 최근 응시 1개만 사용해 재시도가 중복 집계되지 않게 한다.
@@ -117,10 +112,11 @@ export function buildWeeklyReportVars(
     readingPct == null
       ? '▫️ 문제 풀이: 지난주 과제 없음'
       : `▫️ 문제 풀이: ${readingPct}% 완료`
+  // 통과는 '시험 개수' 기준: 부여된 단어 시험 중 통과(완료)한 시험 수.
   const vocabBody =
-    sessionCount === 0
-      ? '▫️ 지난주 응시 기록 없음'
-      : `▫️ 학습 ${vocabAsn.length}회분 · 단어 ${totalWords}개\n▫️ 통과 ${passCount}/${sessionCount}회 (암기 ${totalCorrectV}개)`
+    vocabAsn.length === 0
+      ? '▫️ 지난주 단어 시험 과제 없음'
+      : `▫️ 통과 ${vocabDone}/${vocabAsn.length}개 시험\n▫️ 누적 암기 ${totalCorrectV}개`
   const readingBody =
     solvedReadingAttempts.length === 0
       ? '▫️ 지난주 푼 지문 없음'
