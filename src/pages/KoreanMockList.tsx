@@ -9,6 +9,7 @@ import {
   listKoreanMocks,
 } from '../lib/firestore'
 import {
+  accountSubjects,
   getMockSubject,
   isAssignmentVisibleToStudent,
   MOCK_SUBJECT_LABEL,
@@ -62,6 +63,22 @@ export function KoreanMockList({ manage = false }: { manage?: boolean }) {
         .map((a) => a.refId),
     )
   }, [assignments])
+
+  // 학생 수강 과목에 따라 필터 칩을 축소한다.
+  const subj = profile ? accountSubjects(profile) : { korean: true, english: true }
+  const singleSubject: MockSubject | null =
+    !isAdmin && subj.korean && !subj.english
+      ? 'korean'
+      : !isAdmin && subj.english && !subj.korean
+        ? 'english'
+        : null
+
+  // 단일 과목 학생이면 필터를 그 과목으로 고정
+  useEffect(() => {
+    if (singleSubject && subjectFilter !== singleSubject) {
+      setSubjectFilter(singleSubject)
+    }
+  }, [singleSubject, subjectFilter])
 
   const attemptedRefIds = useMemo(() => {
     return new Set(
@@ -119,22 +136,24 @@ export function KoreanMockList({ manage = false }: { manage?: boolean }) {
         )}
       </header>
 
-      <div className="flex items-center gap-1 text-xs">
-        {(['all', 'korean', 'english'] as const).map((k) => (
-          <button
-            key={k}
-            type="button"
-            onClick={() => setSubjectFilter(k)}
-            className={`px-3 py-1.5 rounded-full transition ${
-              subjectFilter === k
-                ? 'bg-slate-900 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            {k === 'all' ? '전체' : MOCK_SUBJECT_LABEL[k]}
-          </button>
-        ))}
-      </div>
+      {!singleSubject && (
+        <div className="flex items-center gap-1 text-xs">
+          {(['all', 'korean', 'english'] as const).map((k) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setSubjectFilter(k)}
+              className={`px-3 py-1.5 rounded-full transition ${
+                subjectFilter === k
+                  ? 'bg-slate-900 text-white'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              {k === 'all' ? '전체' : MOCK_SUBJECT_LABEL[k]}
+            </button>
+          ))}
+        </div>
+      )}
 
       {loading && <p className="text-slate-500 text-sm">불러오는 중…</p>}
       {error && <p className="text-red-600 text-sm">{error}</p>}
