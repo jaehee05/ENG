@@ -534,7 +534,7 @@ export function AdminStudents() {
             setShowPrereg(false)
             setFeedback({
               kind: 'ok',
-              msg: `${a.displayName} 사전 등록 완료. 학생이 ${a.email} 로 회원가입하면 자동 연결됩니다.`,
+              msg: `${a.displayName} 사전 등록 완료. 학생이 같은 이름·전화(${a.phone}) 로 회원가입하면 자동 연결됩니다.`,
             })
           }}
         />
@@ -612,10 +612,9 @@ function PreregForm({
 }: {
   onCreated: (account: UserAccount) => void
 }) {
-  const [email, setEmail] = useState('')
   const [displayName, setDisplayName] = useState('')
-  const [school, setSchool] = useState('')
   const [phone, setPhone] = useState('')
+  const [school, setSchool] = useState('')
   const [parentPhone, setParentPhone] = useState('')
   const [korean, setKorean] = useState(true)
   const [english, setEnglish] = useState(true)
@@ -635,18 +634,16 @@ function PreregForm({
     setSaving(true)
     try {
       const created = await createPreregisteredStudent({
-        email,
         displayName,
-        school,
         phone,
+        school,
         parentPhone,
         subjects,
       })
       onCreated(created)
-      setEmail('')
       setDisplayName('')
-      setSchool('')
       setPhone('')
+      setSchool('')
       setParentPhone('')
     } catch (e) {
       setErr(e instanceof Error ? e.message : '등록 실패')
@@ -666,18 +663,6 @@ function PreregForm({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <label className="flex flex-col gap-1">
           <span className="text-xs font-medium text-slate-600">
-            이메일 <span className="text-red-500">*</span>
-          </span>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className={inputCls}
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-slate-600">
             이름 <span className="text-red-500">*</span>
           </span>
           <input
@@ -685,6 +670,19 @@ function PreregForm({
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
             required
+            className={inputCls}
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-slate-600">
+            학생 전화 <span className="text-red-500">*</span>
+          </span>
+          <input
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            required
+            placeholder="가입 시 매칭 키"
             className={inputCls}
           />
         </label>
@@ -698,15 +696,6 @@ function PreregForm({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-slate-600">학생 전화</span>
-          <input
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            className={inputCls}
-          />
-        </label>
-        <label className="flex flex-col gap-1 sm:col-span-2">
           <span className="text-xs font-medium text-slate-600">학부모 전화</span>
           <input
             type="tel"
@@ -738,8 +727,9 @@ function PreregForm({
         </label>
       </div>
       <p className="text-[11px] text-slate-500">
-        학생이 같은 이메일로 회원가입하면 이 계정으로 자동 연결되고 즉시 활성
-        상태가 됩니다. 비밀번호는 학생이 가입 시 직접 설정합니다.
+        학생이 <strong>같은 이름 · 같은 전화번호</strong>로 회원가입하면 이
+        계정에 자동으로 연결되고 즉시 활성 상태가 됩니다. 이메일과 비밀번호는
+        학생이 가입 시 직접 설정합니다.
       </p>
       {err && <p className="text-xs text-red-600">{err}</p>}
       <div className="flex justify-end">

@@ -74,41 +74,52 @@ export async function signUpAccount(input: {
 }): Promise<UserAccount> {
   validatePassword(input.password)
   const email = input.email.trim().toLowerCase()
-  const dup = await getDocs(
-    query(collection(db, 'users'), where('email', '==', email), limit(1)),
-  )
   const displayName = input.displayName.trim()
   const school = (input.school ?? '').trim()
   const phone = (input.phone ?? '').trim()
   const parentPhone = (input.parentPhone ?? '').trim()
 
-  if (!dup.empty) {
-    const existing = fromSnap(dup.docs[0])
-    if (existing.preregistered) {
-      // 사전 등록된 학생 → 자동 활성화. 관리자가 미리 지정한 이름/학교/연락처/과목/과제 등은 그대로 유지하고,
-      // 학생 입력값이 있으면 그것으로 덮어씀 (본인이 정정할 수 있게).
-      const patch: Record<string, unknown> = {
-        password: input.password,
-        status: 'active',
-        preregistered: false,
-      }
-      if (displayName) patch.displayName = displayName
-      if (school) patch.school = school
-      if (phone) patch.phone = phone
-      if (parentPhone) patch.parentPhone = parentPhone
-      await updateDoc(doc(db, 'users', existing.id), patch)
-      return {
-        ...existing,
-        password: input.password,
-        status: 'active',
-        preregistered: undefined,
-        displayName: displayName || existing.displayName,
-        school: school || existing.school,
-        phone: phone || existing.phone,
-        parentPhone: parentPhone || existing.parentPhone,
-      }
+  // 1) 같은 이메일 사용자 조회 — 사전 등록이면 활성화, 아니면 중복 오류.
+  const emailHits = await getDocs(
+    query(collection(db, 'users'), where('email', '==', email), limit(1)),
+  )
+  if (!emailHits.empty) {
+    const existing = fromSnap(emailHits.docs[0])
+    if (!existing.preregistered) {
+      throw new Error('이미 가입된 이메일입니다.')
     }
-    throw new Error('이미 가입된 이메일입니다.')
+    return await activatePreregistered(existing, {
+      email,
+      password: input.password,
+      displayName,
+      school,
+      phone,
+      parentPhone,
+    })
+  }
+
+  // 2) 이메일이 새 값이더라도 (이름 + 전화) 로 사전 등록된 계정이 있는지 확인 → 연결.
+  if (displayName && phone) {
+    const prereg = await getDocs(
+      query(
+        collection(db, 'users'),
+        where('preregistered', '==', true),
+        where('displayName', '==', displayName),
+        where('phone', '==', phone),
+        limit(1),
+      ),
+    )
+    if (!prereg.empty) {
+      const existing = fromSnap(prereg.docs[0])
+      return await activatePreregistered(existing, {
+        email,
+        password: input.password,
+        displayName,
+        school,
+        phone,
+        parentPhone,
+      })
+    }
   }
 
   const any = await getDocs(query(collection(db, 'users'), limit(1)))
@@ -142,56 +153,96 @@ export async function signUpAccount(input: {
   }
 }
 
-/** 관리자가 학생 회원가입 전에 미리 계정을 만들어둔다. 학생이 같은 이메일로 signUp 하면 자동 활성화. */
+/** 관리자가 학생 회원가입 전에 미리 계정을 만들어둔다. 학생이 같은 (이름, 전화)로 signUp 하면 자동 활성화. */
 export async function createPreregisteredStudent(input: {
-  email: string
   displayName: string
+  phone: string
   school?: string
-  phone?: string
   parentPhone?: string
   subjects?: MockSubject[]
 }): Promise<UserAccount> {
-  const email = input.email.trim().toLowerCase()
-  if (!email || !/.+@.+/.test(email)) {
-    throw new Error('올바른 이메일을 입력하세요.')
-  }
   const displayName = input.displayName.trim()
   if (!displayName) throw new Error('이름을 입력하세요.')
+  const phone = input.phone.trim()
+  if (!phone) throw new Error('학생 전화번호를 입력하세요. (가입 시 매칭에 필요)')
 
+  // (이름, 전화) 조합이 이미 있으면 중복 방지
   const dup = await getDocs(
-    query(collection(db, 'users'), where('email', '==', email), limit(1)),
+    query(
+      collection(db, 'users'),
+      where('displayName', '==', displayName),
+      where('phone', '==', phone),
+      limit(1),
+    ),
   )
-  if (!dup.empty) throw new Error('해당 이메일의 계정이 이미 존재합니다.')
+  if (!dup.empty) {
+    throw new Error('같은 이름·전화의 계정이 이미 존재합니다.')
+  }
 
   const payload: Record<string, unknown> = {
-    email,
+    email: '',
     displayName,
+    phone,
     role: 'student',
     status: 'pending',
     preregistered: true,
     createdAt: serverTimestamp(),
   }
   const school = (input.school ?? '').trim()
-  const phone = (input.phone ?? '').trim()
   const parentPhone = (input.parentPhone ?? '').trim()
   if (school) payload.school = school
-  if (phone) payload.phone = phone
   if (parentPhone) payload.parentPhone = parentPhone
   if (input.subjects && input.subjects.length > 0) payload.subjects = input.subjects
 
   const ref = await addDoc(collection(db, 'users'), payload)
   return {
     id: ref.id,
-    email,
+    email: '',
     displayName,
     role: 'student',
     status: 'pending',
     preregistered: true,
     school: school || undefined,
-    phone: phone || undefined,
+    phone,
     parentPhone: parentPhone || undefined,
     subjects: input.subjects,
     createdAt: null,
+  }
+}
+
+async function activatePreregistered(
+  existing: UserAccount,
+  input: {
+    email: string
+    password: string
+    displayName: string
+    school: string
+    phone: string
+    parentPhone: string
+  },
+): Promise<UserAccount> {
+  const patch: Record<string, unknown> = {
+    password: input.password,
+    status: 'active',
+    preregistered: false,
+  }
+  // 학생 입력값이 있으면 관리자가 넣어둔 값을 덮어씀 (본인이 정정 가능하도록)
+  if (input.email) patch.email = input.email
+  if (input.displayName) patch.displayName = input.displayName
+  if (input.school) patch.school = input.school
+  if (input.phone) patch.phone = input.phone
+  if (input.parentPhone) patch.parentPhone = input.parentPhone
+  await updateDoc(doc(db, 'users', existing.id), patch)
+  return {
+    ...existing,
+    email: input.email || existing.email,
+    password: input.password,
+    status: 'active',
+    preregistered: undefined,
+    displayName: input.displayName || existing.displayName,
+    school: input.school || existing.school,
+    phone: input.phone || existing.phone,
+    parentPhone: input.parentPhone || existing.parentPhone,
   }
 }
 
