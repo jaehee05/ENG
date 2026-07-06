@@ -507,7 +507,7 @@ function SessionModal({
             <dt className="w-14 shrink-0 text-slate-500">금액</dt>
             <dd className="text-slate-900 tabular-nums flex items-center gap-2 flex-wrap">
               <span>{fmtCurrency(session.cost)}</span>
-              {isAdmin ? (
+              {isAdmin && (
                 <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs">
                   <input
                     type="checkbox"
@@ -528,16 +528,10 @@ function SessionModal({
                         : '미결제'}
                   </span>
                 </label>
-              ) : (
-                session.paid && (
-                  <span className="inline-block rounded-full text-[10px] font-medium px-2 py-0.5 border bg-emerald-50 text-emerald-700 border-emerald-200">
-                    결제 완료
-                  </span>
-                )
               )}
             </dd>
           </div>
-          {payError && (
+          {isAdmin && payError && (
             <p className="text-xs text-red-600 pl-16">{payError}</p>
           )}
           {session.note && (
