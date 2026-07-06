@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../contexts/useAuth'
-import { listClassSessionsForStudent } from '../lib/firestore'
+import { listAccounts } from '../lib/account'
+import {
+  listAllClassSessions,
+  listClassSessionsForStudent,
+} from '../lib/firestore'
 import {
   CLASS_SESSION_STATUS_LABEL,
   type ClassSession,
   type ClassSessionStatus,
+  type UserAccount,
 } from '../lib/types'
 
 const KST_TZ = 'Asia/Seoul'
@@ -84,11 +89,32 @@ function fmtCurrency(n: number): string {
   return `${n.toLocaleString('ko-KR')}원`
 }
 
+/** 학생별 색상 (관리자 뷰용). 색상은 8단계 순환. */
+const STUDENT_COLORS = [
+  { dot: 'bg-sky-500', badge: 'bg-sky-50 text-sky-700 border-sky-200' },
+  { dot: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  { dot: 'bg-amber-500', badge: 'bg-amber-50 text-amber-700 border-amber-200' },
+  { dot: 'bg-violet-500', badge: 'bg-violet-50 text-violet-700 border-violet-200' },
+  { dot: 'bg-rose-500', badge: 'bg-rose-50 text-rose-700 border-rose-200' },
+  { dot: 'bg-teal-500', badge: 'bg-teal-50 text-teal-700 border-teal-200' },
+  { dot: 'bg-indigo-500', badge: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+  { dot: 'bg-orange-500', badge: 'bg-orange-50 text-orange-700 border-orange-200' },
+]
+
+function colorForUid(uid: string): (typeof STUDENT_COLORS)[number] {
+  let h = 0
+  for (let i = 0; i < uid.length; i++) h = (h * 31 + uid.charCodeAt(i)) >>> 0
+  return STUDENT_COLORS[h % STUDENT_COLORS.length]
+}
+
 export function StudentSchedule() {
   const { profile } = useAuth()
+  const isAdmin = profile?.role === 'admin'
   const [sessions, setSessions] = useState<ClassSession[]>([])
+  const [students, setStudents] = useState<UserAccount[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [filterUid, setFilterUid] = useState<string>('all')
 
   const [cursor, setCursor] = useState(() => {
     const now = new Date()
@@ -100,32 +126,43 @@ export function StudentSchedule() {
     if (!profile) return
     let cancelled = false
     setLoading(true)
-    listClassSessionsForStudent(profile.id)
-      .then((s) => {
-        if (!cancelled) {
-          setSessions(s)
-          setLoading(false)
-        }
-      })
-      .catch((e) => {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : '불러오기 실패')
-          setLoading(false)
-        }
-      })
+    const p = isAdmin
+      ? Promise.all([listAllClassSessions(), listAccounts()])
+      : Promise.all([
+          listClassSessionsForStudent(profile.id),
+          Promise.resolve<UserAccount[]>([]),
+        ])
+    p.then(([s, accs]) => {
+      if (cancelled) return
+      setSessions(s)
+      setStudents(
+        accs.filter((a) => a.role === 'student' && a.status === 'active'),
+      )
+      setLoading(false)
+    }).catch((e) => {
+      if (!cancelled) {
+        setError(e instanceof Error ? e.message : '불러오기 실패')
+        setLoading(false)
+      }
+    })
     return () => {
       cancelled = true
     }
-  }, [profile])
+  }, [profile, isAdmin])
 
   const cells = useMemo(
     () => buildCalendarCells(cursor.year, cursor.monthIndex),
     [cursor],
   )
 
+  const filteredSessions = useMemo(() => {
+    if (!isAdmin || filterUid === 'all') return sessions
+    return sessions.filter((s) => s.studentUid === filterUid)
+  }, [sessions, isAdmin, filterUid])
+
   const sessionsByDate = useMemo(() => {
     const map = new Map<string, ClassSession[]>()
-    for (const s of sessions) {
+    for (const s of filteredSessions) {
       const arr = map.get(s.dateISO) ?? []
       arr.push(s)
       map.set(s.dateISO, arr)
@@ -134,7 +171,20 @@ export function StudentSchedule() {
       arr.sort((a, b) => a.startTime.localeCompare(b.startTime))
     }
     return map
-  }, [sessions])
+  }, [filteredSessions])
+
+  const studentNameByUid = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const s of students) map.set(s.id, s.displayName)
+    return map
+  }, [students])
+
+  // 실제로 세션이 있는 학생만 필터 옵션에 노출 (관리자 편의)
+  const activeStudentsWithSessions = useMemo(() => {
+    const uids = new Set<string>()
+    for (const s of sessions) uids.add(s.studentUid)
+    return students.filter((s) => uids.has(s.id))
+  }, [sessions, students])
 
   const today = todayISO()
 
@@ -156,12 +206,56 @@ export function StudentSchedule() {
     <div className="space-y-5">
       <header>
         <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-          나의 학습
+          {isAdmin ? '관리' : '나의 학습'}
         </p>
         <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
-          수업 일정
+          {isAdmin ? '전체 수업 일정' : '수업 일정'}
         </h1>
+        {isAdmin && (
+          <p className="text-xs text-slate-500 mt-1">
+            학생별로 색상이 구분됩니다. 아래 필터로 특정 학생만 볼 수 있습니다.
+          </p>
+        )}
       </header>
+
+      {isAdmin && activeStudentsWithSessions.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setFilterUid('all')}
+            className={`text-xs font-medium rounded-full border px-2.5 py-1 ${
+              filterUid === 'all'
+                ? 'bg-slate-900 text-white border-slate-900'
+                : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+            }`}
+          >
+            전체 ({sessions.length})
+          </button>
+          {activeStudentsWithSessions.map((st) => {
+            const active = filterUid === st.id
+            const color = colorForUid(st.id)
+            const count = sessions.filter((s) => s.studentUid === st.id).length
+            return (
+              <button
+                key={st.id}
+                type="button"
+                onClick={() => setFilterUid(st.id)}
+                className={`text-xs font-medium rounded-full border px-2.5 py-1 flex items-center gap-1.5 ${
+                  active
+                    ? 'bg-slate-900 text-white border-slate-900'
+                    : `${color.badge} hover:brightness-95`
+                }`}
+              >
+                <span
+                  className={`inline-block w-1.5 h-1.5 rounded-full ${color.dot}`}
+                  aria-hidden
+                />
+                {st.displayName} ({count})
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
@@ -242,6 +336,8 @@ export function StudentSchedule() {
                 <div className="mt-1 space-y-0.5">
                   {daySessions.slice(0, 3).map((s) => {
                     const st = STATUS_STYLES[s.status]
+                    const studentColor = isAdmin ? colorForUid(s.studentUid) : null
+                    const studentName = studentNameByUid.get(s.studentUid)
                     return (
                       <button
                         key={s.id}
@@ -250,14 +346,22 @@ export function StudentSchedule() {
                         className="w-full text-left flex items-center gap-1 rounded px-1 py-0.5 hover:bg-slate-100"
                       >
                         <span
-                          className={`shrink-0 inline-block w-1 h-3 sm:h-3.5 rounded-full ${st.bar}`}
+                          className={`shrink-0 inline-block w-1 h-3 sm:h-3.5 rounded-full ${
+                            studentColor ? studentColor.dot : st.bar
+                          }`}
                           aria-hidden
                         />
                         <span
                           className={`truncate text-[10px] sm:text-[11px] ${st.text}`}
                         >
                           <span className="tabular-nums">{s.startTime}</span>{' '}
-                          <span className="opacity-80">{s.title}</span>
+                          {isAdmin && studentName && (
+                            <span className="font-medium">{studentName}</span>
+                          )}
+                          <span className="opacity-80">
+                            {isAdmin && studentName ? ' · ' : ''}
+                            {s.title}
+                          </span>
                         </span>
                       </button>
                     )
@@ -281,7 +385,13 @@ export function StudentSchedule() {
       )}
 
       {selected && (
-        <SessionModal session={selected} onClose={() => setSelected(null)} />
+        <SessionModal
+          session={selected}
+          studentName={
+            isAdmin ? (studentNameByUid.get(selected.studentUid) ?? null) : null
+          }
+          onClose={() => setSelected(null)}
+        />
       )}
     </div>
   )
@@ -289,9 +399,11 @@ export function StudentSchedule() {
 
 function SessionModal({
   session,
+  studentName,
   onClose,
 }: {
   session: ClassSession
+  studentName: string | null
   onClose: () => void
 }) {
   const st = STATUS_STYLES[session.status]
@@ -342,6 +454,12 @@ function SessionModal({
         </div>
 
         <dl className="space-y-2 text-sm">
+          {studentName && (
+            <div className="flex gap-2">
+              <dt className="w-14 shrink-0 text-slate-500">학생</dt>
+              <dd className="text-slate-900 font-medium">{studentName}</dd>
+            </div>
+          )}
           <div className="flex gap-2">
             <dt className="w-14 shrink-0 text-slate-500">날짜</dt>
             <dd className="text-slate-900">{dateLabel}</dd>

@@ -1109,6 +1109,13 @@ export async function listClassSessionsForStudent(
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<ClassSession, 'id'>) }))
 }
 
+export async function listAllClassSessions(): Promise<ClassSession[]> {
+  const snap = await getDocs(
+    query(collection(db, 'classSessions'), orderBy('dateISO', 'asc')),
+  )
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<ClassSession, 'id'>) }))
+}
+
 export async function createClassSession(input: {
   studentUid: string
   title: string
