@@ -14,6 +14,7 @@ import {
   type ClassSessionStatus,
   type UserAccount,
 } from '../lib/types'
+import { colorForStudent } from '../lib/studentColor'
 import {
   EMPTY_SESSION_FORM,
   fromSession,
@@ -99,55 +100,7 @@ function fmtCurrency(n: number): string {
   return `${n.toLocaleString('ko-KR')}원`
 }
 
-/** 학생별 색상 (관리자 뷰용). 색상은 8단계 순환. */
-const STUDENT_COLORS = [
-  {
-    dot: 'bg-sky-500',
-    badge: 'bg-sky-50 text-sky-700 border-sky-200',
-    active: 'bg-sky-600 text-white border-sky-600',
-  },
-  {
-    dot: 'bg-emerald-500',
-    badge: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    active: 'bg-emerald-600 text-white border-emerald-600',
-  },
-  {
-    dot: 'bg-amber-500',
-    badge: 'bg-amber-50 text-amber-800 border-amber-200',
-    active: 'bg-amber-500 text-white border-amber-500',
-  },
-  {
-    dot: 'bg-violet-500',
-    badge: 'bg-violet-50 text-violet-700 border-violet-200',
-    active: 'bg-violet-600 text-white border-violet-600',
-  },
-  {
-    dot: 'bg-rose-500',
-    badge: 'bg-rose-50 text-rose-700 border-rose-200',
-    active: 'bg-rose-600 text-white border-rose-600',
-  },
-  {
-    dot: 'bg-teal-500',
-    badge: 'bg-teal-50 text-teal-700 border-teal-200',
-    active: 'bg-teal-600 text-white border-teal-600',
-  },
-  {
-    dot: 'bg-indigo-500',
-    badge: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-    active: 'bg-indigo-600 text-white border-indigo-600',
-  },
-  {
-    dot: 'bg-orange-500',
-    badge: 'bg-orange-50 text-orange-700 border-orange-200',
-    active: 'bg-orange-600 text-white border-orange-600',
-  },
-]
-
-function colorForUid(uid: string): (typeof STUDENT_COLORS)[number] {
-  let h = 0
-  for (let i = 0; i < uid.length; i++) h = (h * 31 + uid.charCodeAt(i)) >>> 0
-  return STUDENT_COLORS[h % STUDENT_COLORS.length]
-}
+// 학생 색상 팔레트/조회 로직은 src/lib/studentColor.ts 로 분리.
 
 export function StudentSchedule() {
   const { profile } = useAuth()
@@ -231,6 +184,12 @@ export function StudentSchedule() {
   const studentNameByUid = useMemo(() => {
     const map = new Map<string, string>()
     for (const s of students) map.set(s.id, s.displayName)
+    return map
+  }, [students])
+
+  const studentColorKeyByUid = useMemo(() => {
+    const map = new Map<string, string | undefined>()
+    for (const s of students) map.set(s.id, s.colorKey)
     return map
   }, [students])
 
@@ -401,7 +360,7 @@ export function StudentSchedule() {
           </button>
           {activeStudentsWithSessions.map((st) => {
             const active = filterUid === st.id
-            const color = colorForUid(st.id)
+            const color = colorForStudent(st.id, st.colorKey)
             const count = sessions.filter((s) => s.studentUid === st.id).length
             return (
               <button
@@ -504,7 +463,12 @@ export function StudentSchedule() {
                 <div className="mt-1 space-y-0.5">
                   {daySessions.slice(0, 3).map((s) => {
                     const st = STATUS_STYLES[s.status]
-                    const studentColor = isAdmin ? colorForUid(s.studentUid) : null
+                    const studentColor = isAdmin
+                      ? colorForStudent(
+                          s.studentUid,
+                          studentColorKeyByUid.get(s.studentUid),
+                        )
+                      : null
                     const studentName = studentNameByUid.get(s.studentUid)
                     // 관리자 뷰: 학생 색상으로 pill 렌더. 취소는 회색 pill + 취소선으로 구분.
                     const canceled = s.status === 'canceled'

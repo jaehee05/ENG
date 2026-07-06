@@ -2,7 +2,16 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import { ScheduleManager } from '../components/ScheduleManager'
-import { getAccount, updateAccountSubjects } from '../lib/account'
+import {
+  getAccount,
+  updateAccountColorKey,
+  updateAccountSubjects,
+} from '../lib/account'
+import {
+  colorForStudent,
+  STUDENT_COLORS,
+  STUDENT_COLOR_KEYS,
+} from '../lib/studentColor'
 import {
   createAssignment,
   deleteAssignment,
@@ -468,6 +477,10 @@ export function AdminStudentDetail() {
         <SubjectPicker
           account={account}
           onSaved={(next) => setAccount({ ...account, subjects: next })}
+        />
+        <ColorPicker
+          account={account}
+          onSaved={(next) => setAccount({ ...account, colorKey: next })}
         />
       </header>
 
@@ -1416,6 +1429,62 @@ function SubjectPicker({
           {saving ? '저장 중…' : '저장'}
         </button>
       )}
+      {err && <span className="text-red-600">{err}</span>}
+    </div>
+  )
+}
+
+function ColorPicker({
+  account,
+  onSaved,
+}: {
+  account: UserAccount
+  onSaved: (colorKey: string) => void
+}) {
+  const currentColor = colorForStudent(account.id, account.colorKey)
+  const [saving, setSaving] = useState<string | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+
+  async function pick(key: string) {
+    if (key === account.colorKey) return
+    setSaving(key)
+    setErr(null)
+    try {
+      await updateAccountColorKey(account.id, key)
+      onSaved(key)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '저장 실패')
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  return (
+    <div className="mt-3 flex items-center gap-2 flex-wrap text-xs">
+      <span className="text-slate-500">캘린더 색상:</span>
+      <div className="flex items-center gap-1">
+        {STUDENT_COLOR_KEYS.map((k) => {
+          const c = STUDENT_COLORS[k]
+          const active = k === currentColor.key
+          return (
+            <button
+              key={k}
+              type="button"
+              onClick={() => pick(k)}
+              disabled={saving !== null}
+              title={c.label}
+              aria-label={c.label}
+              className={`w-5 h-5 rounded-full border-2 transition ${c.dot} ${
+                active ? 'border-slate-900 scale-110' : 'border-white'
+              } disabled:opacity-50`}
+            />
+          )
+        })}
+      </div>
+      {!account.colorKey && (
+        <span className="text-slate-400">(자동 지정 · {currentColor.label})</span>
+      )}
+      {saving && <span className="text-slate-400">저장 중…</span>}
       {err && <span className="text-red-600">{err}</span>}
     </div>
   )

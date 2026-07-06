@@ -46,9 +46,17 @@ function fromSnap(snap: QueryDocumentSnapshot | DocumentSnapshot): UserAccount {
     phone: d.phone,
     parentPhone: d.parentPhone,
     subjects,
+    colorKey: typeof d.colorKey === 'string' ? d.colorKey : undefined,
     preregistered: d.preregistered === true ? true : undefined,
     createdAt: (d.createdAt as Timestamp | undefined) ?? null,
   }
+}
+
+export async function updateAccountColorKey(
+  id: string,
+  colorKey: string,
+): Promise<void> {
+  await updateDoc(doc(db, 'users', id), { colorKey })
 }
 
 export async function updateAccountSubjects(
