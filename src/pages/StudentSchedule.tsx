@@ -475,7 +475,7 @@ function SessionModal({
             <dd className="text-slate-900">{session.location || '—'}</dd>
           </div>
           <div className="flex gap-2">
-            <dt className="w-14 shrink-0 text-slate-500">비용</dt>
+            <dt className="w-14 shrink-0 text-slate-500">금액</dt>
             <dd className="text-slate-900 tabular-nums">
               {fmtCurrency(session.cost)}
             </dd>

@@ -1,15 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
+import { listAccounts } from '../lib/account'
 import {
   clearAllVocabAttemptLimits,
   deleteVocabSet,
   formatDate,
   listVocabSets,
   listVocabSetsForStudent,
+  updateVocabSetOwner,
   updateVocabSetWords,
 } from '../lib/firestore'
-import type { VocabSense, VocabSet, WordEntry } from '../lib/types'
+import type { UserAccount, VocabSense, VocabSet, WordEntry } from '../lib/types'
 import { parseSenseBody } from '../lib/parseTextbookVocab'
 
 export function VocabList({ manage = false }: { manage?: boolean }) {
@@ -68,6 +70,93 @@ export function VocabList({ manage = false }: { manage?: boolean }) {
   const [reprocessing, setReprocessing] = useState(false)
   const [reprocessNotice, setReprocessNotice] = useState<string | null>(null)
   const [clearingLimits, setClearingLimits] = useState(false)
+
+  // 일괄 지정 상태
+  const [bulkMode, setBulkMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkStudentUid, setBulkStudentUid] = useState('')
+  const [students, setStudents] = useState<UserAccount[]>([])
+  const [bulkSaving, setBulkSaving] = useState(false)
+  const [bulkNotice, setBulkNotice] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!canManage) return
+    listAccounts()
+      .then((all) =>
+        setStudents(
+          all.filter((a) => a.role === 'student' && a.status === 'active'),
+        ),
+      )
+      .catch(() => {})
+  }, [canManage])
+
+  const legacyCount = useMemo(
+    () => sets.filter((s) => !s.studentUid).length,
+    [sets],
+  )
+
+  function toggleBulkMode() {
+    if (bulkMode) {
+      setSelectedIds(new Set())
+      setBulkStudentUid('')
+      setBulkNotice(null)
+    }
+    setBulkMode(!bulkMode)
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function selectAllLegacy() {
+    setSelectedIds(new Set(sets.filter((s) => !s.studentUid).map((s) => s.id)))
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set())
+  }
+
+  async function handleBulkAssign() {
+    if (selectedIds.size === 0 || !bulkStudentUid) return
+    const picked = students.find((s) => s.id === bulkStudentUid)
+    if (!picked) return
+    if (
+      !window.confirm(
+        `${selectedIds.size}개 시험지를 "${picked.displayName}" 학생에게 지정합니다. 계속할까요?`,
+      )
+    )
+      return
+    setBulkSaving(true)
+    setBulkNotice(null)
+    let touched = 0
+    try {
+      for (const id of selectedIds) {
+        await updateVocabSetOwner(id, picked.id, picked.displayName)
+        touched++
+      }
+      setSets((prev) =>
+        prev.map((s) =>
+          selectedIds.has(s.id)
+            ? { ...s, studentUid: picked.id, studentName: picked.displayName }
+            : s,
+        ),
+      )
+      setBulkNotice(`${touched}개 시험지 → "${picked.displayName}" 지정 완료.`)
+      setSelectedIds(new Set())
+    } catch (err) {
+      setBulkNotice(
+        (err instanceof Error ? err.message : '지정 실패') +
+          ` (${touched}/${selectedIds.size} 완료)`,
+      )
+    } finally {
+      setBulkSaving(false)
+    }
+  }
 
   async function handleClearAllLimits() {
     if (!isAdmin) return
@@ -156,6 +245,17 @@ export function VocabList({ manage = false }: { manage?: boolean }) {
           <div className="flex gap-1.5 flex-wrap">
             <button
               type="button"
+              onClick={toggleBulkMode}
+              className={`rounded-md border text-xs font-medium px-3 py-1.5 ${
+                bulkMode
+                  ? 'border-slate-900 bg-slate-900 text-white hover:bg-slate-800'
+                  : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              {bulkMode ? '일괄 모드 종료' : `일괄 지정 (legacy ${legacyCount})`}
+            </button>
+            <button
+              type="button"
               onClick={handleClearAllLimits}
               disabled={clearingLimits}
               className="rounded-md border border-amber-200 text-amber-700 text-xs font-medium px-3 py-1.5 hover:bg-amber-50 disabled:opacity-50"
@@ -186,6 +286,58 @@ export function VocabList({ manage = false }: { manage?: boolean }) {
         )}
       </header>
 
+      {canManage && bulkMode && (
+        <div className="rounded-lg border border-brand-200 bg-brand-50/40 p-4 space-y-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <select
+              value={bulkStudentUid}
+              onChange={(e) => setBulkStudentUid(e.target.value)}
+              className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            >
+              <option value="">— 지정할 학생 선택 —</option>
+              {students.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.displayName}
+                  {s.school ? ` (${s.school})` : ''}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={handleBulkAssign}
+              disabled={
+                bulkSaving || selectedIds.size === 0 || !bulkStudentUid
+              }
+              className="rounded-md bg-slate-900 text-white text-xs font-medium px-3 py-1.5 hover:bg-slate-800 disabled:opacity-50"
+            >
+              {bulkSaving ? '지정 중…' : `${selectedIds.size}개 지정`}
+            </button>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap text-xs">
+            <button
+              type="button"
+              onClick={selectAllLegacy}
+              className="text-slate-600 hover:text-slate-900 underline underline-offset-2"
+            >
+              legacy 전체 선택 ({legacyCount})
+            </button>
+            <button
+              type="button"
+              onClick={clearSelection}
+              className="text-slate-500 hover:text-slate-900 underline underline-offset-2"
+            >
+              선택 해제
+            </button>
+            <span className="text-slate-400">
+              · 체크한 시험지를 위 학생에게 몰아서 지정합니다.
+            </span>
+          </div>
+          {bulkNotice && (
+            <p className="text-xs text-brand-700">{bulkNotice}</p>
+          )}
+        </div>
+      )}
+
       {reprocessNotice && (
         <p className="text-xs text-brand-700">{reprocessNotice}</p>
       )}
@@ -198,45 +350,75 @@ export function VocabList({ manage = false }: { manage?: boolean }) {
       )}
 
       <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white overflow-hidden">
-        {sets.map((s) => (
-          <li key={s.id} className="relative">
-            <Link
-              to={`/vocab/${s.id}`}
-              className="flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-slate-50 active:bg-slate-100"
-            >
-              <div className="min-w-0">
-                <p className="text-[15px] font-medium text-slate-900 truncate">
-                  {s.title}
-                </p>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {s.words.length}단어 · {formatDate(s.createdAt)}
-                  {canManage && (
-                    <>
+        {sets.map((s) => {
+          const checked = selectedIds.has(s.id)
+          return (
+            <li key={s.id} className="relative">
+              {bulkMode ? (
+                <label className="flex items-center gap-3 px-4 py-3.5 cursor-pointer hover:bg-slate-50">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleSelected(s.id)}
+                    className="h-4 w-4 accent-slate-900"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[15px] font-medium text-slate-900 truncate">
+                      {s.title}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {s.words.length}단어 · {formatDate(s.createdAt)}
                       {' · '}
                       {s.studentName ? (
                         <span className="text-brand-700">{s.studentName}</span>
                       ) : (
                         <span className="text-amber-600">공용(legacy)</span>
                       )}
-                    </>
+                    </p>
+                  </div>
+                </label>
+              ) : (
+                <>
+                  <Link
+                    to={`/vocab/${s.id}`}
+                    className="flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-slate-50 active:bg-slate-100"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-[15px] font-medium text-slate-900 truncate">
+                        {s.title}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {s.words.length}단어 · {formatDate(s.createdAt)}
+                        {canManage && (
+                          <>
+                            {' · '}
+                            {s.studentName ? (
+                              <span className="text-brand-700">{s.studentName}</span>
+                            ) : (
+                              <span className="text-amber-600">공용(legacy)</span>
+                            )}
+                          </>
+                        )}
+                      </p>
+                    </div>
+                    <span className="text-slate-300 text-lg shrink-0">→</span>
+                  </Link>
+                  {canManage && (
+                    <button
+                      type="button"
+                      onClick={(e) => handleDelete(e, s)}
+                      disabled={deletingId === s.id}
+                      className="absolute top-2 right-9 text-[10px] text-slate-400 hover:text-red-600 px-1.5 py-0.5 rounded disabled:opacity-50"
+                      aria-label="삭제"
+                    >
+                      {deletingId === s.id ? '…' : '삭제'}
+                    </button>
                   )}
-                </p>
-              </div>
-              <span className="text-slate-300 text-lg shrink-0">→</span>
-            </Link>
-            {canManage && (
-              <button
-                type="button"
-                onClick={(e) => handleDelete(e, s)}
-                disabled={deletingId === s.id}
-                className="absolute top-2 right-9 text-[10px] text-slate-400 hover:text-red-600 px-1.5 py-0.5 rounded disabled:opacity-50"
-                aria-label="삭제"
-              >
-                {deletingId === s.id ? '…' : '삭제'}
-              </button>
-            )}
-          </li>
-        ))}
+                </>
+              )}
+            </li>
+          )
+        })}
       </ul>
     </div>
   )

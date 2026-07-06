@@ -44,7 +44,7 @@ interface FormState {
 }
 
 const EMPTY_FORM: FormState = {
-  title: '수업',
+  title: '1:1 개인 과외',
   dateISO: todayISO(),
   startTime: '19:00',
   endTime: '21:00',
@@ -251,7 +251,7 @@ export function ScheduleManager({
             </label>
             <label className="flex flex-col gap-1">
               <span className="text-xs font-medium text-slate-600">
-                비용 (원)
+                금액 (원)
               </span>
               <input
                 type="number"
