@@ -48,7 +48,7 @@ const EMPTY_FORM: FormState = {
   dateISO: todayISO(),
   startTime: '19:00',
   endTime: '21:00',
-  location: '',
+  location: 'TBD',
   cost: '',
   status: 'scheduled',
   note: '',

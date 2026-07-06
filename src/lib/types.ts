@@ -635,6 +635,8 @@ export interface ClassSession {
   /** KRW. */
   cost: number
   status: ClassSessionStatus
+  /** 결제 완료 여부. 관리자만 편집. */
+  paid?: boolean
   note?: string
   createdAt: Timestamp | null
   updatedAt: Timestamp | null

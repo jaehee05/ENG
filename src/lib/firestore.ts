@@ -1156,6 +1156,7 @@ export async function updateClassSession(
       | 'location'
       | 'cost'
       | 'status'
+      | 'paid'
       | 'note'
     >
   >,

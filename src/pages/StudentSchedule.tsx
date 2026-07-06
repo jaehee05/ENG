@@ -4,6 +4,7 @@ import { listAccounts } from '../lib/account'
 import {
   listAllClassSessions,
   listClassSessionsForStudent,
+  updateClassSession,
 } from '../lib/firestore'
 import {
   CLASS_SESSION_STATUS_LABEL,
@@ -390,6 +391,13 @@ export function StudentSchedule() {
           studentName={
             isAdmin ? (studentNameByUid.get(selected.studentUid) ?? null) : null
           }
+          isAdmin={isAdmin}
+          onPatch={(patch) => {
+            setSessions((prev) =>
+              prev.map((x) => (x.id === selected.id ? { ...x, ...patch } : x)),
+            )
+            setSelected({ ...selected, ...patch })
+          }}
           onClose={() => setSelected(null)}
         />
       )}
@@ -400,13 +408,19 @@ export function StudentSchedule() {
 function SessionModal({
   session,
   studentName,
+  isAdmin,
+  onPatch,
   onClose,
 }: {
   session: ClassSession
   studentName: string | null
+  isAdmin: boolean
+  onPatch: (patch: Partial<ClassSession>) => void
   onClose: () => void
 }) {
   const st = STATUS_STYLES[session.status]
+  const [savingPaid, setSavingPaid] = useState(false)
+  const [payError, setPayError] = useState<string | null>(null)
   const dateLabel = (() => {
     const [y, m, d] = session.dateISO.split('-').map((x) => parseInt(x, 10))
     const weekday = new Date(y, m - 1, d).toLocaleDateString('ko-KR', {
@@ -414,6 +428,21 @@ function SessionModal({
     })
     return `${y}.${pad(m)}.${pad(d)} (${weekday})`
   })()
+
+  async function togglePaid() {
+    if (!isAdmin) return
+    const next = !session.paid
+    setSavingPaid(true)
+    setPayError(null)
+    try {
+      await updateClassSession(session.id, { paid: next })
+      onPatch({ paid: next })
+    } catch (e) {
+      setPayError(e instanceof Error ? e.message : '저장 실패')
+    } finally {
+      setSavingPaid(false)
+    }
+  }
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -474,12 +503,43 @@ function SessionModal({
             <dt className="w-14 shrink-0 text-slate-500">장소</dt>
             <dd className="text-slate-900">{session.location || '—'}</dd>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-start">
             <dt className="w-14 shrink-0 text-slate-500">금액</dt>
-            <dd className="text-slate-900 tabular-nums">
-              {fmtCurrency(session.cost)}
+            <dd className="text-slate-900 tabular-nums flex items-center gap-2 flex-wrap">
+              <span>{fmtCurrency(session.cost)}</span>
+              {isAdmin ? (
+                <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs">
+                  <input
+                    type="checkbox"
+                    checked={!!session.paid}
+                    onChange={togglePaid}
+                    disabled={savingPaid}
+                    className="h-3.5 w-3.5 accent-emerald-600"
+                  />
+                  <span
+                    className={
+                      session.paid ? 'text-emerald-700 font-medium' : 'text-slate-500'
+                    }
+                  >
+                    {savingPaid
+                      ? '저장 중…'
+                      : session.paid
+                        ? '결제 완료'
+                        : '미결제'}
+                  </span>
+                </label>
+              ) : (
+                session.paid && (
+                  <span className="inline-block rounded-full text-[10px] font-medium px-2 py-0.5 border bg-emerald-50 text-emerald-700 border-emerald-200">
+                    결제 완료
+                  </span>
+                )
+              )}
             </dd>
           </div>
+          {payError && (
+            <p className="text-xs text-red-600 pl-16">{payError}</p>
+          )}
           {session.note && (
             <div className="flex gap-2">
               <dt className="w-14 shrink-0 text-slate-500">메모</dt>
