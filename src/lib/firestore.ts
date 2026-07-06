@@ -1125,6 +1125,7 @@ export async function createClassSession(input: {
   location: string
   cost: number
   status: ClassSessionStatus
+  paid?: boolean
   note?: string
 }): Promise<string> {
   const payload: Record<string, unknown> = {
@@ -1139,6 +1140,7 @@ export async function createClassSession(input: {
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   }
+  if (input.paid) payload.paid = true
   if (input.note && input.note.trim()) payload.note = input.note.trim()
   const ref = await addDoc(collection(db, 'classSessions'), payload)
   return ref.id

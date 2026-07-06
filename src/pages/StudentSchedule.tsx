@@ -508,7 +508,7 @@ function SessionModal({
             <dd className="text-slate-900 tabular-nums flex items-center gap-2 flex-wrap">
               <span>{fmtCurrency(session.cost)}</span>
               {isAdmin && (
-                <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs">
+                <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs text-slate-600">
                   <input
                     type="checkbox"
                     checked={!!session.paid}
@@ -518,15 +518,14 @@ function SessionModal({
                   />
                   <span
                     className={
-                      session.paid ? 'text-emerald-700 font-medium' : 'text-slate-500'
+                      session.paid ? 'text-emerald-700 font-medium' : ''
                     }
                   >
-                    {savingPaid
-                      ? '저장 중…'
-                      : session.paid
-                        ? '결제 완료'
-                        : '미결제'}
+                    결제 완료
                   </span>
+                  {savingPaid && (
+                    <span className="text-slate-400">저장 중…</span>
+                  )}
                 </label>
               )}
             </dd>

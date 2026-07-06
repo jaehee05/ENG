@@ -40,6 +40,7 @@ interface FormState {
   location: string
   cost: string
   status: ClassSessionStatus
+  paid: boolean
   note: string
 }
 
@@ -51,6 +52,7 @@ const EMPTY_FORM: FormState = {
   location: 'TBD',
   cost: '',
   status: 'scheduled',
+  paid: false,
   note: '',
 }
 
@@ -101,6 +103,7 @@ export function ScheduleManager({
       location: s.location,
       cost: String(s.cost || ''),
       status: s.status,
+      paid: !!s.paid,
       note: s.note ?? '',
     })
     setEditingId(s.id)
@@ -138,6 +141,7 @@ export function ScheduleManager({
         location: form.location.trim(),
         cost,
         status: form.status,
+        paid: form.paid,
         note: form.note,
       }
       if (editingId) {
@@ -282,6 +286,18 @@ export function ScheduleManager({
                   </option>
                 ))}
               </select>
+            </label>
+            <label className="col-span-2 sm:col-span-4 inline-flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.paid}
+                onChange={(e) => setForm({ ...form, paid: e.target.checked })}
+                className="h-4 w-4 accent-emerald-600"
+              />
+              <span className={form.paid ? 'text-emerald-700 font-medium' : ''}>
+                결제 완료
+              </span>
+              <span className="text-slate-400">(기본값 미결제)</span>
             </label>
             <label className="col-span-2 sm:col-span-4 flex flex-col gap-1">
               <span className="text-xs font-medium text-slate-600">
