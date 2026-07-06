@@ -23,7 +23,8 @@ import type {
   AssignmentCategory,
   Attempt,
   CategoryConfig,
-  ClassSchedule,
+  ClassSession,
+  ClassSessionStatus,
   KoreanMock,
   KoreanMockQuestion,
   KoreanMockResult,
@@ -33,6 +34,7 @@ import type {
   PushSchedule,
   Reading,
   ReadingResult,
+  ScheduleToken,
   UserNotification,
   VocabResult,
   VocabSeries,
@@ -61,6 +63,8 @@ export async function createVocabSet(input: {
   title: string
   words: WordEntry[]
   maxAttempts?: number
+  studentUid?: string
+  studentName?: string
   createdBy: string
   createdByName: string
 }): Promise<string> {
@@ -74,8 +78,25 @@ export async function createVocabSet(input: {
   if (input.maxAttempts && input.maxAttempts > 0) {
     payload.maxAttempts = Math.trunc(input.maxAttempts)
   }
+  if (input.studentUid) {
+    payload.studentUid = input.studentUid
+    if (input.studentName) payload.studentName = input.studentName
+  }
   const ref = await addDoc(collection(db, 'vocabSets'), payload)
   return ref.id
+}
+
+export async function listVocabSetsForStudent(
+  studentUid: string,
+): Promise<VocabSet[]> {
+  const snap = await getDocs(
+    query(
+      collection(db, 'vocabSets'),
+      where('studentUid', '==', studentUid),
+      orderBy('createdAt', 'desc'),
+    ),
+  )
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<VocabSet, 'id'>) }))
 }
 
 export async function deleteVocabSet(id: string): Promise<void> {
@@ -114,6 +135,8 @@ export async function createVocabSeries(input: {
   maxAttempts?: number
   words?: WordEntry[]
   perDay?: number
+  studentUid?: string
+  studentName?: string
   createdBy: string
   createdByName: string
 }): Promise<string> {
@@ -135,8 +158,25 @@ export async function createVocabSeries(input: {
   if (input.words && input.words.length > 0) {
     payload.words = input.words
   }
+  if (input.studentUid) {
+    payload.studentUid = input.studentUid
+    if (input.studentName) payload.studentName = input.studentName
+  }
   const ref = await addDoc(collection(db, 'vocabSeries'), payload)
   return ref.id
+}
+
+export async function listVocabSeriesForStudent(
+  studentUid: string,
+): Promise<VocabSeries[]> {
+  const snap = await getDocs(
+    query(
+      collection(db, 'vocabSeries'),
+      where('studentUid', '==', studentUid),
+      orderBy('createdAt', 'desc'),
+    ),
+  )
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<VocabSeries, 'id'>) }))
 }
 
 export async function bumpVocabSeries(
@@ -1063,27 +1103,128 @@ export async function deleteCategory(id: string): Promise<void> {
   await deleteDoc(doc(db, 'categories', id))
 }
 
-// ───── 오늘 수업 Live Activity 입력 ─────
+// ───── 학생별 수업 일정 (관리형 캘린더) ─────
 
-export async function getTodayClass(): Promise<ClassSchedule | null> {
-  const snap = await getDoc(doc(db, 'classSchedule', 'today'))
-  if (!snap.exists()) return null
-  return snap.data() as ClassSchedule
+export async function listClassSessionsForStudent(
+  studentUid: string,
+): Promise<ClassSession[]> {
+  const snap = await getDocs(
+    query(
+      collection(db, 'classSessions'),
+      where('studentUid', '==', studentUid),
+      orderBy('dateISO', 'asc'),
+    ),
+  )
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<ClassSession, 'id'>) }))
 }
 
-export async function saveTodayClass(input: {
+export async function createClassSession(input: {
+  studentUid: string
+  title: string
+  dateISO: string
+  startTime: string
+  endTime: string
   location: string
-  startLabel: string
-  endLabel: string
-  startAt: Date | null
-  endAt: Date | null
-}): Promise<void> {
-  await setDoc(doc(db, 'classSchedule', 'today'), {
+  cost: number
+  status: ClassSessionStatus
+  note?: string
+}): Promise<string> {
+  const payload: Record<string, unknown> = {
+    studentUid: input.studentUid,
+    title: input.title,
+    dateISO: input.dateISO,
+    startTime: input.startTime,
+    endTime: input.endTime,
     location: input.location,
-    startLabel: input.startLabel,
-    endLabel: input.endLabel,
-    startAt: input.startAt ? Timestamp.fromDate(input.startAt) : null,
-    endAt: input.endAt ? Timestamp.fromDate(input.endAt) : null,
+    cost: input.cost,
+    status: input.status,
+    createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
+  }
+  if (input.note && input.note.trim()) payload.note = input.note.trim()
+  const ref = await addDoc(collection(db, 'classSessions'), payload)
+  return ref.id
+}
+
+export async function updateClassSession(
+  id: string,
+  patch: Partial<
+    Pick<
+      ClassSession,
+      | 'title'
+      | 'dateISO'
+      | 'startTime'
+      | 'endTime'
+      | 'location'
+      | 'cost'
+      | 'status'
+      | 'note'
+    >
+  >,
+): Promise<void> {
+  const update: Record<string, unknown> = { updatedAt: serverTimestamp() }
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === undefined) continue
+    if (k === 'note' && typeof v === 'string' && v.trim() === '') {
+      update.note = deleteField()
+      continue
+    }
+    update[k] = v
+  }
+  await updateDoc(doc(db, 'classSessions', id), update)
+}
+
+export async function deleteClassSession(id: string): Promise<void> {
+  await deleteDoc(doc(db, 'classSessions', id))
+}
+
+// ───── 수업 일정 공유 토큰 ─────
+
+export async function getScheduleToken(token: string): Promise<ScheduleToken | null> {
+  const snap = await getDoc(doc(db, 'scheduleTokens', token))
+  if (!snap.exists()) return null
+  return { id: snap.id, ...(snap.data() as Omit<ScheduleToken, 'id'>) }
+}
+
+export async function findScheduleTokenByStudent(
+  studentUid: string,
+): Promise<ScheduleToken | null> {
+  const snap = await getDocs(
+    query(
+      collection(db, 'scheduleTokens'),
+      where('studentUid', '==', studentUid),
+    ),
+  )
+  const first = snap.docs[0]
+  if (!first) return null
+  return { id: first.id, ...(first.data() as Omit<ScheduleToken, 'id'>) }
+}
+
+export async function createScheduleToken(input: {
+  token: string
+  studentUid: string
+  studentName: string
+  hideCost: boolean
+}): Promise<void> {
+  await setDoc(doc(db, 'scheduleTokens', input.token), {
+    studentUid: input.studentUid,
+    studentName: input.studentName,
+    hideCost: input.hideCost,
+    createdAt: serverTimestamp(),
   })
+}
+
+export async function updateScheduleToken(
+  token: string,
+  patch: Partial<Pick<ScheduleToken, 'hideCost' | 'studentName'>>,
+): Promise<void> {
+  const update: Record<string, unknown> = {}
+  if (patch.hideCost !== undefined) update.hideCost = patch.hideCost
+  if (patch.studentName !== undefined) update.studentName = patch.studentName
+  if (Object.keys(update).length === 0) return
+  await updateDoc(doc(db, 'scheduleTokens', token), update)
+}
+
+export async function deleteScheduleToken(token: string): Promise<void> {
+  await deleteDoc(doc(db, 'scheduleTokens', token))
 }

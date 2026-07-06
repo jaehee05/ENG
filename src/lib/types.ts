@@ -51,6 +51,9 @@ export interface VocabSet {
   id: string
   title: string
   words: WordEntry[]
+  /** 소유 학생 UID. 없으면 legacy(공용) 시험지 — 학생 뷰 미노출, 관리자만 표시. */
+  studentUid?: string
+  studentName?: string
   /** Per-student attempt cap. Undefined = unlimited. */
   maxAttempts?: number
   createdBy: string
@@ -61,6 +64,9 @@ export interface VocabSet {
 export interface VocabSeries {
   id: string
   title: string
+  /** 소유 학생 UID. 없으면 legacy(공용). */
+  studentUid?: string
+  studentName?: string
   lastDayNumber: number
   maxAttempts?: number
   /** Master word list — all words that may be used to spawn DAY tests. */
@@ -609,20 +615,43 @@ export interface UserNotification {
   createdAt: Timestamp | null
 }
 
-/** 오늘 수업 Dynamic Island Live Activity 입력값. classSchedule/today 단일 문서로 저장. */
-export interface ClassSchedule {
-  /** 수업 장소 (예: "강남 본원 A호"). */
+/** 학생별 개별 수업 일정 (관리형 캘린더). */
+export type ClassSessionStatus = 'scheduled' | 'done' | 'canceled' | 'makeup'
+
+export const CLASS_SESSION_STATUS_LABEL: Record<ClassSessionStatus, string> = {
+  scheduled: '예정',
+  done: '완료',
+  canceled: '취소',
+  makeup: '보강',
+}
+
+export interface ClassSession {
+  id: string
+  studentUid: string
+  title: string
+  /** YYYY-MM-DD, Asia/Seoul 로컬 날짜. */
+  dateISO: string
+  /** HH:mm 24시간. */
+  startTime: string
+  endTime: string
   location: string
-  /** 시작 측 텍스트 (예: "출발", "강의 시작"). */
-  startLabel: string
-  /** 종료 측 텍스트 (예: "도착", "강의 끝"). */
-  endLabel: string
-  /** 수업 시작 시각. */
-  startAt: Timestamp | null
-  /** 수업 종료 시각. */
-  endAt: Timestamp | null
-  /** 마지막 수정 시각. */
+  /** KRW. */
+  cost: number
+  status: ClassSessionStatus
+  note?: string
+  createdAt: Timestamp | null
   updatedAt: Timestamp | null
+}
+
+/** 학생별 수업 일정 공유 토큰 → 학생 매핑. 토큰은 32자 이상 랜덤. */
+export interface ScheduleToken {
+  /** 토큰 문자열 자체가 문서 ID. */
+  id: string
+  studentUid: string
+  studentName: string
+  /** true 면 공유 페이지에서 비용 숨김. */
+  hideCost: boolean
+  createdAt: Timestamp | null
 }
 
 export interface WordLookup {

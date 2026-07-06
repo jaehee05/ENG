@@ -112,18 +112,6 @@ const tools: AdminTool[] = [
       </svg>
     ),
   },
-  {
-    to: '/admin/class',
-    title: '오늘 수업 (Dynamic Island)',
-    desc: '잠금화면·다이내믹 아일랜드 수업 표시 입력',
-    icon: (
-      <svg {...iconProps}>
-        <rect x="3" y="5" width="18" height="14" rx="3" />
-        <path d="M8 10h.01M16 10h.01" />
-        <path d="M9 14c1 1 5 1 6 0" />
-      </svg>
-    ),
-  },
 ]
 
 export function AdminHub() {

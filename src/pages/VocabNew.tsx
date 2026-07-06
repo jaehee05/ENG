@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
+import { getAccount, listAccounts } from '../lib/account'
 import {
   bumpVocabSeries,
   createVocabSeries,
   createVocabSet,
-  listVocabSeries,
+  listVocabSeriesForStudent,
 } from '../lib/firestore'
+import type { UserAccount } from '../lib/types'
 import {
   parseWordList,
   type VocabSense,
@@ -39,6 +41,11 @@ interface Extra {
 export function VocabNew() {
   const { profile } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const initialStudent = searchParams.get('student') ?? ''
+  const [studentUid, setStudentUid] = useState(initialStudent)
+  const [studentName, setStudentName] = useState('')
+  const [students, setStudents] = useState<UserAccount[]>([])
   const [title, setTitle] = useState('')
   const [maxAttemptsRaw, setMaxAttemptsRaw] = useState('')
   const [raw, setRaw] = useState('')
@@ -53,11 +60,46 @@ export function VocabNew() {
   const [seriesList, setSeriesList] = useState<VocabSeries[]>([])
   const [seriesMode, setSeriesMode] = useState<string>('new') // 'new' or series.id
 
+  // 학생 목록 (관리자)
   useEffect(() => {
-    listVocabSeries()
-      .then(setSeriesList)
+    listAccounts()
+      .then((all) =>
+        setStudents(
+          all.filter((a) => a.role === 'student' && a.status === 'active'),
+        ),
+      )
       .catch(() => {})
   }, [])
+
+  // 초기 studentUid 지정된 경우 이름도 채움
+  useEffect(() => {
+    if (!studentUid) {
+      setStudentName('')
+      return
+    }
+    const match = students.find((s) => s.id === studentUid)
+    if (match) {
+      setStudentName(match.displayName)
+    } else {
+      // 학생 리스트에 없으면 개별 조회
+      getAccount(studentUid)
+        .then((a) => {
+          if (a) setStudentName(a.displayName)
+        })
+        .catch(() => {})
+    }
+  }, [studentUid, students])
+
+  // 학생별 시리즈 목록
+  useEffect(() => {
+    if (!studentUid) {
+      setSeriesList([])
+      return
+    }
+    listVocabSeriesForStudent(studentUid)
+      .then(setSeriesList)
+      .catch(() => {})
+  }, [studentUid])
 
   const selectedSeries: VocabSeries | null = useMemo(() => {
     if (seriesMode === 'new') return null
@@ -172,6 +214,8 @@ export function VocabNew() {
     setError(null)
     setSplitProgress(null)
     if (!profile) return
+    if (!studentUid) return setError('학생을 선택하세요.')
+    if (!studentName) return setError('학생 정보를 확인 중입니다. 잠시 후 다시 시도.')
     if (!title.trim()) return setError('제목을 입력하세요.')
     if (words.length === 0) return setError('단어를 1개 이상 입력하세요.')
     let maxAttempts: number | undefined
@@ -199,6 +243,8 @@ export function VocabNew() {
           seriesId = await createVocabSeries({
             title: base,
             maxAttempts,
+            studentUid,
+            studentName,
             createdBy: profile.id,
             createdByName: profile.displayName,
           })
@@ -212,6 +258,8 @@ export function VocabNew() {
             title: `${base} DAY ${dayNumber}`,
             words: slice,
             maxAttempts,
+            studentUid,
+            studentName,
             createdBy: profile.id,
             createdByName: profile.displayName,
           })
@@ -234,6 +282,8 @@ export function VocabNew() {
         title: title.trim(),
         words: words.map(cleanWord),
         maxAttempts,
+        studentUid,
+        studentName,
         createdBy: profile.id,
         createdByName: profile.displayName,
       })
@@ -258,6 +308,28 @@ export function VocabNew() {
       </header>
 
       <form onSubmit={handleSubmit} className="space-y-5">
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            학생 <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={studentUid}
+            onChange={(e) => setStudentUid(e.target.value)}
+            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          >
+            <option value="">— 학생 선택 —</option>
+            {students.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.displayName}
+                {s.school ? ` (${s.school})` : ''}
+              </option>
+            ))}
+          </select>
+          {studentUid && !students.find((s) => s.id === studentUid) && studentName && (
+            <p className="text-xs text-slate-500 mt-1">→ {studentName}</p>
+          )}
+        </div>
+
         {seriesList.length > 0 && (
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">

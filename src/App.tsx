@@ -29,7 +29,6 @@ import { AdminStudentDetail } from './pages/AdminStudentDetail'
 import { AdminNotify } from './pages/AdminNotify'
 import { AdminAnnounce } from './pages/AdminAnnounce'
 import { AdminCategories } from './pages/AdminCategories'
-import { AdminClass } from './pages/AdminClass'
 import { AdminHub } from './pages/AdminHub'
 import { MyHistory } from './pages/MyHistory'
 import { Notifications } from './pages/Notifications'
@@ -43,6 +42,7 @@ import { KoreanMockNew } from './pages/KoreanMockNew'
 import { KoreanMockDetail } from './pages/KoreanMockDetail'
 import { KoreanMockTake } from './pages/KoreanMockTake'
 import { KoreanMockResult } from './pages/KoreanMockResult'
+import { StudentSchedule } from './pages/StudentSchedule'
 
 function App() {
   return (
@@ -53,6 +53,7 @@ function App() {
           <Route path="/signup" element={<Signup />} />
           <Route path="/pending" element={<Pending />} />
           <Route path="/rejected" element={<Rejected />} />
+          <Route path="/schedule/:token" element={<StudentSchedule />} />
 
           <Route element={<ProtectedRoute />}>
             <Route element={<Layout />}>
@@ -105,7 +106,6 @@ function App() {
               <Route path="/admin/notify" element={<AdminNotify />} />
               <Route path="/admin/announce" element={<AdminAnnounce />} />
               <Route path="/admin/categories" element={<AdminCategories />} />
-              <Route path="/admin/class" element={<AdminClass />} />
             </Route>
           </Route>
 

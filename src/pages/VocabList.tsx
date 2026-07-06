@@ -6,6 +6,7 @@ import {
   deleteVocabSet,
   formatDate,
   listVocabSets,
+  listVocabSetsForStudent,
   updateVocabSetWords,
 } from '../lib/firestore'
 import type { VocabSense, VocabSet, WordEntry } from '../lib/types'
@@ -21,16 +22,21 @@ export function VocabList({ manage = false }: { manage?: boolean }) {
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   useEffect(() => {
-    listVocabSets()
-      .then((all) => {
-        const sorted = [...all].sort((a, b) =>
-          a.title.localeCompare(b.title, 'ko', { numeric: true, sensitivity: 'base' }),
-        )
-        setSets(sorted)
-      })
+    if (!profile) return
+    // 학생: 자기 시험지만. 관리자 관리 뷰: 전체. 관리자 학습 뷰: 자기 시험지(admin도 학생 데이터 검토 시 쓸 수 있게).
+    const p =
+      canManage
+        ? listVocabSets()
+        : listVocabSetsForStudent(profile.id)
+    p.then((all) => {
+      const sorted = [...all].sort((a, b) =>
+        a.title.localeCompare(b.title, 'ko', { numeric: true, sensitivity: 'base' }),
+      )
+      setSets(sorted)
+    })
       .catch((e) => setError(e.message ?? '목록을 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
-  }, [])
+  }, [profile, canManage])
 
   function reprocessWord(w: WordEntry): WordEntry {
     if (!w.senses || w.senses.length === 0) return w
@@ -204,6 +210,16 @@ export function VocabList({ manage = false }: { manage?: boolean }) {
                 </p>
                 <p className="text-xs text-slate-500 mt-0.5">
                   {s.words.length}단어 · {formatDate(s.createdAt)}
+                  {canManage && (
+                    <>
+                      {' · '}
+                      {s.studentName ? (
+                        <span className="text-brand-700">{s.studentName}</span>
+                      ) : (
+                        <span className="text-amber-600">공용(legacy)</span>
+                      )}
+                    </>
+                  )}
                 </p>
               </div>
               <span className="text-slate-300 text-lg shrink-0">→</span>

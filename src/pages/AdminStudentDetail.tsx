@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
+import { ScheduleManager } from '../components/ScheduleManager'
 import { getAccount } from '../lib/account'
 import {
   createAssignment,
@@ -455,6 +456,14 @@ export function AdminStudentDetail() {
           <span>학부모 {account.parentPhone || '-'}</span>
           <span>가입 {fmtDate(account.createdAt)}</span>
         </div>
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          <Link
+            to={`/vocab/new?student=${account.id}`}
+            className="rounded-md bg-slate-900 text-white text-xs font-medium px-3 py-1.5 hover:bg-slate-800"
+          >
+            + 이 학생 단어 시험지
+          </Link>
+        </div>
       </header>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
@@ -515,6 +524,11 @@ export function AdminStudentDetail() {
         studentName={account.displayName}
         assignments={assignments}
         attempts={attempts}
+      />
+
+      <ScheduleManager
+        studentUid={account.id}
+        studentName={account.displayName}
       />
 
       <section className="space-y-3">
