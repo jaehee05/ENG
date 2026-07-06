@@ -506,31 +506,57 @@ export function StudentSchedule() {
                     const st = STATUS_STYLES[s.status]
                     const studentColor = isAdmin ? colorForUid(s.studentUid) : null
                     const studentName = studentNameByUid.get(s.studentUid)
+                    // 관리자 뷰: 학생 색상으로 pill 렌더. 취소는 회색 pill + 취소선으로 구분.
+                    const canceled = s.status === 'canceled'
+                    const adminPillCls = studentColor
+                      ? canceled
+                        ? 'bg-slate-100 text-slate-400 line-through'
+                        : `${studentColor.badge}`
+                      : ''
                     return (
                       <button
                         key={s.id}
                         type="button"
                         onClick={() => setSelected(s)}
-                        className="w-full text-left flex items-center gap-1 rounded px-1 py-0.5 hover:bg-slate-100"
+                        className={
+                          studentColor
+                            ? `w-full text-left rounded px-1 py-0.5 border ${adminPillCls} hover:brightness-95`
+                            : 'w-full text-left flex items-center gap-1 rounded px-1 py-0.5 hover:bg-slate-100'
+                        }
                       >
-                        <span
-                          className={`shrink-0 inline-block w-1 h-3 sm:h-3.5 rounded-full ${
-                            studentColor ? studentColor.dot : st.bar
-                          }`}
-                          aria-hidden
-                        />
-                        <span
-                          className={`truncate text-[10px] sm:text-[11px] ${st.text}`}
-                        >
-                          <span className="tabular-nums">{s.startTime}</span>{' '}
-                          {isAdmin && studentName && (
-                            <span className="font-medium">{studentName}</span>
-                          )}
-                          <span className="opacity-80">
-                            {isAdmin && studentName ? ' · ' : ''}
-                            {s.title}
+                        {studentColor ? (
+                          <span className="flex items-center gap-1 text-[10px] sm:text-[11px]">
+                            <span
+                              className={`shrink-0 inline-block w-1.5 h-1.5 rounded-full ${
+                                canceled ? 'bg-slate-400' : studentColor.dot
+                              }`}
+                              aria-hidden
+                            />
+                            <span className="truncate">
+                              <span className="tabular-nums">{s.startTime}</span>{' '}
+                              {studentName && (
+                                <span className="font-medium">{studentName}</span>
+                              )}
+                              <span className="opacity-80">
+                                {studentName ? ' · ' : ''}
+                                {s.title}
+                              </span>
+                            </span>
                           </span>
-                        </span>
+                        ) : (
+                          <>
+                            <span
+                              className={`shrink-0 inline-block w-1 h-3 sm:h-3.5 rounded-full ${st.bar}`}
+                              aria-hidden
+                            />
+                            <span
+                              className={`truncate text-[10px] sm:text-[11px] ${st.text}`}
+                            >
+                              <span className="tabular-nums">{s.startTime}</span>{' '}
+                              <span className="opacity-80">{s.title}</span>
+                            </span>
+                          </>
+                        )}
                       </button>
                     )
                   })}
