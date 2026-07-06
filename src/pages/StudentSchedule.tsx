@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../contexts/useAuth'
 import { listAccounts } from '../lib/account'
 import {
+  createClassSession,
+  deleteClassSession,
   listAllClassSessions,
   listClassSessionsForStudent,
   updateClassSession,
@@ -12,6 +14,13 @@ import {
   type ClassSessionStatus,
   type UserAccount,
 } from '../lib/types'
+import {
+  EMPTY_SESSION_FORM,
+  fromSession,
+  SessionForm,
+  type SessionFormResult,
+  type SessionFormValues,
+} from '../components/SessionForm'
 
 const KST_TZ = 'Asia/Seoul'
 
@@ -123,6 +132,19 @@ export function StudentSchedule() {
   })
   const [selected, setSelected] = useState<ClassSession | null>(null)
 
+  // 관리자 CRUD 상태
+  const [addOpen, setAddOpen] = useState(false)
+  const [addForm, setAddForm] = useState<SessionFormValues>(EMPTY_SESSION_FORM)
+  const [addStudentUid, setAddStudentUid] = useState('')
+  const [addSaving, setAddSaving] = useState(false)
+  const [addError, setAddError] = useState<string | null>(null)
+
+  const [editMode, setEditMode] = useState(false)
+  const [editForm, setEditForm] = useState<SessionFormValues>(EMPTY_SESSION_FORM)
+  const [editSaving, setEditSaving] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
   useEffect(() => {
     if (!profile) return
     let cancelled = false
@@ -187,6 +209,42 @@ export function StudentSchedule() {
     return students.filter((s) => uids.has(s.id))
   }, [sessions, students])
 
+  // 보강 부족: 학생별 취소 - 보강 (과거 세션만 카운트)
+  const makeupDeficits = useMemo(() => {
+    if (!isAdmin) return []
+    const today = todayISO()
+    const stats = new Map<
+      string,
+      { canceled: ClassSession[]; makeup: number }
+    >()
+    for (const s of sessions) {
+      if (s.dateISO > today) continue // 미래 세션은 제외
+      const cur = stats.get(s.studentUid) ?? { canceled: [], makeup: 0 }
+      if (s.status === 'canceled') cur.canceled.push(s)
+      else if (s.status === 'makeup') cur.makeup++
+      stats.set(s.studentUid, cur)
+    }
+    const rows: {
+      uid: string
+      name: string
+      canceled: ClassSession[]
+      makeup: number
+      deficit: number
+    }[] = []
+    for (const [uid, { canceled, makeup }] of stats) {
+      const deficit = canceled.length - makeup
+      if (deficit <= 0) continue
+      rows.push({
+        uid,
+        name: studentNameByUid.get(uid) ?? '(알 수 없음)',
+        canceled: canceled.sort((a, b) => b.dateISO.localeCompare(a.dateISO)),
+        makeup,
+        deficit,
+      })
+    }
+    return rows.sort((a, b) => b.deficit - a.deficit)
+  }, [sessions, isAdmin, studentNameByUid])
+
   const today = todayISO()
 
   function shiftMonth(delta: number) {
@@ -201,21 +259,98 @@ export function StudentSchedule() {
     setCursor({ year: now.getFullYear(), monthIndex: now.getMonth() })
   }
 
+  async function reloadAdminSessions() {
+    const s = await listAllClassSessions()
+    setSessions(s)
+  }
+
+  async function handleAdd(v: SessionFormResult) {
+    if (!addStudentUid) return
+    setAddSaving(true)
+    setAddError(null)
+    try {
+      await createClassSession({ studentUid: addStudentUid, ...v })
+      setAddOpen(false)
+      setAddForm(EMPTY_SESSION_FORM)
+      setAddStudentUid('')
+      await reloadAdminSessions()
+    } catch (e) {
+      setAddError(e instanceof Error ? e.message : '저장 실패')
+    } finally {
+      setAddSaving(false)
+    }
+  }
+
+  async function handleEdit(v: SessionFormResult) {
+    if (!selected) return
+    setEditSaving(true)
+    setEditError(null)
+    try {
+      await updateClassSession(selected.id, v)
+      const patched: ClassSession = { ...selected, ...v }
+      setSessions((prev) => prev.map((x) => (x.id === selected.id ? patched : x)))
+      setSelected(patched)
+      setEditMode(false)
+    } catch (e) {
+      setEditError(e instanceof Error ? e.message : '저장 실패')
+    } finally {
+      setEditSaving(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!selected) return
+    if (
+      !window.confirm(
+        `"${selected.title}" (${selected.dateISO}) 수업을 삭제하시겠습니까?`,
+      )
+    )
+      return
+    setDeleting(true)
+    try {
+      await deleteClassSession(selected.id)
+      setSessions((prev) => prev.filter((x) => x.id !== selected.id))
+      setSelected(null)
+      setEditMode(false)
+    } catch (e) {
+      setEditError(e instanceof Error ? e.message : '삭제 실패')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const monthLabel = `${cursor.year}년 ${cursor.monthIndex + 1}월`
 
   return (
     <div className="space-y-5">
-      <header>
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-          {isAdmin ? '관리' : '나의 학습'}
-        </p>
-        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
-          {isAdmin ? '전체 수업 일정' : '수업 일정'}
-        </h1>
-        {isAdmin && (
-          <p className="text-xs text-slate-500 mt-1">
-            학생별로 색상이 구분됩니다. 아래 필터로 특정 학생만 볼 수 있습니다.
+      <header className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+            {isAdmin ? '관리' : '나의 학습'}
           </p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
+            {isAdmin ? '전체 수업 일정' : '수업 일정'}
+          </h1>
+          {isAdmin && (
+            <p className="text-xs text-slate-500 mt-1">
+              학생별로 색상이 구분됩니다. 필터·수업 추가·편집·삭제·보강 확인을
+              여기서 처리할 수 있습니다.
+            </p>
+          )}
+        </div>
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={() => {
+              setAddForm(EMPTY_SESSION_FORM)
+              setAddStudentUid('')
+              setAddError(null)
+              setAddOpen(true)
+            }}
+            className="rounded-md bg-slate-900 text-white text-xs font-medium px-3 py-1.5 hover:bg-slate-800"
+          >
+            + 수업 추가
+          </button>
         )}
       </header>
 
@@ -385,6 +520,91 @@ export function StudentSchedule() {
         </p>
       )}
 
+      {isAdmin && makeupDeficits.length > 0 && (
+        <section className="space-y-2">
+          <div className="flex items-baseline gap-2">
+            <h2 className="text-base font-semibold text-slate-900">
+              보강 필요
+            </h2>
+            <span className="text-xs text-slate-500">
+              4주 정산 시 취소된 수업만큼 보강 세션을 추가해야 합니다.
+            </span>
+          </div>
+          <ul className="rounded-lg border border-orange-200 bg-orange-50/40 divide-y divide-orange-100">
+            {makeupDeficits.map((row) => (
+              <li key={row.uid} className="px-4 py-3 space-y-1.5">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <p className="text-sm font-semibold text-slate-900">
+                    {row.name}
+                  </p>
+                  <span className="text-xs">
+                    <span className="text-red-700 font-semibold">
+                      취소 {row.canceled.length}
+                    </span>
+                    <span className="text-slate-400"> · </span>
+                    <span className="text-orange-700 font-medium">
+                      보강 {row.makeup}
+                    </span>
+                    <span className="text-slate-400"> · </span>
+                    <span className="text-orange-800 font-semibold">
+                      부족 {row.deficit}
+                    </span>
+                  </span>
+                </div>
+                <ul className="text-[11px] text-slate-600 pl-1 space-y-0.5">
+                  {row.canceled.slice(0, 5).map((s) => (
+                    <li key={s.id} className="tabular-nums">
+                      {s.dateISO} {s.startTime}–{s.endTime} · {s.title}
+                    </li>
+                  ))}
+                  {row.canceled.length > 5 && (
+                    <li className="text-slate-400">
+                      … 외 {row.canceled.length - 5}건
+                    </li>
+                  )}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {isAdmin && addOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm"
+          onClick={() => !addSaving && setAddOpen(false)}
+        >
+          <div
+            className="w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-2xl shadow-xl p-5 space-y-3 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="text-lg font-semibold text-slate-900">수업 추가</h3>
+              <button
+                type="button"
+                onClick={() => setAddOpen(false)}
+                disabled={addSaving}
+                className="text-slate-400 hover:text-slate-900 text-lg leading-none px-1"
+              >
+                ✕
+              </button>
+            </div>
+            <SessionForm
+              value={addForm}
+              onChange={setAddForm}
+              students={students}
+              studentUid={addStudentUid}
+              onStudentChange={setAddStudentUid}
+              onSubmit={handleAdd}
+              onCancel={() => setAddOpen(false)}
+              submitLabel="등록"
+              saving={addSaving}
+              error={addError}
+            />
+          </div>
+        </div>
+      )}
+
       {selected && (
         <SessionModal
           session={selected}
@@ -392,13 +612,30 @@ export function StudentSchedule() {
             isAdmin ? (studentNameByUid.get(selected.studentUid) ?? null) : null
           }
           isAdmin={isAdmin}
+          editMode={editMode}
+          editForm={editForm}
+          editSaving={editSaving}
+          editError={editError}
+          deleting={deleting}
+          onStartEdit={() => {
+            setEditForm(fromSession(selected))
+            setEditError(null)
+            setEditMode(true)
+          }}
+          onCancelEdit={() => setEditMode(false)}
+          onEditFormChange={setEditForm}
+          onSaveEdit={handleEdit}
+          onDelete={handleDelete}
           onPatch={(patch) => {
             setSessions((prev) =>
               prev.map((x) => (x.id === selected.id ? { ...x, ...patch } : x)),
             )
             setSelected({ ...selected, ...patch })
           }}
-          onClose={() => setSelected(null)}
+          onClose={() => {
+            setSelected(null)
+            setEditMode(false)
+          }}
         />
       )}
     </div>
@@ -409,12 +646,32 @@ function SessionModal({
   session,
   studentName,
   isAdmin,
+  editMode,
+  editForm,
+  editSaving,
+  editError,
+  deleting,
+  onStartEdit,
+  onCancelEdit,
+  onEditFormChange,
+  onSaveEdit,
+  onDelete,
   onPatch,
   onClose,
 }: {
   session: ClassSession
   studentName: string | null
   isAdmin: boolean
+  editMode: boolean
+  editForm: SessionFormValues
+  editSaving: boolean
+  editError: string | null
+  deleting: boolean
+  onStartEdit: () => void
+  onCancelEdit: () => void
+  onEditFormChange: (v: SessionFormValues) => void
+  onSaveEdit: (v: SessionFormResult) => Promise<void>
+  onDelete: () => Promise<void>
   onPatch: (patch: Partial<ClassSession>) => void
   onClose: () => void
 }) {
@@ -455,10 +712,10 @@ function SessionModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm"
-      onClick={onClose}
+      onClick={editMode ? undefined : onClose}
     >
       <div
-        className="w-full sm:max-w-sm bg-white rounded-t-2xl sm:rounded-2xl shadow-xl p-5 space-y-3"
+        className="w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-2xl shadow-xl p-5 space-y-3 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3">
@@ -469,7 +726,7 @@ function SessionModal({
               {CLASS_SESSION_STATUS_LABEL[session.status]}
             </span>
             <h3 className={`mt-1.5 text-lg font-semibold ${st.text}`}>
-              {session.title}
+              {editMode ? '수업 편집' : session.title}
             </h3>
           </div>
           <button
@@ -482,64 +739,97 @@ function SessionModal({
           </button>
         </div>
 
-        <dl className="space-y-2 text-sm">
-          {studentName && (
-            <div className="flex gap-2">
-              <dt className="w-14 shrink-0 text-slate-500">학생</dt>
-              <dd className="text-slate-900 font-medium">{studentName}</dd>
-            </div>
-          )}
-          <div className="flex gap-2">
-            <dt className="w-14 shrink-0 text-slate-500">날짜</dt>
-            <dd className="text-slate-900">{dateLabel}</dd>
-          </div>
-          <div className="flex gap-2">
-            <dt className="w-14 shrink-0 text-slate-500">시간</dt>
-            <dd className="text-slate-900 tabular-nums">
-              {session.startTime} – {session.endTime}
-            </dd>
-          </div>
-          <div className="flex gap-2">
-            <dt className="w-14 shrink-0 text-slate-500">장소</dt>
-            <dd className="text-slate-900">{session.location || '—'}</dd>
-          </div>
-          <div className="flex gap-2 items-start">
-            <dt className="w-14 shrink-0 text-slate-500">금액</dt>
-            <dd className="text-slate-900 tabular-nums flex items-center gap-2 flex-wrap">
-              <span>{fmtCurrency(session.cost)}</span>
-              {isAdmin && (
-                <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs text-slate-600">
-                  <input
-                    type="checkbox"
-                    checked={!!session.paid}
-                    onChange={togglePaid}
-                    disabled={savingPaid}
-                    className="h-3.5 w-3.5 accent-emerald-600"
-                  />
-                  <span
-                    className={
-                      session.paid ? 'text-emerald-700 font-medium' : ''
-                    }
-                  >
-                    결제 완료
-                  </span>
-                  {savingPaid && (
-                    <span className="text-slate-400">저장 중…</span>
-                  )}
-                </label>
+        {editMode ? (
+          <SessionForm
+            value={editForm}
+            onChange={onEditFormChange}
+            onSubmit={onSaveEdit}
+            onCancel={onCancelEdit}
+            submitLabel="저장"
+            saving={editSaving}
+            error={editError}
+          />
+        ) : (
+          <>
+            <dl className="space-y-2 text-sm">
+              {studentName && (
+                <div className="flex gap-2">
+                  <dt className="w-14 shrink-0 text-slate-500">학생</dt>
+                  <dd className="text-slate-900 font-medium">{studentName}</dd>
+                </div>
               )}
-            </dd>
-          </div>
-          {isAdmin && payError && (
-            <p className="text-xs text-red-600 pl-16">{payError}</p>
-          )}
-          {session.note && (
-            <div className="flex gap-2">
-              <dt className="w-14 shrink-0 text-slate-500">메모</dt>
-              <dd className="text-slate-900 whitespace-pre-wrap">{session.note}</dd>
-            </div>
-          )}
-        </dl>
+              <div className="flex gap-2">
+                <dt className="w-14 shrink-0 text-slate-500">날짜</dt>
+                <dd className="text-slate-900">{dateLabel}</dd>
+              </div>
+              <div className="flex gap-2">
+                <dt className="w-14 shrink-0 text-slate-500">시간</dt>
+                <dd className="text-slate-900 tabular-nums">
+                  {session.startTime} – {session.endTime}
+                </dd>
+              </div>
+              <div className="flex gap-2">
+                <dt className="w-14 shrink-0 text-slate-500">장소</dt>
+                <dd className="text-slate-900">{session.location || '—'}</dd>
+              </div>
+              <div className="flex gap-2 items-start">
+                <dt className="w-14 shrink-0 text-slate-500">금액</dt>
+                <dd className="text-slate-900 tabular-nums flex items-center gap-2 flex-wrap">
+                  <span>{fmtCurrency(session.cost)}</span>
+                  {isAdmin && (
+                    <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={!!session.paid}
+                        onChange={togglePaid}
+                        disabled={savingPaid}
+                        className="h-3.5 w-3.5 accent-emerald-600"
+                      />
+                      <span
+                        className={
+                          session.paid ? 'text-emerald-700 font-medium' : ''
+                        }
+                      >
+                        결제 완료
+                      </span>
+                      {savingPaid && (
+                        <span className="text-slate-400">저장 중…</span>
+                      )}
+                    </label>
+                  )}
+                </dd>
+              </div>
+              {isAdmin && payError && (
+                <p className="text-xs text-red-600 pl-16">{payError}</p>
+              )}
+              {session.note && (
+                <div className="flex gap-2">
+                  <dt className="w-14 shrink-0 text-slate-500">메모</dt>
+                  <dd className="text-slate-900 whitespace-pre-wrap">{session.note}</dd>
+                </div>
+              )}
+            </dl>
+            {isAdmin && (
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  disabled={deleting}
+                  className="text-xs text-slate-400 hover:text-red-600 px-2 py-1 disabled:opacity-50"
+                >
+                  {deleting ? '삭제 중…' : '삭제'}
+                </button>
+                <button
+                  type="button"
+                  onClick={onStartEdit}
+                  className="rounded-md border border-slate-300 text-slate-700 text-xs font-medium px-3 py-1.5 hover:bg-slate-50"
+                >
+                  편집
+                </button>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   )
