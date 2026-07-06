@@ -15,6 +15,8 @@ export interface UserAccount {
   parentPhone?: string
   /** 학생 수강 과목. 없거나 빈 배열이면 둘 다(호환). */
   subjects?: MockSubject[]
+  /** true 면 관리자가 미리 등록한 placeholder. 학생이 회원가입하면 자동으로 활성화되고 이 플래그가 해제됨. */
+  preregistered?: boolean
   /** iOS Capacitor 앱에서 받은 FCM 디바이스 토큰들 (다중 기기 지원). */
   fcmTokens?: string[]
   createdAt: Timestamp | null

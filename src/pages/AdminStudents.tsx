@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import {
+  createPreregisteredStudent,
   deleteAccount,
   listAccounts,
   setAccountPassword,
@@ -17,7 +18,13 @@ import {
   sendAssignmentStatusNow,
   sendWeeklyReportNow,
 } from '../lib/ppurioApi'
-import type { Assignment, Attempt, UserAccount, UserStatus } from '../lib/types'
+import type {
+  Assignment,
+  Attempt,
+  MockSubject,
+  UserAccount,
+  UserStatus,
+} from '../lib/types'
 
 const STATUS_LABEL: Record<UserStatus, string> = {
   pending: '승인 대기',
@@ -177,11 +184,18 @@ function StudentCard({
             {account.parentPhone && ` · 학부모 ${account.parentPhone}`}
           </p>
         </div>
-        <span
-          className={`shrink-0 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLASS[account.status]}`}
-        >
-          {STATUS_LABEL[account.status]}
-        </span>
+        <div className="shrink-0 flex flex-col items-end gap-1">
+          <span
+            className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLASS[account.status]}`}
+          >
+            {STATUS_LABEL[account.status]}
+          </span>
+          {account.preregistered && (
+            <span className="inline-block rounded-full px-2 py-0.5 text-[10px] font-medium bg-violet-50 text-violet-700 border border-violet-200">
+              사전 등록
+            </span>
+          )}
+        </div>
       </header>
 
       {isActive && (
@@ -404,6 +418,8 @@ export function AdminStudents() {
     }
   }
 
+  const [showPrereg, setShowPrereg] = useState(false)
+
   const [regrading, setRegrading] = useState(false)
   const [regradeNote, setRegradeNote] = useState<string | null>(null)
   async function handleRegradeAll() {
@@ -488,16 +504,41 @@ export function AdminStudents() {
             관리자
           </span>
         </div>
-        <button
-          type="button"
-          onClick={handleRegradeAll}
-          disabled={regrading}
-          className="rounded-md border border-slate-200 text-slate-700 text-xs font-medium px-3 py-1.5 hover:bg-slate-50 disabled:opacity-50"
-          title="모든 학생의 지문 시험 기록을 현재 정답 기준으로 재채점"
-        >
-          {regrading ? '재채점 중…' : '지문 일괄 재채점'}
-        </button>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setShowPrereg((v) => !v)}
+            className={`rounded-md text-xs font-medium px-3 py-1.5 border ${
+              showPrereg
+                ? 'bg-slate-900 text-white border-slate-900'
+                : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            {showPrereg ? '닫기' : '+ 학생 미리 등록'}
+          </button>
+          <button
+            type="button"
+            onClick={handleRegradeAll}
+            disabled={regrading}
+            className="rounded-md border border-slate-200 text-slate-700 text-xs font-medium px-3 py-1.5 hover:bg-slate-50 disabled:opacity-50"
+            title="모든 학생의 지문 시험 기록을 현재 정답 기준으로 재채점"
+          >
+            {regrading ? '재채점 중…' : '지문 일괄 재채점'}
+          </button>
+        </div>
       </div>
+      {showPrereg && (
+        <PreregForm
+          onCreated={(a) => {
+            setAccounts((prev) => [a, ...prev])
+            setShowPrereg(false)
+            setFeedback({
+              kind: 'ok',
+              msg: `${a.displayName} 사전 등록 완료. 학생이 ${a.email} 로 회원가입하면 자동 연결됩니다.`,
+            })
+          }}
+        />
+      )}
       {regradeNote && <p className="text-xs text-brand-700 -mt-3">{regradeNote}</p>}
 
       <div className="flex flex-wrap items-center gap-2">
@@ -563,5 +604,153 @@ export function AdminStudents() {
         })}
       </div>
     </div>
+  )
+}
+
+function PreregForm({
+  onCreated,
+}: {
+  onCreated: (account: UserAccount) => void
+}) {
+  const [email, setEmail] = useState('')
+  const [displayName, setDisplayName] = useState('')
+  const [school, setSchool] = useState('')
+  const [phone, setPhone] = useState('')
+  const [parentPhone, setParentPhone] = useState('')
+  const [korean, setKorean] = useState(true)
+  const [english, setEnglish] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    setErr(null)
+    if (!korean && !english) {
+      setErr('과목을 하나 이상 선택하세요.')
+      return
+    }
+    const subjects: MockSubject[] = []
+    if (korean) subjects.push('korean')
+    if (english) subjects.push('english')
+    setSaving(true)
+    try {
+      const created = await createPreregisteredStudent({
+        email,
+        displayName,
+        school,
+        phone,
+        parentPhone,
+        subjects,
+      })
+      onCreated(created)
+      setEmail('')
+      setDisplayName('')
+      setSchool('')
+      setPhone('')
+      setParentPhone('')
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '등록 실패')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const inputCls =
+    'w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500'
+
+  return (
+    <form
+      onSubmit={submit}
+      className="rounded-lg border border-brand-200 bg-brand-50/40 p-4 space-y-3"
+    >
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-slate-600">
+            이메일 <span className="text-red-500">*</span>
+          </span>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className={inputCls}
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-slate-600">
+            이름 <span className="text-red-500">*</span>
+          </span>
+          <input
+            type="text"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            required
+            className={inputCls}
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-slate-600">학교</span>
+          <input
+            type="text"
+            value={school}
+            onChange={(e) => setSchool(e.target.value)}
+            className={inputCls}
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-slate-600">학생 전화</span>
+          <input
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className={inputCls}
+          />
+        </label>
+        <label className="flex flex-col gap-1 sm:col-span-2">
+          <span className="text-xs font-medium text-slate-600">학부모 전화</span>
+          <input
+            type="tel"
+            value={parentPhone}
+            onChange={(e) => setParentPhone(e.target.value)}
+            className={inputCls}
+          />
+        </label>
+      </div>
+      <div className="flex items-center gap-3 flex-wrap text-xs">
+        <span className="text-slate-600 font-medium">수강 과목</span>
+        <label className="inline-flex items-center gap-1.5 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={korean}
+            onChange={(e) => setKorean(e.target.checked)}
+            className="h-3.5 w-3.5"
+          />
+          국어
+        </label>
+        <label className="inline-flex items-center gap-1.5 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={english}
+            onChange={(e) => setEnglish(e.target.checked)}
+            className="h-3.5 w-3.5"
+          />
+          영어
+        </label>
+      </div>
+      <p className="text-[11px] text-slate-500">
+        학생이 같은 이메일로 회원가입하면 이 계정으로 자동 연결되고 즉시 활성
+        상태가 됩니다. 비밀번호는 학생이 가입 시 직접 설정합니다.
+      </p>
+      {err && <p className="text-xs text-red-600">{err}</p>}
+      <div className="flex justify-end">
+        <button
+          type="submit"
+          disabled={saving}
+          className="rounded-md bg-slate-900 text-white text-xs font-medium px-3 py-1.5 hover:bg-slate-800 disabled:opacity-50"
+        >
+          {saving ? '등록 중…' : '사전 등록'}
+        </button>
+      </div>
+    </form>
   )
 }
