@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import { ScheduleManager } from '../components/ScheduleManager'
-import { getAccount } from '../lib/account'
+import { getAccount, updateAccountSubjects } from '../lib/account'
 import {
   createAssignment,
   deleteAssignment,
@@ -20,6 +20,7 @@ import { sendPushNotification } from '../lib/ppurioApi'
 import { buildWeeklyReportVars } from '../lib/weeklyReport'
 import { listMyWordbook } from '../lib/wordbook'
 import {
+  accountSubjects,
   getAssignmentStatusView,
   getDDay,
   type Assignment,
@@ -464,6 +465,10 @@ export function AdminStudentDetail() {
             + 이 학생 단어 시험지
           </Link>
         </div>
+        <SubjectPicker
+          account={account}
+          onSaved={(next) => setAccount({ ...account, subjects: next })}
+        />
       </header>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
@@ -1341,6 +1346,77 @@ function ProgressCard({ label, done, total }: { label: string; done: number; tot
       <div className="h-1 w-full rounded-full bg-slate-100 overflow-hidden">
         <div className="h-full bg-brand-500" style={{ width: `${pct}%` }} />
       </div>
+    </div>
+  )
+}
+
+function SubjectPicker({
+  account,
+  onSaved,
+}: {
+  account: UserAccount
+  onSaved: (subjects: MockSubject[]) => void
+}) {
+  const cur = accountSubjects(account)
+  const [korean, setKorean] = useState(cur.korean)
+  const [english, setEnglish] = useState(cur.english)
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const changed = korean !== cur.korean || english !== cur.english
+  const valid = korean || english
+
+  async function save() {
+    if (!valid) {
+      setErr('과목을 하나 이상 선택하세요.')
+      return
+    }
+    setSaving(true)
+    setErr(null)
+    const next: MockSubject[] = []
+    if (korean) next.push('korean')
+    if (english) next.push('english')
+    try {
+      await updateAccountSubjects(account.id, next)
+      onSaved(next)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '저장 실패')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="mt-3 flex items-center gap-3 flex-wrap text-xs">
+      <span className="text-slate-500">수강 과목:</span>
+      <label className="inline-flex items-center gap-1.5 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={korean}
+          onChange={(e) => setKorean(e.target.checked)}
+          className="h-3.5 w-3.5"
+        />
+        국어
+      </label>
+      <label className="inline-flex items-center gap-1.5 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={english}
+          onChange={(e) => setEnglish(e.target.checked)}
+          className="h-3.5 w-3.5"
+        />
+        영어
+      </label>
+      {changed && (
+        <button
+          type="button"
+          onClick={save}
+          disabled={saving || !valid}
+          className="rounded-md bg-slate-900 text-white text-[11px] font-medium px-2.5 py-1 hover:bg-slate-800 disabled:opacity-50"
+        >
+          {saving ? '저장 중…' : '저장'}
+        </button>
+      )}
+      {err && <span className="text-red-600">{err}</span>}
     </div>
   )
 }

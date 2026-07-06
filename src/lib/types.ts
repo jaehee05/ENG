@@ -13,9 +13,24 @@ export interface UserAccount {
   school?: string
   phone?: string
   parentPhone?: string
+  /** 학생 수강 과목. 없거나 빈 배열이면 둘 다(호환). */
+  subjects?: MockSubject[]
   /** iOS Capacitor 앱에서 받은 FCM 디바이스 토큰들 (다중 기기 지원). */
   fcmTokens?: string[]
   createdAt: Timestamp | null
+}
+
+/** 계정에서 유효 과목 집합을 뽑는다. 미설정/빈 값은 둘 다로 간주. */
+export function accountSubjects(a: Pick<UserAccount, 'subjects'>): {
+  korean: boolean
+  english: boolean
+} {
+  const s = a.subjects
+  if (!s || s.length === 0) return { korean: true, english: true }
+  return {
+    korean: s.includes('korean'),
+    english: s.includes('english'),
+  }
 }
 
 export interface VocabExample {

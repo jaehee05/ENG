@@ -16,7 +16,7 @@ import {
   type DocumentSnapshot,
 } from 'firebase/firestore'
 import { db } from './firebase'
-import type { UserAccount, UserStatus } from './types'
+import type { MockSubject, UserAccount, UserStatus } from './types'
 
 export function validatePassword(pw: string): void {
   if (!pw || pw.length < 4) {
@@ -29,6 +29,12 @@ export function validatePassword(pw: string): void {
 
 function fromSnap(snap: QueryDocumentSnapshot | DocumentSnapshot): UserAccount {
   const d = snap.data() ?? {}
+  const rawSubjects = Array.isArray(d.subjects) ? d.subjects : undefined
+  const subjects = rawSubjects
+    ? (rawSubjects.filter(
+        (x: unknown) => x === 'korean' || x === 'english',
+      ) as MockSubject[])
+    : undefined
   return {
     id: snap.id,
     email: d.email ?? '',
@@ -39,8 +45,16 @@ function fromSnap(snap: QueryDocumentSnapshot | DocumentSnapshot): UserAccount {
     school: d.school,
     phone: d.phone,
     parentPhone: d.parentPhone,
+    subjects,
     createdAt: (d.createdAt as Timestamp | undefined) ?? null,
   }
+}
+
+export async function updateAccountSubjects(
+  id: string,
+  subjects: MockSubject[],
+): Promise<void> {
+  await updateDoc(doc(db, 'users', id), { subjects })
 }
 
 export async function getAccount(id: string): Promise<UserAccount | null> {

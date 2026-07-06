@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import {
   formatDate,
@@ -8,7 +8,7 @@ import {
   listAssignmentsForStudent,
   listAttemptsForUser,
 } from '../lib/firestore'
-import { isAssignmentVisibleToStudent } from '../lib/types'
+import { accountSubjects, isAssignmentVisibleToStudent } from '../lib/types'
 import type { Announcement, Assignment, Attempt } from '../lib/types'
 
 interface ShortcutCard {
@@ -112,6 +112,17 @@ export function Dashboard() {
   const [topAnnouncement, setTopAnnouncement] = useState<Announcement | null>(
     null,
   )
+
+  // 국어만 수강하는 학생은 대시보드 없이 바로 과제 페이지로.
+  const koreanOnly =
+    !!profile &&
+    profile.role === 'student' &&
+    (() => {
+      const s = accountSubjects(profile)
+      return s.korean && !s.english
+    })()
+  if (koreanOnly) return <Navigate to="/assignments" replace />
+
 
   useEffect(() => {
     if (!profile) return

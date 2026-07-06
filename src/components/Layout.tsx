@@ -4,6 +4,7 @@ import { Capacitor } from '@capacitor/core'
 import { FirebaseMessaging } from '@capacitor-firebase/messaging'
 import { useAuth } from '../contexts/useAuth'
 import { unreadNotificationCount } from '../lib/firestore'
+import { accountSubjects } from '../lib/types'
 
 interface NavItem {
   to: string
@@ -166,12 +167,26 @@ export function Layout() {
     navigate('/login')
   }
 
+  // 학생 계정 과목 확인 — 국어만이면 영어 콘텐츠 탭 숨김
+  const subj = profile ? accountSubjects(profile) : { korean: true, english: true }
+  const englishOnlyPaths = new Set<string>([
+    '/', // 홈(Dashboard)은 영어 위주로 구성됨
+    '/reading',
+    '/vocab',
+    '/wordbook',
+    '/history',
+  ])
+  const filterForSubjects = (items: NavItem[]) =>
+    subj.english || isAdmin
+      ? items
+      : items.filter((i) => !englishOnlyPaths.has(i.to))
+
   // 데스크탑/iPad landscape: 모든 항목 표시
   const desktopNav = isAdmin
     ? [...studentNav, ...studentExtraNav, ...adminExtraNav]
-    : [...studentNav, ...studentExtraNav]
+    : filterForSubjects([...studentNav, ...studentExtraNav])
   // 모바일 + iPad portrait 하단 탭바: 관리자는 단어장 자리에 "관리"
-  const mobileNav = isAdmin ? adminMobileNav : studentNav
+  const mobileNav = isAdmin ? adminMobileNav : filterForSubjects(studentNav)
 
   return (
     <div className="h-dvh flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
