@@ -80,6 +80,12 @@ const calendarIcon = (
     <path d="M16 2v4M8 2v4M3 10h18" />
   </svg>
 )
+const mockIcon = (
+  <svg {...iconProps}>
+    <path d="M9 2h6l2 2h3v18H4V4h3l2-2Z" />
+    <path d="M9 12l2 2 4-4" />
+  </svg>
+)
 
 const adminGearIcon = (
   <svg {...iconProps}>
@@ -167,7 +173,7 @@ export function Layout() {
     navigate('/login')
   }
 
-  // 학생 계정 과목 확인 — 국어만이면 영어 콘텐츠 탭 숨김
+  // 학생 계정 과목 확인 — 국어만이면 영어 콘텐츠 탭 숨김. 국어 포함이면 모의고사 탭 노출.
   const subj = profile ? accountSubjects(profile) : { korean: true, english: true }
   const englishOnlyPaths = new Set<string>([
     '/', // 홈(Dashboard)은 영어 위주로 구성됨
@@ -181,12 +187,25 @@ export function Layout() {
       ? items
       : items.filter((i) => !englishOnlyPaths.has(i.to))
 
+  const mockNavItem: NavItem = {
+    to: '/korean-mocks',
+    label: '모의고사',
+    icon: mockIcon,
+  }
+  const koreanOnly = !isAdmin && subj.korean && !subj.english
+
   // 데스크탑/iPad landscape: 모든 항목 표시
   const desktopNav = isAdmin
     ? [...studentNav, ...studentExtraNav, ...adminExtraNav]
-    : filterForSubjects([...studentNav, ...studentExtraNav])
+    : koreanOnly
+      ? [...filterForSubjects(studentNav), mockNavItem]
+      : filterForSubjects([...studentNav, ...studentExtraNav])
   // 모바일 + iPad portrait 하단 탭바: 관리자는 단어장 자리에 "관리"
-  const mobileNav = isAdmin ? adminMobileNav : filterForSubjects(studentNav)
+  const mobileNav = isAdmin
+    ? adminMobileNav
+    : koreanOnly
+      ? [...filterForSubjects(studentNav), mockNavItem]
+      : filterForSubjects(studentNav)
 
   return (
     <div className="h-dvh flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
@@ -311,7 +330,12 @@ export function Layout() {
 
       {/* 모바일 + iPad portrait 하단 탭바 */}
       <nav className="lg:hidden border-t border-slate-200 bg-white safe-bottom safe-x">
-        <div className="grid grid-cols-5 px-1 max-w-md mx-auto">
+        <div
+          className="grid px-1 max-w-md mx-auto"
+          style={{
+            gridTemplateColumns: `repeat(${Math.max(mobileNav.length, 1)}, minmax(0, 1fr))`,
+          }}
+        >
           {mobileNav.map((i) => (
             <NavLink
               key={i.to}
