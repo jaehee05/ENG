@@ -64,9 +64,6 @@ export interface VocabSet {
 export interface VocabSeries {
   id: string
   title: string
-  /** 소유 학생 UID. 없으면 legacy(공용). */
-  studentUid?: string
-  studentName?: string
   lastDayNumber: number
   maxAttempts?: number
   /** Master word list — all words that may be used to spawn DAY tests. */

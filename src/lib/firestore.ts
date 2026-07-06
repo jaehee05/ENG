@@ -145,8 +145,6 @@ export async function createVocabSeries(input: {
   maxAttempts?: number
   words?: WordEntry[]
   perDay?: number
-  studentUid?: string
-  studentName?: string
   createdBy: string
   createdByName: string
 }): Promise<string> {
@@ -168,25 +166,8 @@ export async function createVocabSeries(input: {
   if (input.words && input.words.length > 0) {
     payload.words = input.words
   }
-  if (input.studentUid) {
-    payload.studentUid = input.studentUid
-    if (input.studentName) payload.studentName = input.studentName
-  }
   const ref = await addDoc(collection(db, 'vocabSeries'), payload)
   return ref.id
-}
-
-export async function listVocabSeriesForStudent(
-  studentUid: string,
-): Promise<VocabSeries[]> {
-  const snap = await getDocs(
-    query(
-      collection(db, 'vocabSeries'),
-      where('studentUid', '==', studentUid),
-      orderBy('createdAt', 'desc'),
-    ),
-  )
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<VocabSeries, 'id'>) }))
 }
 
 export async function bumpVocabSeries(

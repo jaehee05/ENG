@@ -6,7 +6,7 @@ import {
   bumpVocabSeries,
   createVocabSeries,
   createVocabSet,
-  listVocabSeriesForStudent,
+  listVocabSeries,
 } from '../lib/firestore'
 import type { UserAccount } from '../lib/types'
 import {
@@ -90,16 +90,12 @@ export function VocabNew() {
     }
   }, [studentUid, students])
 
-  // 학생별 시리즈 목록
+  // 교재(시리즈)는 공용 — 학생과 무관하게 전체 목록
   useEffect(() => {
-    if (!studentUid) {
-      setSeriesList([])
-      return
-    }
-    listVocabSeriesForStudent(studentUid)
+    listVocabSeries()
       .then(setSeriesList)
       .catch(() => {})
-  }, [studentUid])
+  }, [])
 
   const selectedSeries: VocabSeries | null = useMemo(() => {
     if (seriesMode === 'new') return null
@@ -243,8 +239,6 @@ export function VocabNew() {
           seriesId = await createVocabSeries({
             title: base,
             maxAttempts,
-            studentUid,
-            studentName,
             createdBy: profile.id,
             createdByName: profile.displayName,
           })
