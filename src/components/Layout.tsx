@@ -73,6 +73,12 @@ const notifyIcon = (
     <path d="M10 21a2 2 0 0 0 4 0" />
   </svg>
 )
+const calendarIcon = (
+  <svg {...iconProps}>
+    <rect x="3" y="4" width="18" height="18" rx="2" />
+    <path d="M16 2v4M8 2v4M3 10h18" />
+  </svg>
+)
 
 const adminGearIcon = (
   <svg {...iconProps}>
@@ -86,18 +92,19 @@ const studentNav: NavItem[] = [
   { to: '/assignments', label: '과제', icon: checkIcon },
   { to: '/reading', label: '지문', icon: readingIcon },
   { to: '/vocab', label: '단어', icon: vocabIcon },
-  { to: '/wordbook', label: '단어장', icon: wordbookIcon },
+  { to: '/schedule', label: '일정', icon: calendarIcon },
 ]
 
 const adminMobileNav: NavItem[] = [
   { to: '/', label: '홈', end: true, icon: homeIcon },
   { to: '/assignments', label: '과제', icon: checkIcon },
-  { to: '/reading', label: '지문', icon: readingIcon },
   { to: '/vocab', label: '단어', icon: vocabIcon },
+  { to: '/schedule', label: '일정', icon: calendarIcon },
   { to: '/admin', label: '관리', icon: adminGearIcon },
 ]
 
 const studentExtraNav: NavItem[] = [
+  { to: '/wordbook', label: '단어장', icon: wordbookIcon },
   { to: '/history', label: '기록', icon: historyIcon },
 ]
 

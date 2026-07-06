@@ -526,10 +526,7 @@ export function AdminStudentDetail() {
         attempts={attempts}
       />
 
-      <ScheduleManager
-        studentUid={account.id}
-        studentName={account.displayName}
-      />
+      <ScheduleManager studentUid={account.id} />
 
       <section className="space-y-3">
         <div className="flex items-center justify-between">

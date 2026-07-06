@@ -34,7 +34,6 @@ import type {
   PushSchedule,
   Reading,
   ReadingResult,
-  ScheduleToken,
   UserNotification,
   VocabResult,
   VocabSeries,
@@ -115,6 +114,17 @@ export async function updateVocabSetTitle(
   title: string,
 ): Promise<void> {
   await updateDoc(doc(db, 'vocabSets', id), { title })
+}
+
+export async function updateVocabSetOwner(
+  id: string,
+  studentUid: string,
+  studentName: string,
+): Promise<void> {
+  await updateDoc(doc(db, 'vocabSets', id), {
+    studentUid,
+    studentName,
+  })
 }
 
 export async function listVocabSeries(): Promise<VocabSeries[]> {
@@ -1176,55 +1186,4 @@ export async function updateClassSession(
 
 export async function deleteClassSession(id: string): Promise<void> {
   await deleteDoc(doc(db, 'classSessions', id))
-}
-
-// ───── 수업 일정 공유 토큰 ─────
-
-export async function getScheduleToken(token: string): Promise<ScheduleToken | null> {
-  const snap = await getDoc(doc(db, 'scheduleTokens', token))
-  if (!snap.exists()) return null
-  return { id: snap.id, ...(snap.data() as Omit<ScheduleToken, 'id'>) }
-}
-
-export async function findScheduleTokenByStudent(
-  studentUid: string,
-): Promise<ScheduleToken | null> {
-  const snap = await getDocs(
-    query(
-      collection(db, 'scheduleTokens'),
-      where('studentUid', '==', studentUid),
-    ),
-  )
-  const first = snap.docs[0]
-  if (!first) return null
-  return { id: first.id, ...(first.data() as Omit<ScheduleToken, 'id'>) }
-}
-
-export async function createScheduleToken(input: {
-  token: string
-  studentUid: string
-  studentName: string
-  hideCost: boolean
-}): Promise<void> {
-  await setDoc(doc(db, 'scheduleTokens', input.token), {
-    studentUid: input.studentUid,
-    studentName: input.studentName,
-    hideCost: input.hideCost,
-    createdAt: serverTimestamp(),
-  })
-}
-
-export async function updateScheduleToken(
-  token: string,
-  patch: Partial<Pick<ScheduleToken, 'hideCost' | 'studentName'>>,
-): Promise<void> {
-  const update: Record<string, unknown> = {}
-  if (patch.hideCost !== undefined) update.hideCost = patch.hideCost
-  if (patch.studentName !== undefined) update.studentName = patch.studentName
-  if (Object.keys(update).length === 0) return
-  await updateDoc(doc(db, 'scheduleTokens', token), update)
-}
-
-export async function deleteScheduleToken(token: string): Promise<void> {
-  await deleteDoc(doc(db, 'scheduleTokens', token))
 }

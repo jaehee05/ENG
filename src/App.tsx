@@ -53,7 +53,6 @@ function App() {
           <Route path="/signup" element={<Signup />} />
           <Route path="/pending" element={<Pending />} />
           <Route path="/rejected" element={<Rejected />} />
-          <Route path="/schedule/:token" element={<StudentSchedule />} />
 
           <Route element={<ProtectedRoute />}>
             <Route element={<Layout />}>
@@ -82,6 +81,7 @@ function App() {
 
               <Route path="/history" element={<MyHistory />} />
               <Route path="/assignments" element={<Assignments />} />
+              <Route path="/schedule" element={<StudentSchedule />} />
               <Route path="/notifications" element={<Notifications />} />
               <Route path="/notice" element={<Notice />} />
             </Route>

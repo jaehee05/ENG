@@ -1,19 +1,14 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
   createClassSession,
-  createScheduleToken,
   deleteClassSession,
-  deleteScheduleToken,
-  findScheduleTokenByStudent,
   listClassSessionsForStudent,
   updateClassSession,
-  updateScheduleToken,
 } from '../lib/firestore'
 import {
   CLASS_SESSION_STATUS_LABEL,
   type ClassSession,
   type ClassSessionStatus,
-  type ScheduleToken,
 } from '../lib/types'
 
 const KST_TZ = 'Asia/Seoul'
@@ -35,15 +30,6 @@ function todayISO(): string {
     day: '2-digit',
   })
   return fmt.format(new Date())
-}
-
-/** crypto.getRandomValues 로 32자 base64url 토큰 생성. */
-function genToken(): string {
-  const bytes = new Uint8Array(24)
-  crypto.getRandomValues(bytes)
-  let bin = ''
-  for (const b of bytes) bin += String.fromCharCode(b)
-  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
 interface FormState {
@@ -70,13 +56,11 @@ const EMPTY_FORM: FormState = {
 
 export function ScheduleManager({
   studentUid,
-  studentName,
 }: {
   studentUid: string
-  studentName: string
+  studentName?: string
 }) {
   const [sessions, setSessions] = useState<ClassSession[]>([])
-  const [token, setToken] = useState<ScheduleToken | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -88,14 +72,9 @@ export function ScheduleManager({
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    Promise.all([
-      listClassSessionsForStudent(studentUid),
-      findScheduleTokenByStudent(studentUid),
-    ])
-      .then(([s, t]) => {
-        if (cancelled) return
-        setSessions(s)
-        setToken(t)
+    listClassSessionsForStudent(studentUid)
+      .then((s) => {
+        if (!cancelled) setSessions(s)
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : '불러오기 실패')
@@ -185,68 +164,6 @@ export function ScheduleManager({
     }
   }
 
-  async function issueToken() {
-    if (token) return
-    const t = genToken()
-    try {
-      await createScheduleToken({
-        token: t,
-        studentUid,
-        studentName,
-        hideCost: false,
-      })
-      setToken({
-        id: t,
-        studentUid,
-        studentName,
-        hideCost: false,
-        createdAt: null,
-      })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '토큰 생성 실패')
-    }
-  }
-
-  async function toggleHideCost() {
-    if (!token) return
-    const next = !token.hideCost
-    try {
-      await updateScheduleToken(token.id, { hideCost: next })
-      setToken({ ...token, hideCost: next })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '설정 저장 실패')
-    }
-  }
-
-  async function revokeToken() {
-    if (!token) return
-    if (
-      !window.confirm(
-        '공유 링크를 폐기하시겠습니까? 기존 링크는 즉시 만료되고, 새 링크를 발급할 수 있습니다.',
-      )
-    )
-      return
-    try {
-      await deleteScheduleToken(token.id)
-      setToken(null)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '토큰 폐기 실패')
-    }
-  }
-
-  const shareUrl = token
-    ? `${window.location.origin}/schedule/${token.id}`
-    : null
-
-  async function copyShareUrl() {
-    if (!shareUrl) return
-    try {
-      await navigator.clipboard.writeText(shareUrl)
-    } catch {
-      // clipboard 실패 시 무시 (사용자가 수동 복사 가능)
-    }
-  }
-
   const upcomingSessions = useMemo(() => {
     const today = todayISO()
     return sessions
@@ -275,65 +192,9 @@ export function ScheduleManager({
         <h2 className="text-base font-semibold text-slate-900">수업 일정</h2>
         <span className="text-xs text-slate-500">총 {sessions.length}건</span>
       </div>
-
-      {/* 공유 링크 */}
-      <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-2">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <p className="text-sm font-medium text-slate-800">학생 공유 링크</p>
-          {token ? (
-            <div className="flex items-center gap-2">
-              <label className="flex items-center gap-1.5 text-xs text-slate-600">
-                <input
-                  type="checkbox"
-                  checked={token.hideCost}
-                  onChange={toggleHideCost}
-                  className="h-3.5 w-3.5"
-                />
-                비용 숨김
-              </label>
-              <button
-                type="button"
-                onClick={revokeToken}
-                className="text-xs text-slate-400 hover:text-red-600 px-1"
-              >
-                폐기
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={issueToken}
-              className="rounded-md bg-slate-900 text-white text-xs font-medium px-3 py-1.5 hover:bg-slate-800"
-            >
-              공유 링크 생성
-            </button>
-          )}
-        </div>
-        {shareUrl && (
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={shareUrl}
-              readOnly
-              onFocus={(e) => e.currentTarget.select()}
-              className="flex-1 min-w-0 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs font-mono text-slate-700 focus:outline-none"
-            />
-            <button
-              type="button"
-              onClick={copyShareUrl}
-              className="shrink-0 rounded-md border border-slate-300 text-slate-700 text-xs font-medium px-2.5 py-1.5 hover:bg-slate-50"
-            >
-              복사
-            </button>
-          </div>
-        )}
-        {!token && (
-          <p className="text-xs text-slate-500">
-            학생/학부모가 볼 수 있는 캘린더 링크입니다. 링크에 포함된 토큰만
-            해당 학생의 일정을 조회할 수 있습니다.
-          </p>
-        )}
-      </div>
+      <p className="text-xs text-slate-500">
+        학생 계정으로 로그인하면 "일정" 탭에서 확인할 수 있습니다.
+      </p>
 
       {/* 등록/편집 폼 */}
       {showAdd ? (

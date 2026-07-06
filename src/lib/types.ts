@@ -643,17 +643,6 @@ export interface ClassSession {
   updatedAt: Timestamp | null
 }
 
-/** 학생별 수업 일정 공유 토큰 → 학생 매핑. 토큰은 32자 이상 랜덤. */
-export interface ScheduleToken {
-  /** 토큰 문자열 자체가 문서 ID. */
-  id: string
-  studentUid: string
-  studentName: string
-  /** true 면 공유 페이지에서 비용 숨김. */
-  hideCost: boolean
-  createdAt: Timestamp | null
-}
-
 export interface WordLookup {
   en: string
   ko: string
