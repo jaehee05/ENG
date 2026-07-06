@@ -4,12 +4,15 @@ import { useAuth } from '../contexts/useAuth'
 import {
   deleteKoreanMock,
   formatDate,
+  listAssignmentsForStudent,
   listAttemptsForUser,
   listKoreanMocks,
 } from '../lib/firestore'
 import {
   getMockSubject,
+  isAssignmentVisibleToStudent,
   MOCK_SUBJECT_LABEL,
+  type Assignment,
   type Attempt,
   type KoreanMock,
   type MockSubject,
@@ -27,6 +30,7 @@ export function KoreanMockList({ manage = false }: { manage?: boolean }) {
   const isAdmin = profile?.role === 'admin'
   const canManage = isAdmin && manage
   const [mocks, setMocks] = useState<KoreanMock[]>([])
+  const [assignments, setAssignments] = useState<Assignment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -45,6 +49,20 @@ export function KoreanMockList({ manage = false }: { manage?: boolean }) {
     listAttemptsForUser(profile.id).then(setMyAttempts).catch(() => {})
   }, [profile])
 
+  // 학생 뷰: 자기에게 할당된 모의고사만. 관리자 뷰: 전체.
+  useEffect(() => {
+    if (!profile || isAdmin) return
+    listAssignmentsForStudent(profile.id).then(setAssignments).catch(() => {})
+  }, [profile, isAdmin])
+
+  const assignedMockRefIds = useMemo(() => {
+    return new Set(
+      assignments
+        .filter((a) => a.type === 'korean_mock' && isAssignmentVisibleToStudent(a))
+        .map((a) => a.refId),
+    )
+  }, [assignments])
+
   const attemptedRefIds = useMemo(() => {
     return new Set(
       myAttempts
@@ -54,9 +72,13 @@ export function KoreanMockList({ manage = false }: { manage?: boolean }) {
   }, [myAttempts])
 
   const visibleMocks = useMemo(() => {
-    if (subjectFilter === 'all') return mocks
-    return mocks.filter((m) => getMockSubject(m) === subjectFilter)
-  }, [mocks, subjectFilter])
+    // 학생은 자기에게 할당된 것만
+    const base = isAdmin
+      ? mocks
+      : mocks.filter((m) => assignedMockRefIds.has(m.id))
+    if (subjectFilter === 'all') return base
+    return base.filter((m) => getMockSubject(m) === subjectFilter)
+  }, [mocks, subjectFilter, isAdmin, assignedMockRefIds])
 
   async function handleDelete(e: React.MouseEvent, m: KoreanMock) {
     e.preventDefault()
@@ -118,9 +140,11 @@ export function KoreanMockList({ manage = false }: { manage?: boolean }) {
       {error && <p className="text-red-600 text-sm">{error}</p>}
       {!loading && visibleMocks.length === 0 && (
         <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
-          {subjectFilter === 'all'
-            ? '등록된 모의고사가 없어요.'
-            : `${MOCK_SUBJECT_LABEL[subjectFilter]} 모의고사가 없어요.`}
+          {isAdmin
+            ? subjectFilter === 'all'
+              ? '등록된 모의고사가 없어요.'
+              : `${MOCK_SUBJECT_LABEL[subjectFilter]} 모의고사가 없어요.`
+            : '아직 할당된 모의고사가 없어요.'}
         </div>
       )}
 
