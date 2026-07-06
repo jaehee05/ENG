@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
-import { deleteVocabSet, getVocabSet, listAttemptsForUser } from '../lib/firestore'
+import {
+  deleteVocabSet,
+  getVocabSet,
+  listAttemptsForUser,
+  updateVocabSetTitle,
+} from '../lib/firestore'
 import { MyAttemptsBox } from '../components/MyAttemptsBox'
 import { highlightHead } from '../lib/highlightWord'
 import type { Attempt, VocabSet } from '../lib/types'
@@ -72,6 +77,9 @@ export function VocabDetail() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [titleDraft, setTitleDraft] = useState('')
+  const [savingTitle, setSavingTitle] = useState(false)
 
   useEffect(() => {
     if (!id || !profile) return
@@ -91,6 +99,31 @@ export function VocabDetail() {
     () => attempts.filter((a) => a.type === 'vocab' && a.refId === id),
     [attempts, id],
   )
+
+  function startTitleEdit() {
+    if (!set) return
+    setTitleDraft(set.title)
+    setEditingTitle(true)
+  }
+
+  async function saveTitle() {
+    if (!set) return
+    const next = titleDraft.trim()
+    if (!next || next === set.title) {
+      setEditingTitle(false)
+      return
+    }
+    setSavingTitle(true)
+    try {
+      await updateVocabSetTitle(set.id, next)
+      setSet({ ...set, title: next })
+      setEditingTitle(false)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '제목 저장 실패')
+    } finally {
+      setSavingTitle(false)
+    }
+  }
 
   async function handleDelete() {
     if (!set) return
@@ -113,18 +146,61 @@ export function VocabDetail() {
   return (
     <div className="space-y-5 max-w-3xl">
       <header className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
+        <div className="min-w-0 flex-1">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
             단어 시험지
           </p>
-          <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
-            {set.title}
-          </h1>
+          {editingTitle ? (
+            <div className="flex items-center gap-2 flex-wrap">
+              <input
+                type="text"
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') saveTitle()
+                  if (e.key === 'Escape') setEditingTitle(false)
+                }}
+                autoFocus
+                className="flex-1 min-w-[10rem] rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-lg font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+              <button
+                type="button"
+                onClick={saveTitle}
+                disabled={savingTitle || !titleDraft.trim()}
+                className="rounded-md bg-slate-900 text-white text-xs font-medium px-3 py-1.5 hover:bg-slate-800 disabled:opacity-50"
+              >
+                {savingTitle ? '저장 중…' : '저장'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditingTitle(false)}
+                disabled={savingTitle}
+                className="text-xs text-slate-500 hover:text-slate-900 px-1"
+              >
+                취소
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
+                {set.title}
+              </h1>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={startTitleEdit}
+                  className="text-xs text-slate-500 hover:text-slate-900 px-1"
+                >
+                  편집
+                </button>
+              )}
+            </div>
+          )}
           <p className="text-xs text-slate-500 mt-1">
             {set.words.length}단어 · {set.createdByName}
           </p>
         </div>
-        {isAdmin && (
+        {isAdmin && !editingTitle && (
           <button
             type="button"
             onClick={handleDelete}

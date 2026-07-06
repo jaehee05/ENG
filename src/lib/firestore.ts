@@ -89,6 +89,13 @@ export async function updateVocabSetWords(
   await updateDoc(doc(db, 'vocabSets', id), { words })
 }
 
+export async function updateVocabSetTitle(
+  id: string,
+  title: string,
+): Promise<void> {
+  await updateDoc(doc(db, 'vocabSets', id), { title })
+}
+
 export async function listVocabSeries(): Promise<VocabSeries[]> {
   const snap = await getDocs(
     query(collection(db, 'vocabSeries'), orderBy('createdAt', 'desc')),

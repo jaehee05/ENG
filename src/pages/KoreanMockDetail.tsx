@@ -41,6 +41,7 @@ export function KoreanMockDetail() {
   // 편집 상태 (관리자)
   const [editing, setEditing] = useState(false)
   const [eTitle, setETitle] = useState('')
+  const [eSubject, setESubject] = useState<MockSubject>('korean')
   const [eQuestions, setEQuestions] = useState<KoreanMockQuestion[]>([])
   const [saving, setSaving] = useState(false)
 
@@ -86,6 +87,7 @@ export function KoreanMockDetail() {
   function startEdit() {
     if (!mock) return
     setETitle(mock.title)
+    setESubject(getMockSubject(mock))
     setEQuestions(mock.questions.map((q) => ({ ...q })))
     setEditing(true)
   }
@@ -97,9 +99,15 @@ export function KoreanMockDetail() {
     try {
       await updateKoreanMock(mock.id, {
         title: eTitle.trim(),
+        subject: eSubject,
         questions: eQuestions,
       })
-      setMock({ ...mock, title: eTitle.trim(), questions: eQuestions })
+      setMock({
+        ...mock,
+        title: eTitle.trim(),
+        subject: eSubject,
+        questions: eQuestions,
+      })
       setEditing(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : '저장 실패')
@@ -217,6 +225,8 @@ export function KoreanMockDetail() {
               <EditAnswerGrid
                 title={eTitle}
                 setTitle={setETitle}
+                subject={eSubject}
+                setSubject={setESubject}
                 questions={eQuestions}
                 setQuestions={setEQuestions}
               />
@@ -292,11 +302,15 @@ export function KoreanMockDetail() {
 function EditAnswerGrid({
   title,
   setTitle,
+  subject,
+  setSubject,
   questions,
   setQuestions,
 }: {
   title: string
   setTitle: (s: string) => void
+  subject: MockSubject
+  setSubject: (s: MockSubject) => void
   questions: KoreanMockQuestion[]
   setQuestions: (q: KoreanMockQuestion[]) => void
 }) {
@@ -322,6 +336,33 @@ function EditAnswerGrid({
           onChange={(e) => setTitle(e.target.value)}
           className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
         />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-slate-600 mb-1">과목</label>
+        <div className="flex gap-2">
+          {([
+            { key: 'korean', label: '국어' },
+            { key: 'english', label: '영어' },
+          ] as { key: MockSubject; label: string }[]).map((opt) => {
+            const active = subject === opt.key
+            return (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => setSubject(opt.key)}
+                className={`rounded-md px-3 py-1.5 text-xs font-medium border transition ${
+                  active
+                    ? opt.key === 'korean'
+                      ? 'bg-rose-600 text-white border-rose-600'
+                      : 'bg-sky-600 text-white border-sky-600'
+                    : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                {opt.label}
+              </button>
+            )
+          })}
+        </div>
       </div>
       <div className="space-y-1.5">
         <p className="text-xs font-medium text-slate-600">
