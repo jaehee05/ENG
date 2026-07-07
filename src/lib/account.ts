@@ -16,6 +16,7 @@ import {
   type DocumentSnapshot,
 } from 'firebase/firestore'
 import { db } from './firebase'
+import { formatPhoneKR } from './phone'
 import type { MockSubject, UserAccount, UserStatus } from './types'
 
 export function validatePassword(pw: string): void {
@@ -84,8 +85,8 @@ export async function signUpAccount(input: {
   const email = input.email.trim().toLowerCase()
   const displayName = input.displayName.trim()
   const school = (input.school ?? '').trim()
-  const phone = (input.phone ?? '').trim()
-  const parentPhone = (input.parentPhone ?? '').trim()
+  const phone = formatPhoneKR(input.phone)
+  const parentPhone = formatPhoneKR(input.parentPhone)
 
   // 1) 같은 이메일 사용자 조회 — 사전 등록이면 활성화, 아니면 중복 오류.
   const emailHits = await getDocs(
@@ -171,7 +172,7 @@ export async function createPreregisteredStudent(input: {
 }): Promise<UserAccount> {
   const displayName = input.displayName.trim()
   if (!displayName) throw new Error('이름을 입력하세요.')
-  const phone = input.phone.trim()
+  const phone = formatPhoneKR(input.phone)
   if (!phone) throw new Error('학생 전화번호를 입력하세요. (가입 시 매칭에 필요)')
 
   // (이름, 전화) 조합이 이미 있으면 중복 방지
@@ -197,7 +198,7 @@ export async function createPreregisteredStudent(input: {
     createdAt: serverTimestamp(),
   }
   const school = (input.school ?? '').trim()
-  const parentPhone = (input.parentPhone ?? '').trim()
+  const parentPhone = formatPhoneKR(input.parentPhone)
   if (school) payload.school = school
   if (parentPhone) payload.parentPhone = parentPhone
   if (input.subjects && input.subjects.length > 0) payload.subjects = input.subjects

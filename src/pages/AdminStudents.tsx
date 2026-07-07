@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
+import { formatPhoneKR } from '../lib/phone'
 import {
   createPreregisteredStudent,
   deleteAccount,
@@ -681,6 +682,7 @@ function PreregForm({
             type="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
+            onBlur={() => setPhone(formatPhoneKR(phone))}
             required
             placeholder="가입 시 매칭 키"
             className={inputCls}
@@ -701,6 +703,7 @@ function PreregForm({
             type="tel"
             value={parentPhone}
             onChange={(e) => setParentPhone(e.target.value)}
+            onBlur={() => setParentPhone(formatPhoneKR(parentPhone))}
             className={inputCls}
           />
         </label>

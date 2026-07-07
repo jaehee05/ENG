@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
+import { formatPhoneKR } from '../lib/phone'
 
 export function Signup() {
   const { signUp } = useAuth()
@@ -93,6 +94,7 @@ export function Signup() {
                 inputMode="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
+                onBlur={() => setPhone(formatPhoneKR(phone))}
                 placeholder="010-1234-5678"
                 className={inputCls}
               />
@@ -106,6 +108,7 @@ export function Signup() {
                 inputMode="tel"
                 value={parentPhone}
                 onChange={(e) => setParentPhone(e.target.value)}
+                onBlur={() => setParentPhone(formatPhoneKR(parentPhone))}
                 placeholder="010-1234-5678"
                 className={inputCls}
               />

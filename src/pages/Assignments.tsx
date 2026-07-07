@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { Clover, CloverCheck, progressToLeaves } from '../components/Clover'
 import { useAuth } from '../contexts/useAuth'
+import { listAccounts } from '../lib/account'
+import type { UserAccount } from '../lib/types'
 import {
   addTodo,
   deleteTodo,
@@ -45,6 +47,13 @@ function isOverdue(a: Assignment): boolean {
 }
 
 export function Assignments() {
+  const { profile } = useAuth()
+  // 관리자는 본인 과제 대신 학생에게 과제를 부여하는 진입 화면을 본다.
+  if (profile?.role === 'admin') return <AdminAssignEntry />
+  return <StudentAssignments />
+}
+
+function StudentAssignments() {
   const { profile } = useAuth()
   const [categories, setCategories] = useState<CategoryConfig[]>([])
   const [assignments, setAssignments] = useState<Assignment[]>([])
@@ -358,6 +367,97 @@ export function Assignments() {
             </section>
           )
         })}
+    </div>
+  )
+}
+
+// 관리자 과제 탭: 학생을 골라 과제 부여 화면(학생 상세)으로 이동.
+function AdminAssignEntry() {
+  const [students, setStudents] = useState<UserAccount[]>([])
+  const [loading, setLoading] = useState(true)
+  const [q, setQ] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    listAccounts()
+      .then((accs) => {
+        if (cancelled) return
+        setStudents(
+          accs
+            .filter((a) => a.role === 'student' && a.status === 'active')
+            .sort((a, b) => a.displayName.localeCompare(b.displayName, 'ko')),
+        )
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const filtered = useMemo(() => {
+    const kw = q.trim().toLowerCase()
+    if (!kw) return students
+    return students.filter(
+      (s) =>
+        s.displayName.toLowerCase().includes(kw) ||
+        (s.school ?? '').toLowerCase().includes(kw),
+    )
+  }, [students, q])
+
+  return (
+    <div className="space-y-5">
+      <header>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+          관리
+        </p>
+        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
+          과제 부여
+        </h1>
+        <p className="text-xs text-slate-500 mt-1">
+          학생을 선택하면 그 학생의 과제 부여·현황 화면으로 이동합니다.
+        </p>
+      </header>
+
+      {students.length > 5 && (
+        <input
+          type="text"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="학생 이름·학교 검색"
+          className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+        />
+      )}
+
+      {loading ? (
+        <p className="text-slate-500 text-sm">불러오는 중…</p>
+      ) : filtered.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+          활성 학생이 없습니다.
+        </div>
+      ) : (
+        <div className="rounded-xl border border-slate-200 bg-white overflow-hidden divide-y divide-slate-100">
+          {filtered.map((s) => (
+            <Link
+              key={s.id}
+              to={`/admin/students/${s.id}`}
+              className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50"
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-slate-900 truncate">
+                  {s.displayName}
+                  {s.school ? (
+                    <span className="text-slate-400 font-normal"> · {s.school}</span>
+                  ) : null}
+                </p>
+              </div>
+              <span className="text-slate-300 text-lg shrink-0">→</span>
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
