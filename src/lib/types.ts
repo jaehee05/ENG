@@ -661,6 +661,21 @@ export interface ClassSession {
   updatedAt: Timestamp | null
 }
 
+/** 학생 선불 결제 기록. 잔액 = Σ결제 − Σ(완료된 수업 cost). */
+export interface Payment {
+  id: string
+  studentUid: string
+  studentName: string
+  /** KRW, 양수. */
+  amount: number
+  /** 결제일 YYYY-MM-DD (Asia/Seoul). */
+  dateISO: string
+  note?: string
+  createdBy: string
+  createdByName: string
+  createdAt: Timestamp | null
+}
+
 export interface WordLookup {
   en: string
   ko: string

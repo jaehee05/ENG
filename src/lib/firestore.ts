@@ -30,6 +30,7 @@ import type {
   KoreanMockResult,
   MockSubject,
   NotificationKind,
+  Payment,
   PersonalTodo,
   PushSchedule,
   Reading,
@@ -1240,4 +1241,39 @@ export async function updateClassSession(
 
 export async function deleteClassSession(id: string): Promise<void> {
   await deleteDoc(doc(db, 'classSessions', id))
+}
+
+// ───── 선불 결제 (정산) ─────
+export async function createPayment(input: {
+  studentUid: string
+  studentName: string
+  amount: number
+  dateISO: string
+  note?: string
+  createdBy: string
+  createdByName: string
+}): Promise<string> {
+  const payload: Record<string, unknown> = {
+    studentUid: input.studentUid,
+    studentName: input.studentName,
+    amount: Math.round(input.amount),
+    dateISO: input.dateISO,
+    createdBy: input.createdBy,
+    createdByName: input.createdByName,
+    createdAt: serverTimestamp(),
+  }
+  if (input.note && input.note.trim()) payload.note = input.note.trim()
+  const ref = await addDoc(collection(db, 'payments'), payload)
+  return ref.id
+}
+
+export async function listAllPayments(): Promise<Payment[]> {
+  const snap = await getDocs(
+    query(collection(db, 'payments'), orderBy('dateISO', 'desc')),
+  )
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Payment, 'id'>) }))
+}
+
+export async function deletePayment(id: string): Promise<void> {
+  await deleteDoc(doc(db, 'payments', id))
 }

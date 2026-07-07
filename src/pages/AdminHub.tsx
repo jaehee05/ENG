@@ -34,6 +34,18 @@ const tools: AdminTool[] = [
     ),
   },
   {
+    to: '/admin/payments',
+    title: '결제 / 정산',
+    desc: '수입 확인 · 선불 잔액 · 결제 필요일',
+    icon: (
+      <svg {...iconProps}>
+        <rect x="2" y="5" width="20" height="14" rx="2" />
+        <path d="M2 10h20" />
+        <path d="M6 15h4" />
+      </svg>
+    ),
+  },
+  {
     to: '/admin/notify',
     title: '알림톡 / 푸시',
     desc: '뿌리오 알림톡 · 주간 리포트 · 푸시 발송',

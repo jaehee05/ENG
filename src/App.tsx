@@ -43,6 +43,7 @@ import { KoreanMockDetail } from './pages/KoreanMockDetail'
 import { KoreanMockTake } from './pages/KoreanMockTake'
 import { KoreanMockResult } from './pages/KoreanMockResult'
 import { StudentSchedule } from './pages/StudentSchedule'
+import { AdminPayments } from './pages/AdminPayments'
 
 function App() {
   return (
@@ -106,6 +107,7 @@ function App() {
               <Route path="/admin/notify" element={<AdminNotify />} />
               <Route path="/admin/announce" element={<AdminAnnounce />} />
               <Route path="/admin/categories" element={<AdminCategories />} />
+              <Route path="/admin/payments" element={<AdminPayments />} />
             </Route>
           </Route>
 

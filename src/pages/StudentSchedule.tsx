@@ -725,6 +725,7 @@ function SessionModal({
 }) {
   const st = STATUS_STYLES[session.status]
   const [savingPaid, setSavingPaid] = useState(false)
+  const [savingStatus, setSavingStatus] = useState(false)
   const [payError, setPayError] = useState<string | null>(null)
   const dateLabel = (() => {
     const [y, m, d] = session.dateISO.split('-').map((x) => parseInt(x, 10))
@@ -746,6 +747,20 @@ function SessionModal({
       setPayError(e instanceof Error ? e.message : '저장 실패')
     } finally {
       setSavingPaid(false)
+    }
+  }
+
+  async function setStatus(next: ClassSessionStatus) {
+    if (!isAdmin || next === session.status) return
+    setSavingStatus(true)
+    setPayError(null)
+    try {
+      await updateClassSession(session.id, { status: next })
+      onPatch({ status: next })
+    } catch (e) {
+      setPayError(e instanceof Error ? e.message : '상태 변경 실패')
+    } finally {
+      setSavingStatus(false)
     }
   }
 
@@ -857,6 +872,40 @@ function SessionModal({
                 </div>
               )}
             </dl>
+            {isAdmin && (
+              <div className="pt-2 border-t border-slate-100">
+                <p className="text-[11px] font-medium text-slate-500 mb-1.5">
+                  상태 변경
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {(Object.keys(CLASS_SESSION_STATUS_LABEL) as ClassSessionStatus[]).map(
+                    (stv) => {
+                      const active = session.status === stv
+                      return (
+                        <button
+                          key={stv}
+                          type="button"
+                          onClick={() => setStatus(stv)}
+                          disabled={savingStatus || active}
+                          className={`rounded-full px-3 py-1.5 text-xs font-medium border transition disabled:opacity-60 ${
+                            active
+                              ? 'bg-slate-900 text-white border-slate-900'
+                              : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          {CLASS_SESSION_STATUS_LABEL[stv]}
+                        </button>
+                      )
+                    },
+                  )}
+                </div>
+                {session.status === 'done' && (
+                  <p className="text-[11px] text-slate-400 mt-1.5">
+                    완료 상태이면 결제/정산에서 이 수업 금액이 잔액에서 차감됩니다.
+                  </p>
+                )}
+              </div>
+            )}
             {isAdmin && (
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
