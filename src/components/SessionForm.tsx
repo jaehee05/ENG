@@ -219,7 +219,7 @@ export function SessionForm({
             type="number"
             inputMode="numeric"
             min={0}
-            step={1000}
+            step={1}
             value={value.cost}
             onChange={(e) => onChange({ ...value, cost: e.target.value })}
             placeholder="0"

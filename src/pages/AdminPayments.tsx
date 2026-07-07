@@ -481,8 +481,8 @@ export function AdminPayments() {
                 <input
                   type="number"
                   inputMode="numeric"
-                  min={1}
-                  step={10000}
+                  min={0}
+                  step={1}
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="예: 400000"
