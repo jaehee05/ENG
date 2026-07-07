@@ -7,9 +7,19 @@ import {
   listAllClassSessions,
   listAllPayments,
 } from '../lib/firestore'
-import type { ClassSession, Payment, UserAccount } from '../lib/types'
+import type {
+  ClassSession,
+  ClassSessionStatus,
+  Payment,
+  UserAccount,
+} from '../lib/types'
 
 const KST_TZ = 'Asia/Seoul'
+
+/** 잔액에서 차감(수입 집계)되는 수업 상태: 완료·보강. 취소·예정은 제외. */
+function isConsumed(status: ClassSessionStatus): boolean {
+  return status === 'done' || status === 'makeup'
+}
 
 function todayISO(): string {
   return new Intl.DateTimeFormat('en-CA', {
@@ -98,7 +108,7 @@ export function AdminPayments() {
     let total = 0
     let received = 0 // 이번 달 실제 입금(결제) 합계
     for (const s of sessions) {
-      if (s.status !== 'done') continue
+      if (!isConsumed(s.status)) continue
       total += s.cost || 0
       if (s.dateISO.slice(0, 7) === curMonth) month += s.cost || 0
     }
@@ -127,7 +137,7 @@ export function AdminPayments() {
     for (const s of sessions) {
       const b = map.get(s.studentUid)
       if (!b) continue
-      if (s.status === 'done') b.used += s.cost || 0
+      if (isConsumed(s.status)) b.used += s.cost || 0
       else if (s.status === 'scheduled' && s.dateISO >= today) {
         const arr = upcomingByUid.get(s.studentUid) ?? []
         arr.push(s)
@@ -171,12 +181,12 @@ export function AdminPayments() {
       })
     }
     for (const s of sessions) {
-      if (s.studentUid !== selectedUid || s.status !== 'done') continue
+      if (s.studentUid !== selectedUid || !isConsumed(s.status)) continue
       rows.push({
         key: `s-${s.id}`,
         dateISO: s.dateISO,
         kind: 'class',
-        label: `수업 완료 · ${s.title}`,
+        label: `${s.status === 'makeup' ? '보강' : '수업 완료'} · ${s.title}`,
         delta: -(s.cost || 0),
       })
     }
@@ -287,14 +297,14 @@ export function AdminPayments() {
           결제 / 정산
         </h1>
         <p className="text-xs text-slate-500 mt-1">
-          수입은 <b>완료한 수업</b> 기준으로 집계됩니다. 선불 결제를 적립하면 수업을 완료할 때마다 잔액이 차감되고, 잔액이 부족해지는 수업일을 <b>결제 필요일</b>로 알려줘요.
+          수입은 <b>완료·보강 수업</b> 기준으로 집계됩니다. 선불 결제를 적립하면 수업을 완료(또는 보강)할 때마다 잔액이 차감되고, 잔액이 부족해지는 수업일을 <b>결제 필요일</b>로 알려줘요.
         </p>
       </header>
 
       {!selectedStudent && (
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-lg border border-brand-200 bg-brand-50/60 p-3.5">
-            <p className="text-[11px] text-slate-500">이번 달 수입 (완료 수업)</p>
+            <p className="text-[11px] text-slate-500">이번 달 수입 (완료·보강)</p>
             <p className="text-lg font-bold text-brand-700 tabular-nums mt-0.5">
               {fmtCurrency(income.month)}
             </p>
@@ -345,7 +355,7 @@ export function AdminPayments() {
                     </p>
                   ) : (
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      결제 {fmtCurrency(b.paid)} · 완료 {fmtCurrency(b.used)}
+                      결제 {fmtCurrency(b.paid)} · 완료·보강 {fmtCurrency(b.used)}
                     </p>
                   )}
                 </div>
@@ -386,7 +396,7 @@ export function AdminPayments() {
                 </p>
               </div>
               <div className="rounded-lg border border-slate-200 bg-white p-3">
-                <p className="text-[11px] text-slate-500">완료 수업 차감</p>
+                <p className="text-[11px] text-slate-500">완료·보강 차감</p>
                 <p className="text-sm font-semibold text-slate-900 tabular-nums mt-0.5">
                   {fmtCurrency(sel.used)}
                 </p>
@@ -519,7 +529,7 @@ export function AdminPayments() {
             </div>
             {ledger.length === 0 ? (
               <p className="px-4 py-6 text-sm text-slate-400 text-center">
-                아직 결제·완료 수업 기록이 없습니다.
+                아직 결제·수업 기록이 없습니다.
               </p>
             ) : (
               <ul className="divide-y divide-slate-100">

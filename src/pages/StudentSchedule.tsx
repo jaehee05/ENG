@@ -899,9 +899,9 @@ function SessionModal({
                     },
                   )}
                 </div>
-                {session.status === 'done' && (
+                {(session.status === 'done' || session.status === 'makeup') && (
                   <p className="text-[11px] text-slate-400 mt-1.5">
-                    완료 상태이면 결제/정산에서 이 수업 금액이 잔액에서 차감됩니다.
+                    완료·보강 상태이면 결제/정산에서 이 수업 금액이 잔액에서 차감됩니다.
                   </p>
                 )}
               </div>
