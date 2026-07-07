@@ -794,11 +794,11 @@ function SessionModal({
                 <dt className="w-14 shrink-0 text-slate-500">장소</dt>
                 <dd className="text-slate-900">{session.location || '—'}</dd>
               </div>
-              <div className="flex gap-2 items-start">
-                <dt className="w-14 shrink-0 text-slate-500">금액</dt>
-                <dd className="text-slate-900 tabular-nums flex items-center gap-2 flex-wrap">
-                  <span>{fmtCurrency(session.cost)}</span>
-                  {isAdmin && (
+              {isAdmin && (
+                <div className="flex gap-2 items-start">
+                  <dt className="w-14 shrink-0 text-slate-500">금액</dt>
+                  <dd className="text-slate-900 tabular-nums flex items-center gap-2 flex-wrap">
+                    <span>{fmtCurrency(session.cost)}</span>
                     <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs text-slate-600">
                       <input
                         type="checkbox"
@@ -818,9 +818,9 @@ function SessionModal({
                         <span className="text-slate-400">저장 중…</span>
                       )}
                     </label>
-                  )}
-                </dd>
-              </div>
+                  </dd>
+                </div>
+              )}
               {isAdmin && payError && (
                 <p className="text-xs text-red-600 pl-16">{payError}</p>
               )}
