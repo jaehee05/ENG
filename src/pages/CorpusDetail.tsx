@@ -5,6 +5,7 @@ import {
   createVocabSet,
   deleteVocabSeries,
   getVocabSeries,
+  renameVocabSeriesSheets,
   updateVocabSeries,
 } from '../lib/firestore'
 import {
@@ -32,6 +33,9 @@ export function CorpusDetail() {
   const [generating, setGenerating] = useState(false)
   const [appending, setAppending] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  const [renamingTitle, setRenamingTitle] = useState(false)
+  const [titleDraft, setTitleDraft] = useState('')
+  const [savingTitle, setSavingTitle] = useState(false)
   const [editingIdx, setEditingIdx] = useState<number | null>(null)
   const [editEn, setEditEn] = useState('')
   const [editKo, setEditKo] = useState('')
@@ -293,6 +297,45 @@ export function CorpusDetail() {
     }
   }
 
+  function startRenameTitle() {
+    if (!series) return
+    setTitleDraft(series.title)
+    setRenamingTitle(true)
+  }
+
+  async function handleRenameTitle() {
+    if (!series) return
+    const next = titleDraft.trim()
+    if (!next) {
+      setNotice('교재명을 입력하세요.')
+      return
+    }
+    if (next === series.title) {
+      setRenamingTitle(false)
+      return
+    }
+    setSavingTitle(true)
+    setNotice(null)
+    try {
+      const oldTitle = series.title
+      // 교재명은 이미 시험지를 생성했더라도 언제든 변경 가능.
+      await updateVocabSeries(series.id, { title: next })
+      const renamed = await renameVocabSeriesSheets(oldTitle, next)
+      const refreshed = await getVocabSeries(series.id)
+      if (refreshed) setSeries(refreshed)
+      setRenamingTitle(false)
+      setNotice(
+        renamed > 0
+          ? `교재명을 변경했습니다. 생성된 DAY 시험지 ${renamed}개 제목도 함께 변경됨.`
+          : '교재명을 변경했습니다.',
+      )
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : '이름 변경 실패')
+    } finally {
+      setSavingTitle(false)
+    }
+  }
+
   async function handleDelete() {
     if (!series) return
     if (
@@ -322,7 +365,53 @@ export function CorpusDetail() {
           <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mt-1 mb-1">
             교재
           </p>
-          <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">{series.title}</h1>
+          {renamingTitle ? (
+            <div className="flex items-center gap-2 mt-0.5">
+              <input
+                type="text"
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    void handleRenameTitle()
+                  } else if (e.key === 'Escape') {
+                    setRenamingTitle(false)
+                  }
+                }}
+                className="w-full max-w-sm rounded-md border border-slate-300 px-3 py-1.5 text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+              <button
+                type="button"
+                onClick={() => void handleRenameTitle()}
+                disabled={savingTitle}
+                className="shrink-0 rounded-md bg-brand-600 text-white text-sm font-medium px-3 py-1.5 hover:bg-brand-700 disabled:opacity-50"
+              >
+                {savingTitle ? '저장 중…' : '저장'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setRenamingTitle(false)}
+                className="shrink-0 rounded-md border border-slate-300 text-slate-600 text-sm px-2.5 py-1.5 hover:bg-slate-100"
+              >
+                취소
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
+                {series.title}
+              </h1>
+              <button
+                type="button"
+                onClick={startRenameTitle}
+                className="shrink-0 text-xs text-slate-500 hover:text-slate-900 underline underline-offset-2"
+              >
+                이름 변경
+              </button>
+            </div>
+          )}
           <p className="text-sm text-slate-500 mt-1">
             전체 {total}단어 · 사용 {used} · 남은 {remaining} · 현재 DAY{' '}
             {series.lastDayNumber}까지 생성

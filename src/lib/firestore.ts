@@ -200,6 +200,30 @@ export async function deleteVocabSeries(id: string): Promise<void> {
   await deleteDoc(doc(db, 'vocabSeries', id))
 }
 
+/**
+ * 교재명 변경 시 이미 생성된 "{oldTitle} DAY N" 시험지 제목도 함께 갱신.
+ * 갱신한 시험지 개수를 반환. (교재명 변경은 언제든 가능하며 생성된 시험지와 무관하게 동작)
+ */
+export async function renameVocabSeriesSheets(
+  oldTitle: string,
+  newTitle: string,
+): Promise<number> {
+  if (!oldTitle || oldTitle === newTitle) return 0
+  const prefix = `${oldTitle} DAY `
+  const snap = await getDocs(collection(db, 'vocabSets'))
+  const batch = writeBatch(db)
+  let count = 0
+  for (const d of snap.docs) {
+    const title = (d.data() as { title?: string }).title ?? ''
+    if (title.startsWith(prefix)) {
+      batch.update(d.ref, { title: `${newTitle} DAY ${title.slice(prefix.length)}` })
+      count++
+    }
+  }
+  if (count > 0) await batch.commit()
+  return count
+}
+
 export async function listReadings(): Promise<Reading[]> {
   const snap = await getDocs(query(collection(db, 'readings'), orderBy('createdAt', 'desc')))
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Reading, 'id'>) }))
