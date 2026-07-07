@@ -73,6 +73,26 @@ export function AdminPayments() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // 금액 가리기 (화면 공유 시 프라이버시). 기기에 설정 저장.
+  const [masked, setMasked] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('pay_masked') === '1'
+    } catch {
+      return false
+    }
+  })
+  function toggleMasked() {
+    const next = !masked
+    setMasked(next)
+    try {
+      localStorage.setItem('pay_masked', next ? '1' : '0')
+    } catch {
+      // ignore
+    }
+  }
+  const money = (n: number) => (masked ? '•••••' : fmtCurrency(n))
+  const num = (n: number) => (masked ? '•••••' : n.toLocaleString('ko-KR'))
+
   const today = todayISO()
   const curMonth = today.slice(0, 7)
 
@@ -290,12 +310,37 @@ export function AdminPayments() {
   return (
     <div className="space-y-5">
       <header>
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-          관리
-        </p>
-        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
-          결제 / 정산
-        </h1>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+              관리
+            </p>
+            <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
+              결제 / 정산
+            </h1>
+          </div>
+          <button
+            type="button"
+            onClick={toggleMasked}
+            className="shrink-0 inline-flex items-center gap-1.5 rounded-md border border-slate-300 text-slate-600 text-xs font-medium px-2.5 py-1.5 hover:bg-slate-50"
+            title={masked ? '금액 표시' : '금액 가리기'}
+          >
+            {masked ? (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 10 8 10 8a13.2 13.2 0 0 1-1.67 2.68" />
+                <path d="M6.61 6.61A13.5 13.5 0 0 0 2 12s3 8 10 8a9.7 9.7 0 0 0 5.39-1.61" />
+                <path d="M3 3l18 18" />
+                <path d="M9.9 9.9a3 3 0 1 0 4.2 4.2" />
+              </svg>
+            ) : (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M2 12s3-8 10-8 10 8 10 8-3 8-10 8-10-8-10-8Z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            )}
+            {masked ? '금액 표시' : '금액 가리기'}
+          </button>
+        </div>
         <p className="text-xs text-slate-500 mt-1">
           수입은 <b>완료·보강 수업</b> 기준으로 집계됩니다. 선불 결제를 적립하면 수업을 완료(또는 보강)할 때마다 잔액이 차감되고, 잔액이 부족해지는 수업일을 <b>결제 필요일</b>로 알려줘요.
         </p>
@@ -306,16 +351,16 @@ export function AdminPayments() {
           <div className="rounded-lg border border-brand-200 bg-brand-50/60 p-3.5">
             <p className="text-[11px] text-slate-500">이번 달 수입 (완료·보강)</p>
             <p className="text-lg font-bold text-brand-700 tabular-nums mt-0.5">
-              {fmtCurrency(income.month)}
+              {money(income.month)}
             </p>
             <p className="text-[11px] text-slate-400 mt-0.5">
-              이번 달 입금 {fmtCurrency(income.received)}
+              이번 달 입금 {money(income.received)}
             </p>
           </div>
           <div className="rounded-lg border border-slate-200 bg-white p-3.5">
             <p className="text-[11px] text-slate-500">전체 누적 수입</p>
             <p className="text-lg font-bold text-slate-900 tabular-nums mt-0.5">
-              {fmtCurrency(income.total)}
+              {money(income.total)}
             </p>
           </div>
         </div>
@@ -355,7 +400,7 @@ export function AdminPayments() {
                     </p>
                   ) : (
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      결제 {fmtCurrency(b.paid)} · 완료·보강 {fmtCurrency(b.used)}
+                      결제 {money(b.paid)} · 완료·보강 {money(b.used)}
                     </p>
                   )}
                 </div>
@@ -365,7 +410,7 @@ export function AdminPayments() {
                       low ? 'text-red-600' : 'text-slate-900'
                     }`}
                   >
-                    {fmtCurrency(b.balance)}
+                    {money(b.balance)}
                   </p>
                   <p className="text-[10px] text-slate-400">잔액</p>
                 </div>
@@ -392,13 +437,13 @@ export function AdminPayments() {
               <div className="rounded-lg border border-slate-200 bg-white p-3">
                 <p className="text-[11px] text-slate-500">총 결제</p>
                 <p className="text-sm font-semibold text-slate-900 tabular-nums mt-0.5">
-                  {fmtCurrency(sel.paid)}
+                  {money(sel.paid)}
                 </p>
               </div>
               <div className="rounded-lg border border-slate-200 bg-white p-3">
                 <p className="text-[11px] text-slate-500">완료·보강 차감</p>
                 <p className="text-sm font-semibold text-slate-900 tabular-nums mt-0.5">
-                  {fmtCurrency(sel.used)}
+                  {money(sel.used)}
                 </p>
               </div>
               <div
@@ -414,7 +459,7 @@ export function AdminPayments() {
                     sel.balance <= 0 ? 'text-red-600' : 'text-brand-700'
                   }`}
                 >
-                  {fmtCurrency(sel.balance)}
+                  {money(sel.balance)}
                 </p>
               </div>
             </div>
@@ -454,7 +499,7 @@ export function AdminPayments() {
                       {s.title}
                     </span>
                     <span className="shrink-0 text-xs text-slate-500 tabular-nums">
-                      −{fmtCurrency(s.cost || 0).replace('원', '')}
+                      −{num(s.cost || 0)}
                     </span>
                     <span
                       className={`w-24 shrink-0 text-right text-xs font-medium tabular-nums ${
@@ -462,7 +507,7 @@ export function AdminPayments() {
                       }`}
                     >
                       {after < 0 ? '부족 ' : '잔액 '}
-                      {after.toLocaleString('ko-KR')}
+                      {num(after)}
                     </span>
                   </li>
                 ))}
@@ -556,10 +601,10 @@ export function AdminPayments() {
                       }`}
                     >
                       {tx.delta >= 0 ? '+' : '−'}
-                      {fmtCurrency(Math.abs(tx.delta)).replace('원', '')}
+                      {num(Math.abs(tx.delta))}
                     </span>
                     <span className="w-20 shrink-0 text-right text-[11px] text-slate-400 tabular-nums">
-                      잔액 {tx.balanceAfter.toLocaleString('ko-KR')}
+                      잔액 {num(tx.balanceAfter)}
                     </span>
                     {tx.paymentId ? (
                       <button
