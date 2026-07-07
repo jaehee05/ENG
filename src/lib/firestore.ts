@@ -1170,6 +1170,45 @@ export async function createClassSession(input: {
   return ref.id
 }
 
+/** 여러 수업을 한 번의 배치로 생성 (반복 수업 자동 추가용). 생성 개수 반환. */
+export async function createClassSessionsBatch(
+  inputs: Array<{
+    studentUid: string
+    title: string
+    dateISO: string
+    startTime: string
+    endTime: string
+    location: string
+    cost: number
+    status: ClassSessionStatus
+    paid?: boolean
+    note?: string
+  }>,
+): Promise<number> {
+  if (inputs.length === 0) return 0
+  const batch = writeBatch(db)
+  for (const input of inputs) {
+    const ref = doc(collection(db, 'classSessions'))
+    const payload: Record<string, unknown> = {
+      studentUid: input.studentUid,
+      title: input.title,
+      dateISO: input.dateISO,
+      startTime: input.startTime,
+      endTime: input.endTime,
+      location: input.location,
+      cost: input.cost,
+      status: input.status,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }
+    if (input.paid) payload.paid = true
+    if (input.note && input.note.trim()) payload.note = input.note.trim()
+    batch.set(ref, payload)
+  }
+  await batch.commit()
+  return inputs.length
+}
+
 export async function updateClassSession(
   id: string,
   patch: Partial<

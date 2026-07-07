@@ -30,6 +30,8 @@ export interface SessionFormValues {
   status: ClassSessionStatus
   paid: boolean
   note: string
+  /** 반복 생성 주 수 ('1'=반복 안 함). 신규 추가 시에만 사용. */
+  repeatWeeks: string
 }
 
 export const EMPTY_SESSION_FORM: SessionFormValues = {
@@ -42,6 +44,7 @@ export const EMPTY_SESSION_FORM: SessionFormValues = {
   status: 'scheduled',
   paid: false,
   note: '',
+  repeatWeeks: '1',
 }
 
 export function fromSession(s: ClassSession): SessionFormValues {
@@ -55,6 +58,7 @@ export function fromSession(s: ClassSession): SessionFormValues {
     status: s.status,
     paid: !!s.paid,
     note: s.note ?? '',
+    repeatWeeks: '1',
   }
 }
 
@@ -68,6 +72,8 @@ export interface SessionFormResult {
   status: ClassSessionStatus
   paid: boolean
   note?: string
+  /** 1이면 단일 수업, N이면 매주 같은 요일로 N주간 생성. */
+  repeatWeeks: number
 }
 
 interface Props {
@@ -77,6 +83,8 @@ interface Props {
   students?: UserAccount[]
   studentUid?: string
   onStudentChange?: (uid: string) => void
+  /** 반복 생성 옵션 노출 (신규 추가 시에만). */
+  allowRepeat?: boolean
   onSubmit: (result: SessionFormResult) => Promise<void>
   onCancel?: () => void
   submitLabel: string
@@ -90,6 +98,7 @@ export function SessionForm({
   students,
   studentUid,
   onStudentChange,
+  allowRepeat,
   onSubmit,
   onCancel,
   submitLabel,
@@ -116,6 +125,9 @@ export function SessionForm({
       setLocalErr('금액은 0 이상의 숫자여야 합니다.')
       return
     }
+    const repeatWeeks = allowRepeat
+      ? Math.max(1, parseInt(value.repeatWeeks, 10) || 1)
+      : 1
     await onSubmit({
       title: value.title.trim(),
       dateISO: value.dateISO,
@@ -126,6 +138,7 @@ export function SessionForm({
       status: value.status,
       paid: value.paid,
       note: value.note,
+      repeatWeeks,
     })
   }
 
@@ -232,6 +245,26 @@ export function SessionForm({
             ))}
           </select>
         </label>
+        {allowRepeat && (
+          <label className="col-span-2 sm:col-span-4 flex flex-col gap-1">
+            <span className="text-xs font-medium text-slate-600">
+              반복 생성{' '}
+              <span className="font-normal text-slate-400">
+                (매주 같은 요일로 자동 추가)
+              </span>
+            </span>
+            <select
+              value={value.repeatWeeks}
+              onChange={(e) => onChange({ ...value, repeatWeeks: e.target.value })}
+              className={inputCls}
+            >
+              <option value="1">반복 안 함 (1회)</option>
+              <option value="4">매주 · 4주 (4회)</option>
+              <option value="8">매주 · 8주 (8회)</option>
+              <option value="12">매주 · 12주 (12회)</option>
+            </select>
+          </label>
+        )}
         <label className="col-span-2 sm:col-span-4 inline-flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
           <input
             type="checkbox"

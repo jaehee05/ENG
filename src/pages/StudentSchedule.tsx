@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../contexts/useAuth'
 import { listAccounts } from '../lib/account'
 import {
-  createClassSession,
+  createClassSessionsBatch,
   deleteClassSession,
   listAllClassSessions,
   listClassSessionsForStudent,
@@ -98,6 +98,17 @@ function buildCalendarCells(
 
 function fmtCurrency(n: number): string {
   return `${n.toLocaleString('ko-KR')}원`
+}
+
+/** 'YYYY-MM-DD'에 일수를 더한 로컬 날짜 문자열 (달력 기준, TZ 안전). */
+function addDaysISO(iso: string, days: number): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  const dt = new Date(Date.UTC(y, m - 1, d))
+  dt.setUTCDate(dt.getUTCDate() + days)
+  const yy = dt.getUTCFullYear()
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, '0')
+  const dd = String(dt.getUTCDate()).padStart(2, '0')
+  return `${yy}-${mm}-${dd}`
 }
 
 // 학생 색상 팔레트/조회 로직은 src/lib/studentColor.ts 로 분리.
@@ -260,7 +271,21 @@ export function StudentSchedule() {
     setAddSaving(true)
     setAddError(null)
     try {
-      await createClassSession({ studentUid: addStudentUid, ...v })
+      const weeks = Math.max(1, v.repeatWeeks || 1)
+      // 매주 같은 요일로 weeks회 생성 (첫 회는 선택한 날짜).
+      const inputs = Array.from({ length: weeks }, (_, k) => ({
+        studentUid: addStudentUid,
+        title: v.title,
+        dateISO: addDaysISO(v.dateISO, 7 * k),
+        startTime: v.startTime,
+        endTime: v.endTime,
+        location: v.location,
+        cost: v.cost,
+        status: v.status,
+        paid: v.paid,
+        note: v.note,
+      }))
+      await createClassSessionsBatch(inputs)
       setAddOpen(false)
       setAddForm(EMPTY_SESSION_FORM)
       setAddStudentUid('')
@@ -617,6 +642,7 @@ export function StudentSchedule() {
               students={students}
               studentUid={addStudentUid}
               onStudentChange={setAddStudentUid}
+              allowRepeat
               onSubmit={handleAdd}
               onCancel={() => setAddOpen(false)}
               submitLabel="등록"
