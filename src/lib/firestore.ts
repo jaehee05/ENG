@@ -512,7 +512,16 @@ export async function createKoreanMock(input: {
 
 export async function updateKoreanMock(
   id: string,
-  patch: Partial<Pick<KoreanMock, 'title' | 'subject' | 'startNumber' | 'questions'>>,
+  patch: Partial<
+    Pick<KoreanMock, 'title' | 'subject' | 'startNumber' | 'questions'>
+  > & {
+    /** 해설 PDF 설정 정보. null 이면 해설 PDF 를 제거(필드 삭제). */
+    explanationPdf?: {
+      url: string
+      name: string
+      path: string
+    } | null
+  },
 ): Promise<void> {
   const update: Record<string, unknown> = {}
   if (patch.title !== undefined) update.title = patch.title
@@ -521,6 +530,17 @@ export async function updateKoreanMock(
     update.startNumber = patch.startNumber && patch.startNumber > 0 ? patch.startNumber : 1
   }
   if (patch.questions !== undefined) update.questions = patch.questions
+  if (patch.explanationPdf !== undefined) {
+    if (patch.explanationPdf === null) {
+      update.explanationPdfUrl = deleteField()
+      update.explanationPdfName = deleteField()
+      update.explanationPdfPath = deleteField()
+    } else {
+      update.explanationPdfUrl = patch.explanationPdf.url
+      update.explanationPdfName = patch.explanationPdf.name
+      update.explanationPdfPath = patch.explanationPdf.path
+    }
+  }
   if (Object.keys(update).length === 0) return
   await updateDoc(doc(db, 'koreanMocks', id), update)
 }

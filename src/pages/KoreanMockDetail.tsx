@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import {
@@ -9,6 +9,10 @@ import {
   listKoreanMockAttempts,
   updateKoreanMock,
 } from '../lib/firestore'
+import {
+  deleteMockExplanationPdf,
+  uploadMockExplanationPdf,
+} from '../lib/mockStorage'
 import { MyAttemptsBox } from '../components/MyAttemptsBox'
 import {
   getMockSubject,
@@ -44,6 +48,11 @@ export function KoreanMockDetail() {
   const [eSubject, setESubject] = useState<MockSubject>('korean')
   const [eQuestions, setEQuestions] = useState<KoreanMockQuestion[]>([])
   const [saving, setSaving] = useState(false)
+
+  // 해설 PDF (관리자)
+  const pdfInputRef = useRef<HTMLInputElement>(null)
+  const [pdfBusy, setPdfBusy] = useState(false)
+  const [pdfError, setPdfError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -124,6 +133,57 @@ export function KoreanMockDetail() {
       navigate('/admin/korean-mocks')
     } catch (err) {
       setError(err instanceof Error ? err.message : '삭제 실패')
+    }
+  }
+
+  async function handlePdfPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    // 같은 파일 재선택도 인식되도록 input 값 초기화.
+    e.target.value = ''
+    if (!file || !mock) return
+    setPdfError(null)
+    setPdfBusy(true)
+    try {
+      const prevPath = mock.explanationPdfPath
+      const info = await uploadMockExplanationPdf(mock.id, file)
+      await updateKoreanMock(mock.id, { explanationPdf: info })
+      // 교체 시 이전 파일 정리(실패해도 무시).
+      if (prevPath && prevPath !== info.path) {
+        deleteMockExplanationPdf(prevPath).catch(() => {})
+      }
+      setMock({
+        ...mock,
+        explanationPdfUrl: info.url,
+        explanationPdfName: info.name,
+        explanationPdfPath: info.path,
+      })
+    } catch (err) {
+      setPdfError(err instanceof Error ? err.message : '해설 PDF 업로드 실패')
+    } finally {
+      setPdfBusy(false)
+    }
+  }
+
+  async function handleRemovePdf() {
+    if (!mock || !mock.explanationPdfUrl) return
+    if (!window.confirm('해설 PDF를 삭제하시겠습니까?')) return
+    setPdfError(null)
+    setPdfBusy(true)
+    try {
+      if (mock.explanationPdfPath) {
+        await deleteMockExplanationPdf(mock.explanationPdfPath)
+      }
+      await updateKoreanMock(mock.id, { explanationPdf: null })
+      setMock({
+        ...mock,
+        explanationPdfUrl: undefined,
+        explanationPdfName: undefined,
+        explanationPdfPath: undefined,
+      })
+    } catch (err) {
+      setPdfError(err instanceof Error ? err.message : '해설 PDF 삭제 실패')
+    } finally {
+      setPdfBusy(false)
     }
   }
 
@@ -243,6 +303,70 @@ export function KoreanMockDetail() {
                 ))}
               </div>
             )}
+          </div>
+        </section>
+      )}
+
+      {/* 관리자: 해설 PDF */}
+      {isAdmin && (
+        <section className="space-y-3">
+          <h2 className="text-base font-semibold text-slate-900">해설 PDF</h2>
+          <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
+            <p className="text-xs text-slate-500">
+              해설 PDF를 등록하면 학생이 채점을 마친 뒤 결과 화면에서 열람할 수
+              있습니다. 등록하지 않으면 채점 후 해설은 제공되지 않습니다. (PDF,
+              10MB 이하)
+            </p>
+            <input
+              ref={pdfInputRef}
+              type="file"
+              accept="application/pdf"
+              onChange={handlePdfPick}
+              className="hidden"
+            />
+            {mock.explanationPdfUrl ? (
+              <div className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                <a
+                  href={mock.explanationPdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="min-w-0 flex items-center gap-2 text-sm text-brand-700 hover:underline"
+                >
+                  <span aria-hidden>📄</span>
+                  <span className="truncate">
+                    {mock.explanationPdfName ?? '해설 PDF'}
+                  </span>
+                </a>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => pdfInputRef.current?.click()}
+                    disabled={pdfBusy}
+                    className="text-xs text-slate-500 hover:text-slate-900 px-1 disabled:opacity-50"
+                  >
+                    {pdfBusy ? '처리 중…' : '교체'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRemovePdf}
+                    disabled={pdfBusy}
+                    className="text-xs text-slate-400 hover:text-red-600 px-1 disabled:opacity-50"
+                  >
+                    삭제
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => pdfInputRef.current?.click()}
+                disabled={pdfBusy}
+                className="rounded-md border border-slate-300 text-slate-700 text-sm font-medium px-4 py-2 hover:bg-slate-50 disabled:opacity-50"
+              >
+                {pdfBusy ? '업로드 중…' : '해설 PDF 업로드'}
+              </button>
+            )}
+            {pdfError && <p className="text-sm text-red-600">{pdfError}</p>}
           </div>
         </section>
       )}

@@ -1,0 +1,17 @@
+rules_version = '2';
+
+// IMPORTANT: 이 프로젝트는 Firebase Authentication 을 의도적으로 사용하지 않습니다
+// (세션은 localStorage, request.auth 없음 — firestore.rules 참고). 따라서 Storage
+// 규칙도 규칙 계층에서 사용자별 접근을 강제할 수 없습니다. 민감한 파일은 올리지 마세요.
+service firebase.storage {
+  match /b/{bucket}/o {
+    // 모의고사 해설 PDF. 관리자가 업로드하고 학생이 채점 후 열람.
+    match /mock-explanations/{mockId}/{fileName} {
+      allow read: if true;
+      // 10MB 이하 PDF 만 허용.
+      allow write: if request.resource == null
+        || (request.resource.size < 10 * 1024 * 1024
+            && request.resource.contentType == 'application/pdf');
+    }
+  }
+}

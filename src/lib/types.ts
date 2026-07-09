@@ -344,6 +344,12 @@ export interface KoreanMock {
   /** 답안 일괄 입력 시 첫 문항 번호. 영어는 보통 18. 미설정이면 1. */
   startNumber?: number
   questions: KoreanMockQuestion[]
+  /** 해설 PDF 다운로드 URL(Storage). 설정 시 채점 후 학생에게 제공, 없으면 생략. */
+  explanationPdfUrl?: string
+  /** 해설 PDF 원본 파일명(표시용). */
+  explanationPdfName?: string
+  /** 해설 PDF Storage 경로(교체·삭제용). */
+  explanationPdfPath?: string
   createdAt: Timestamp | null
   createdBy: string
   createdByName: string

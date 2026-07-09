@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { getAttempt } from '../lib/firestore'
+import { getAttempt, getKoreanMock } from '../lib/firestore'
 import {
   MOCK_SUBJECT_LABEL,
   type Attempt,
+  type KoreanMock,
   type MockSubject,
 } from '../lib/types'
 
@@ -15,6 +16,7 @@ const SUBJECT_BADGE_CLASS: Record<MockSubject, string> = {
 export function KoreanMockResult() {
   const { id, attemptId } = useParams<{ id: string; attemptId: string }>()
   const [attempt, setAttempt] = useState<Attempt | null>(null)
+  const [mock, setMock] = useState<KoreanMock | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -28,6 +30,14 @@ export function KoreanMockResult() {
       .catch((e) => setError(e.message ?? '불러오기 실패'))
       .finally(() => setLoading(false))
   }, [attemptId])
+
+  useEffect(() => {
+    if (!id) return
+    // 해설 PDF 노출용으로 모의고사 정보를 함께 조회. 실패해도 결과 화면은 유지.
+    getKoreanMock(id)
+      .then(setMock)
+      .catch(() => {})
+  }, [id])
 
   if (loading) return <p className="text-slate-500 text-sm">불러오는 중…</p>
   if (error) return <p className="text-red-600 text-sm">{error}</p>
@@ -80,6 +90,16 @@ export function KoreanMockResult() {
             style={{ width: `${ratio}%` }}
           />
         </div>
+        {mock?.explanationPdfUrl && (
+          <a
+            href={mock.explanationPdfUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-4 inline-flex items-center gap-2 rounded-md bg-brand-600 text-white text-sm font-semibold px-4 py-2 hover:bg-brand-700 transition"
+          >
+            <span aria-hidden>📄</span> 해설 보기
+          </a>
+        )}
       </div>
 
       <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
