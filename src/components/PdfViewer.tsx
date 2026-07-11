@@ -34,6 +34,7 @@ export function PdfViewer({ url, title, onClose }: PdfViewerProps) {
   useEffect(() => {
     let cancelled = false
     let pdfDoc: { numPages: number; getPage: (n: number) => Promise<unknown>; destroy: () => void } | null = null
+    const objectUrls: string[] = []
 
     async function run() {
       setStatus('loading')
@@ -56,9 +57,15 @@ export function PdfViewer({ url, title, onClose }: PdfViewerProps) {
       if (!container) return
       container.innerHTML = ''
 
-      // 컨테이너 실제 너비에 맞춰 렌더(선명도 위해 DPR 반영, 과도한 캔버스 방지 위해 상한).
-      const cssWidth = container.clientWidth || 800
-      const dpr = Math.min(window.devicePixelRatio || 1, 2)
+      // 표시 폭에 맞춰 렌더. 화질을 위해 DPR 을 반영하되, iOS WebKit 의 캔버스
+      // 메모리 한계를 넘지 않도록 캔버스 픽셀 폭에 상한(MAX_PX_W)을 둔다.
+      const cssWidth =
+        container.clientWidth ||
+        container.parentElement?.clientWidth ||
+        window.innerWidth
+      const dpr = window.devicePixelRatio || 1
+      const MAX_PX_W = 2400
+      const pxWidth = Math.min(cssWidth * dpr, MAX_PX_W)
 
       for (let i = 1; i <= pdfDoc.numPages; i++) {
         const page = (await pdfDoc.getPage(i)) as {
@@ -68,21 +75,37 @@ export function PdfViewer({ url, title, onClose }: PdfViewerProps) {
         if (cancelled) return
 
         const base = page.getViewport({ scale: 1 })
-        const scale = (cssWidth / base.width) * dpr
-        const viewport = page.getViewport({ scale })
+        const viewport = page.getViewport({ scale: pxWidth / base.width })
 
+        // 한 페이지만 캔버스에 렌더한 뒤 즉시 이미지로 변환하고 캔버스는 버린다.
+        // → 살아있는 큰 캔버스가 항상 1개뿐이라 메모리가 터지지 않는다.
         const canvas = document.createElement('canvas')
         canvas.width = Math.floor(viewport.width)
         canvas.height = Math.floor(viewport.height)
-        canvas.style.width = '100%'
-        canvas.style.height = 'auto'
-        canvas.style.display = 'block'
-        canvas.className = 'rounded shadow-sm bg-white'
         const ctx = canvas.getContext('2d')
         if (!ctx) continue
-        container.appendChild(canvas)
         await page.render({ canvasContext: ctx, viewport }).promise
         if (cancelled) return
+
+        const blob = await new Promise<Blob | null>((resolve) =>
+          canvas.toBlob(resolve, 'image/jpeg', 0.92),
+        )
+        // 캔버스 메모리 즉시 해제.
+        canvas.width = 0
+        canvas.height = 0
+        if (cancelled) return
+        if (!blob) continue
+
+        const imgUrl = URL.createObjectURL(blob)
+        objectUrls.push(imgUrl)
+        const img = document.createElement('img')
+        img.src = imgUrl
+        img.style.width = '100%'
+        img.style.height = 'auto'
+        img.style.display = 'block'
+        img.className = 'rounded shadow-sm bg-white'
+        img.draggable = false
+        container.appendChild(img)
       }
 
       if (!cancelled) setStatus('done')
@@ -104,6 +127,7 @@ export function PdfViewer({ url, title, onClose }: PdfViewerProps) {
 
     return () => {
       cancelled = true
+      objectUrls.forEach((u) => URL.revokeObjectURL(u))
       pdfDoc?.destroy()
     }
   }, [url])
