@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { PdfViewer } from '../components/PdfViewer'
 import { getAttempt, getKoreanMock } from '../lib/firestore'
 import {
   MOCK_SUBJECT_LABEL,
@@ -19,6 +20,7 @@ export function KoreanMockResult() {
   const [mock, setMock] = useState<KoreanMock | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [viewerOpen, setViewerOpen] = useState(false)
 
   useEffect(() => {
     if (!attemptId) return
@@ -91,14 +93,13 @@ export function KoreanMockResult() {
           />
         </div>
         {mock?.explanationPdfUrl && (
-          <a
-            href={mock.explanationPdfUrl}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            type="button"
+            onClick={() => setViewerOpen(true)}
             className="mt-4 inline-flex items-center gap-2 rounded-md bg-brand-600 text-white text-sm font-semibold px-4 py-2 hover:bg-brand-700 transition"
           >
             <span aria-hidden>📄</span> 해설 보기
-          </a>
+          </button>
         )}
       </div>
 
@@ -168,6 +169,14 @@ export function KoreanMockResult() {
           목록으로
         </Link>
       </div>
+
+      {viewerOpen && mock?.explanationPdfUrl && (
+        <PdfViewer
+          url={mock.explanationPdfUrl}
+          title={mock.explanationPdfName ?? '해설'}
+          onClose={() => setViewerOpen(false)}
+        />
+      )}
     </div>
   )
 }

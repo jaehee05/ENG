@@ -14,6 +14,7 @@ import {
   uploadMockExplanationPdf,
 } from '../lib/mockStorage'
 import { MyAttemptsBox } from '../components/MyAttemptsBox'
+import { PdfViewer } from '../components/PdfViewer'
 import {
   getMockSubject,
   MOCK_SUBJECT_LABEL,
@@ -53,6 +54,7 @@ export function KoreanMockDetail() {
   const pdfInputRef = useRef<HTMLInputElement>(null)
   const [pdfBusy, setPdfBusy] = useState(false)
   const [pdfError, setPdfError] = useState<string | null>(null)
+  const [pdfViewerOpen, setPdfViewerOpen] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -326,17 +328,16 @@ export function KoreanMockDetail() {
             />
             {mock.explanationPdfUrl ? (
               <div className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-                <a
-                  href={mock.explanationPdfUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={() => setPdfViewerOpen(true)}
                   className="min-w-0 flex items-center gap-2 text-sm text-brand-700 hover:underline"
                 >
                   <span aria-hidden>📄</span>
                   <span className="truncate">
                     {mock.explanationPdfName ?? '해설 PDF'}
                   </span>
-                </a>
+                </button>
                 <div className="flex items-center gap-2 shrink-0">
                   <button
                     type="button"
@@ -418,6 +419,14 @@ export function KoreanMockDetail() {
             </ul>
           )}
         </section>
+      )}
+
+      {pdfViewerOpen && mock.explanationPdfUrl && (
+        <PdfViewer
+          url={mock.explanationPdfUrl}
+          title={mock.explanationPdfName ?? '해설 PDF'}
+          onClose={() => setPdfViewerOpen(false)}
+        />
       )}
     </div>
   )
