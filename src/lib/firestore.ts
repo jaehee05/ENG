@@ -1294,6 +1294,19 @@ export async function listAllPayments(): Promise<Payment[]> {
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Payment, 'id'>) }))
 }
 
+export async function listPaymentsForStudent(
+  studentUid: string,
+): Promise<Payment[]> {
+  const snap = await getDocs(
+    query(
+      collection(db, 'payments'),
+      where('studentUid', '==', studentUid),
+      orderBy('dateISO', 'desc'),
+    ),
+  )
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Payment, 'id'>) }))
+}
+
 export async function deletePayment(id: string): Promise<void> {
   await deleteDoc(doc(db, 'payments', id))
 }

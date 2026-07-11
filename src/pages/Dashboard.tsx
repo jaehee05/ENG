@@ -7,8 +7,11 @@ import {
   listAnnouncements,
   listAssignmentsForStudent,
   listAttemptsForUser,
+  listClassSessionsForStudent,
+  listPaymentsForStudent,
 } from '../lib/firestore'
 import { accountSubjects, isAssignmentVisibleToStudent } from '../lib/types'
+import { computeStudentBalance, fmtDateLabel, todayISO } from '../lib/payments'
 import type { Announcement, Assignment, Attempt } from '../lib/types'
 
 interface ShortcutCard {
@@ -112,8 +115,11 @@ export function Dashboard() {
   const [topAnnouncement, setTopAnnouncement] = useState<Announcement | null>(
     null,
   )
+  // 학생 본인의 다음 결제 필요일(없으면 null → 표시 안 함).
+  const [dueDateISO, setDueDateISO] = useState<string | null>(null)
 
   // 국어만 수강하는 학생은 대시보드 없이 바로 과제 페이지로.
+  // (실제 리다이렉트는 모든 훅 호출 뒤에서 — 훅 순서 보존.)
   const koreanOnly =
     !!profile &&
     profile.role === 'student' &&
@@ -121,7 +127,6 @@ export function Dashboard() {
       const s = accountSubjects(profile)
       return s.korean && !s.english
     })()
-  if (koreanOnly) return <Navigate to="/assignments" replace />
 
 
   useEffect(() => {
@@ -145,6 +150,25 @@ export function Dashboard() {
       .catch(() => {
         // dashboard 보조 정보. 실패해도 카드는 보여야 함
       })
+  }, [profile])
+
+  useEffect(() => {
+    if (!profile || profile.role !== 'student') return
+    let alive = true
+    Promise.all([
+      listPaymentsForStudent(profile.id),
+      listClassSessionsForStudent(profile.id),
+    ])
+      .then(([pays, sess]) => {
+        if (!alive) return
+        setDueDateISO(computeStudentBalance(pays, sess, todayISO()).dueDateISO)
+      })
+      .catch(() => {
+        // 결제 정보는 보조. 실패해도 대시보드는 유지.
+      })
+    return () => {
+      alive = false
+    }
   }, [profile])
 
   const openRaw = useMemo(
@@ -225,13 +249,23 @@ export function Dashboard() {
     return '좋은 저녁이에요'
   })()
 
+  // 모든 훅 호출 후 리다이렉트(훅 순서 보존).
+  if (koreanOnly) return <Navigate to="/assignments" replace />
+
   return (
     <div className="space-y-8">
       <section>
         <p className="text-xs text-slate-500 mb-1">{greeting}</p>
-        <h1 className="text-2xl sm:text-[28px] font-semibold text-slate-900 tracking-tight">
-          {profile?.displayName}님
-        </h1>
+        <div className="flex items-center gap-x-2 gap-y-1 flex-wrap">
+          <h1 className="text-2xl sm:text-[28px] font-semibold text-slate-900 tracking-tight">
+            {profile?.displayName}님
+          </h1>
+          {dueDateISO && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 text-amber-700 text-xs font-medium px-2 py-0.5">
+              다음 결제 {fmtDateLabel(dueDateISO)}
+            </span>
+          )}
+        </div>
         {totalOpen > 0 ? (
           <p className="text-sm text-slate-500 mt-1.5">
             오늘 끝낼 과제가{' '}
