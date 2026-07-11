@@ -42,6 +42,7 @@ import { KoreanMockNew } from './pages/KoreanMockNew'
 import { KoreanMockDetail } from './pages/KoreanMockDetail'
 import { KoreanMockTake } from './pages/KoreanMockTake'
 import { KoreanMockResult } from './pages/KoreanMockResult'
+import { KoreanMockExplanation } from './pages/KoreanMockExplanation'
 import { StudentSchedule } from './pages/StudentSchedule'
 import { AdminPayments } from './pages/AdminPayments'
 
@@ -78,6 +79,7 @@ function App() {
               <Route path="/korean-mocks" element={<KoreanMockList />} />
               <Route path="/korean-mocks/:id" element={<KoreanMockDetail />} />
               <Route path="/korean-mocks/:id/take" element={<KoreanMockTake />} />
+              <Route path="/korean-mocks/:id/explanation" element={<KoreanMockExplanation />} />
               <Route path="/korean-mocks/:id/result/:attemptId" element={<KoreanMockResult />} />
 
               <Route path="/history" element={<MyHistory />} />

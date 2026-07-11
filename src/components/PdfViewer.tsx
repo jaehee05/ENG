@@ -17,10 +17,69 @@ type Status = 'loading' | 'done' | 'error'
  * 어렵게 만든다(실용적 차단 — 우클릭/컨텍스트 메뉴 차단, 텍스트 선택 불가).
  * 다만 클라이언트로 전달된 바이트나 스크린샷까지 막을 수는 없다.
  */
+const MIN_ZOOM = 1
+const MAX_ZOOM = 4
+const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z))
+
 export function PdfViewer({ url, title, onClose }: PdfViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
   const [status, setStatus] = useState<Status>('loading')
   const [error, setError] = useState<string | null>(null)
+  // 뷰어 내부 전용 확대(앱 전역은 user-scalable=no 라 네이티브 핀치줌이 꺼져 있음).
+  const [zoom, setZoom] = useState(1)
+  const zoomRef = useRef(1)
+  const applyZoom = (z: number) => {
+    const next = clampZoom(z)
+    zoomRef.current = next
+    setZoom(next)
+  }
+
+  // 핀치 확대 + 더블탭 확대(뷰어 스크롤 영역에서만). 네이티브 스크롤과 겹치지
+  // 않도록 두 손가락일 때만 preventDefault 한다(리스너는 non-passive).
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    let startDist = 0
+    let startZoom = 1
+    let lastTap = 0
+    const dist = (t: TouchList) =>
+      Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY)
+
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        startDist = dist(e.touches)
+        startZoom = zoomRef.current
+      }
+    }
+    const onMove = (e: TouchEvent) => {
+      if (e.touches.length === 2 && startDist > 0) {
+        e.preventDefault()
+        applyZoom(startZoom * (dist(e.touches) / startDist))
+      }
+    }
+    const onEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) startDist = 0
+      // 한 손가락 더블탭: 확대/원복 토글.
+      if (e.touches.length === 0 && e.changedTouches.length === 1) {
+        const now = e.timeStamp
+        if (now - lastTap < 300) {
+          applyZoom(zoomRef.current > 1 ? 1 : 2)
+          lastTap = 0
+        } else {
+          lastTap = now
+        }
+      }
+    }
+    el.addEventListener('touchstart', onStart, { passive: false })
+    el.addEventListener('touchmove', onMove, { passive: false })
+    el.addEventListener('touchend', onEnd)
+    return () => {
+      el.removeEventListener('touchstart', onStart)
+      el.removeEventListener('touchmove', onMove)
+      el.removeEventListener('touchend', onEnd)
+    }
+  }, [])
 
   // Esc 로 닫기.
   useEffect(() => {
@@ -64,8 +123,10 @@ export function PdfViewer({ url, title, onClose }: PdfViewerProps) {
         container.parentElement?.clientWidth ||
         window.innerWidth
       const dpr = window.devicePixelRatio || 1
-      const MAX_PX_W = 2400
-      const pxWidth = Math.min(cssWidth * dpr, MAX_PX_W)
+      // 확대 시에도 어느 정도 선명하도록 표시 해상도보다 여유 있게 렌더하되,
+      // iOS 캔버스/디코딩 메모리를 감안해 픽셀 폭에 상한을 둔다.
+      const MAX_PX_W = 3000
+      const pxWidth = Math.min(Math.round(cssWidth * dpr * 1.5), MAX_PX_W)
 
       for (let i = 1; i <= pdfDoc.numPages; i++) {
         const page = (await pdfDoc.getPage(i)) as {
@@ -147,23 +208,55 @@ export function PdfViewer({ url, title, onClose }: PdfViewerProps) {
           <span aria-hidden>📄</span>
           <span className="truncate text-sm font-semibold">{title ?? '해설'}</span>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="shrink-0 rounded-md bg-white/10 hover:bg-white/20 text-white text-sm font-medium px-3 py-1.5 transition"
-        >
-          닫기
-        </button>
+        <div className="shrink-0 flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => applyZoom(zoomRef.current - 0.5)}
+            disabled={zoom <= MIN_ZOOM}
+            aria-label="축소"
+            className="w-8 h-8 rounded-md bg-white/10 hover:bg-white/20 text-white text-lg leading-none transition disabled:opacity-30"
+          >
+            −
+          </button>
+          <span className="w-11 text-center text-white text-xs tabular-nums">
+            {Math.round(zoom * 100)}%
+          </span>
+          <button
+            type="button"
+            onClick={() => applyZoom(zoomRef.current + 0.5)}
+            disabled={zoom >= MAX_ZOOM}
+            aria-label="확대"
+            className="w-8 h-8 rounded-md bg-white/10 hover:bg-white/20 text-white text-lg leading-none transition disabled:opacity-30"
+          >
+            +
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="ml-1 rounded-md bg-white/10 hover:bg-white/20 text-white text-sm font-medium px-3 py-1.5 transition"
+          >
+            닫기
+          </button>
+        </div>
       </header>
 
       <div
-        className="flex-1 overflow-y-auto overscroll-contain px-3 py-4"
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)' }}
+        ref={scrollRef}
+        className="flex-1 overflow-auto overscroll-contain px-3 py-4"
+        style={{
+          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)',
+          touchAction: zoom > 1 ? 'pan-x pan-y' : 'pan-y',
+        }}
       >
         <div
           ref={containerRef}
-          className="mx-auto max-w-3xl space-y-3 select-none"
-          style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none' }}
+          className="mx-auto space-y-3 select-none"
+          style={{
+            width: zoom > 1 ? `${zoom * 100}%` : '100%',
+            maxWidth: zoom > 1 ? 'none' : '48rem',
+            WebkitTouchCallout: 'none',
+            WebkitUserSelect: 'none',
+          }}
         />
         {status === 'loading' && (
           <p className="text-center text-sm text-white/70 py-8">불러오는 중…</p>

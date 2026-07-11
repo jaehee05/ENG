@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { PdfViewer } from '../components/PdfViewer'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { getAttempt, getKoreanMock } from '../lib/firestore'
 import {
   MOCK_SUBJECT_LABEL,
@@ -16,11 +15,11 @@ const SUBJECT_BADGE_CLASS: Record<MockSubject, string> = {
 
 export function KoreanMockResult() {
   const { id, attemptId } = useParams<{ id: string; attemptId: string }>()
+  const navigate = useNavigate()
   const [attempt, setAttempt] = useState<Attempt | null>(null)
   const [mock, setMock] = useState<KoreanMock | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [viewerOpen, setViewerOpen] = useState(false)
 
   useEffect(() => {
     if (!attemptId) return
@@ -95,7 +94,7 @@ export function KoreanMockResult() {
         {mock?.explanationPdfUrl && (
           <button
             type="button"
-            onClick={() => setViewerOpen(true)}
+            onClick={() => navigate(`/korean-mocks/${id}/explanation`)}
             className="mt-4 inline-flex items-center gap-2 rounded-md bg-brand-600 text-white text-sm font-semibold px-4 py-2 hover:bg-brand-700 transition"
           >
             <span aria-hidden>📄</span> 해설 보기
@@ -169,14 +168,6 @@ export function KoreanMockResult() {
           목록으로
         </Link>
       </div>
-
-      {viewerOpen && mock?.explanationPdfUrl && (
-        <PdfViewer
-          url={mock.explanationPdfUrl}
-          title={mock.explanationPdfName ?? '해설'}
-          onClose={() => setViewerOpen(false)}
-        />
-      )}
     </div>
   )
 }
