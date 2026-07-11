@@ -328,7 +328,11 @@ export function KoreanMockDetail() {
               <div className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
                 <button
                   type="button"
-                  onClick={() => navigate(`/korean-mocks/${mock.id}/explanation`)}
+                  onClick={() =>
+                    navigate(`/korean-mocks/${mock.id}/explanation`, {
+                      state: { from: `/korean-mocks/${mock.id}` },
+                    })
+                  }
                   className="min-w-0 flex items-center gap-2 text-sm text-brand-700 hover:underline"
                 >
                   <span aria-hidden>📄</span>

@@ -94,7 +94,11 @@ export function KoreanMockResult() {
         {mock?.explanationPdfUrl && (
           <button
             type="button"
-            onClick={() => navigate(`/korean-mocks/${id}/explanation`)}
+            onClick={() =>
+              navigate(`/korean-mocks/${id}/explanation`, {
+                state: { from: `/korean-mocks/${id}/result/${attemptId}` },
+              })
+            }
             className="mt-4 inline-flex items-center gap-2 rounded-md bg-brand-600 text-white text-sm font-semibold px-4 py-2 hover:bg-brand-700 transition"
           >
             <span aria-hidden>📄</span> 해설 보기
