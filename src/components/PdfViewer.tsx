@@ -90,7 +90,15 @@ export function PdfViewer({ url, title, onClose }: PdfViewerProps) {
 
     run().catch((e) => {
       if (cancelled) return
-      setError(e instanceof Error ? e.message : '해설을 불러오지 못했습니다.')
+      // WebKit 의 fetch 실패는 'Load failed' 로만 떠서 원인이 안 보인다.
+      // 대개 Storage 버킷 CORS 미설정으로 인한 차단이라 안내를 덧붙인다.
+      const raw = e instanceof Error ? e.message : String(e)
+      const isNetwork = /load failed|failed to fetch|networkerror/i.test(raw)
+      setError(
+        isNetwork
+          ? '해설을 불러오지 못했습니다. 네트워크 연결을 확인해 주세요.'
+          : raw || '해설을 불러오지 못했습니다.',
+      )
       setStatus('error')
     })
 
@@ -105,7 +113,12 @@ export function PdfViewer({ url, title, onClose }: PdfViewerProps) {
       className="fixed inset-0 z-50 flex flex-col bg-slate-900/95 backdrop-blur-sm"
       onContextMenu={(e) => e.preventDefault()}
     >
-      <header className="flex items-center justify-between gap-3 px-4 py-3 border-b border-white/10 shrink-0">
+      <header
+        className="flex items-center justify-between gap-3 px-4 pb-3 border-b border-white/10 shrink-0"
+        // 다이나믹 아일랜드/노치에 헤더가 가리지 않도록 상단 safe-area 만큼 여백 추가
+        // (capacitor.config 의 contentInset:'never' 라 웹뷰가 상태바 영역까지 채움)
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)' }}
+      >
         <div className="min-w-0 flex items-center gap-2 text-white">
           <span aria-hidden>📄</span>
           <span className="truncate text-sm font-semibold">{title ?? '해설'}</span>
@@ -119,7 +132,10 @@ export function PdfViewer({ url, title, onClose }: PdfViewerProps) {
         </button>
       </header>
 
-      <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-4">
+      <div
+        className="flex-1 overflow-y-auto overscroll-contain px-3 py-4"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1rem)' }}
+      >
         <div
           ref={containerRef}
           className="mx-auto max-w-3xl space-y-3 select-none"
