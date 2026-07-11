@@ -92,7 +92,10 @@ export function PdfViewer({ url, title, onClose }: PdfViewerProps) {
 
   useEffect(() => {
     let cancelled = false
-    let pdfDoc: { numPages: number; getPage: (n: number) => Promise<unknown>; destroy: () => void } | null = null
+    // pdfjs v6: destroy() 는 로딩 태스크에 있고, .promise 가 주는 문서 프록시엔
+    // 없다(프록시는 numPages/getPage/cleanup만). 정리는 loadingTask.destroy() 로.
+    let loadingTask: { promise: Promise<unknown>; destroy: () => Promise<void> } | null = null
+    let pdfDoc: { numPages: number; getPage: (n: number) => Promise<unknown> } | null = null
     const objectUrls: string[] = []
 
     async function run() {
@@ -109,7 +112,8 @@ export function PdfViewer({ url, title, onClose }: PdfViewerProps) {
       const buffer = await res.arrayBuffer()
       if (cancelled) return
 
-      pdfDoc = (await pdfjsLib.getDocument({ data: buffer }).promise) as unknown as typeof pdfDoc
+      loadingTask = pdfjsLib.getDocument({ data: buffer }) as unknown as typeof loadingTask
+      pdfDoc = (await loadingTask!.promise) as unknown as typeof pdfDoc
       if (cancelled || !pdfDoc) return
 
       const container = containerRef.current
@@ -189,7 +193,13 @@ export function PdfViewer({ url, title, onClose }: PdfViewerProps) {
     return () => {
       cancelled = true
       objectUrls.forEach((u) => URL.revokeObjectURL(u))
-      pdfDoc?.destroy()
+      // 언마운트(닫기) 중 여기서 예외가 나면 React 커밋이 깨져 화면 전체가
+      // 흰 화면이 되므로, 무슨 일이 있어도 예외를 삼킨다.
+      try {
+        void loadingTask?.destroy()
+      } catch {
+        /* noop */
+      }
     }
   }, [url])
 
