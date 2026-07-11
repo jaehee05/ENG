@@ -18,7 +18,7 @@ type Status = 'loading' | 'done' | 'error'
  * 다만 클라이언트로 전달된 바이트나 스크린샷까지 막을 수는 없다.
  */
 const MIN_ZOOM = 1
-const MAX_ZOOM = 4
+const MAX_ZOOM = 2
 const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z))
 
 export function PdfViewer({ url, title, onClose }: PdfViewerProps) {
