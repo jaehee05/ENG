@@ -1297,12 +1297,10 @@ export async function listAllPayments(): Promise<Payment[]> {
 export async function listPaymentsForStudent(
   studentUid: string,
 ): Promise<Payment[]> {
+  // orderBy 를 붙이면 (studentUid + dateISO) 복합 인덱스가 필요해 쿼리가 실패한다.
+  // 잔액 계산은 결제 순서와 무관하므로 equality 필터만 사용(인덱스 불필요).
   const snap = await getDocs(
-    query(
-      collection(db, 'payments'),
-      where('studentUid', '==', studentUid),
-      orderBy('dateISO', 'desc'),
-    ),
+    query(collection(db, 'payments'), where('studentUid', '==', studentUid)),
   )
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Payment, 'id'>) }))
 }

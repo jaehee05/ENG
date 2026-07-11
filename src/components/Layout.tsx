@@ -176,7 +176,7 @@ export function Layout() {
   // 학생 계정 과목 확인 — 국어만이면 영어 콘텐츠 탭 숨김. 국어 포함이면 모의고사 탭 노출.
   const subj = profile ? accountSubjects(profile) : { korean: true, english: true }
   const englishOnlyPaths = new Set<string>([
-    '/', // 홈(Dashboard)은 영어 위주로 구성됨
+    // 홈(/)은 국어 전용 학생에게도 노출(학습 바로가기 숨기고 과제 리스트 표시).
     '/reading',
     '/vocab',
     '/wordbook',
