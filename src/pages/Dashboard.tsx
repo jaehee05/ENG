@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Link, Navigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import {
   formatDate,
@@ -118,8 +118,8 @@ export function Dashboard() {
   // 학생 본인의 다음 결제 필요일(없으면 null → 표시 안 함).
   const [dueDateISO, setDueDateISO] = useState<string | null>(null)
 
-  // 국어만 수강하는 학생은 대시보드 없이 바로 과제 페이지로.
-  // (실제 리다이렉트는 모든 훅 호출 뒤에서 — 훅 순서 보존.)
+  // 국어만 수강하는 학생: 홈은 보여주되 '학습' 바로가기(지문·단어 등)는 숨기고
+  // 과제 리스트를 메인으로 둔다.
   const koreanOnly =
     !!profile &&
     profile.role === 'student' &&
@@ -248,9 +248,6 @@ export function Dashboard() {
     if (h < 18) return '좋은 오후예요'
     return '좋은 저녁이에요'
   })()
-
-  // 모든 훅 호출 후 리다이렉트(훅 순서 보존).
-  if (koreanOnly) return <Navigate to="/assignments" replace />
 
   return (
     <div className="space-y-8">
@@ -452,28 +449,30 @@ export function Dashboard() {
         </section>
       )}
 
-      <section className="space-y-2.5">
-        <h2 className="text-[13px] font-semibold text-slate-900 uppercase tracking-wider">
-          학습
-        </h2>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-          {shortcuts.map((c) => (
-            <Link
-              key={c.to}
-              to={c.to}
-              className="block rounded-lg border border-slate-200 bg-white p-4 hover:border-slate-300 hover:bg-slate-50/60 transition"
-            >
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-slate-100 text-slate-700">
-                {c.icon}
-              </span>
-              <p className="mt-3 text-[15px] font-semibold text-slate-900">
-                {c.title}
-              </p>
-              <p className="text-xs text-slate-500 mt-0.5">{c.desc}</p>
-            </Link>
-          ))}
-        </div>
-      </section>
+      {!koreanOnly && (
+        <section className="space-y-2.5">
+          <h2 className="text-[13px] font-semibold text-slate-900 uppercase tracking-wider">
+            학습
+          </h2>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+            {shortcuts.map((c) => (
+              <Link
+                key={c.to}
+                to={c.to}
+                className="block rounded-lg border border-slate-200 bg-white p-4 hover:border-slate-300 hover:bg-slate-50/60 transition"
+              >
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-slate-100 text-slate-700">
+                  {c.icon}
+                </span>
+                <p className="mt-3 text-[15px] font-semibold text-slate-900">
+                  {c.title}
+                </p>
+                <p className="text-xs text-slate-500 mt-0.5">{c.desc}</p>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   )
 }
