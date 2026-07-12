@@ -12,7 +12,7 @@ import {
 } from '../lib/firestore'
 import { accountSubjects, isAssignmentVisibleToStudent } from '../lib/types'
 import { computeStudentBalance, fmtDateLabel, todayISO } from '../lib/payments'
-import type { Announcement, Assignment, Attempt } from '../lib/types'
+import type { Announcement, Assignment, Attempt, ClassSession } from '../lib/types'
 
 interface ShortcutCard {
   to: string
@@ -96,6 +96,43 @@ function isOverdue(a: Assignment): boolean {
   return a.dueAt.toMillis() < Date.now()
 }
 
+const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
+
+/** KST 현재 시각 'HH:mm'. */
+function nowHHmmKST(): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Seoul',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(new Date())
+}
+
+/** 오늘 이후(진행 중 포함)의 가장 가까운 예정·보강 수업. 없으면 null. */
+function pickNextSession(sessions: ClassSession[]): ClassSession | null {
+  const today = todayISO()
+  const now = nowHHmmKST()
+  const upcoming = sessions
+    .filter(
+      (s) =>
+        (s.status === 'scheduled' || s.status === 'makeup') &&
+        (s.dateISO > today || (s.dateISO === today && s.endTime >= now)),
+    )
+    .sort(
+      (a, b) =>
+        a.dateISO.localeCompare(b.dateISO) ||
+        a.startTime.localeCompare(b.startTime),
+    )
+  return upcoming[0] ?? null
+}
+
+/** 'YYYY-MM-DD' → 'M월 D일 (요일)'. */
+function fmtWhenLabel(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  const wd = WEEKDAYS[new Date(y, m - 1, d).getDay()]
+  return `${m}월 ${d}일 (${wd})`
+}
+
 const TITLE_RE = /^(.+?)\s+(\d+(?:-\d+)?)\s*(?:번|문제)?\s*$/
 
 function parseTitle(title: string): { category: string; tag: string } | null {
@@ -117,6 +154,8 @@ export function Dashboard() {
   )
   // 학생 본인의 다음 결제 필요일(없으면 null → 표시 안 함).
   const [dueDateISO, setDueDateISO] = useState<string | null>(null)
+  // 학생 본인의 다음(진행 중 포함) 수업(없으면 null → 표시 안 함).
+  const [nextSession, setNextSession] = useState<ClassSession | null>(null)
 
   // 국어만 수강하는 학생: 홈은 보여주되 '학습' 바로가기(지문·단어 등)는 숨기고
   // 과제 리스트를 메인으로 둔다.
@@ -162,6 +201,7 @@ export function Dashboard() {
       .then(([pays, sess]) => {
         if (!alive) return
         setDueDateISO(computeStudentBalance(pays, sess, todayISO()).dueDateISO)
+        setNextSession(pickNextSession(sess))
       })
       .catch(() => {
         // 결제 정보는 보조. 실패해도 대시보드는 유지.
@@ -299,6 +339,36 @@ export function Dashboard() {
               {topAnnouncement.body}
             </p>
           )}
+        </Link>
+      )}
+
+      {nextSession && (
+        <Link
+          to="/schedule"
+          className="block rounded-lg border border-slate-200 bg-white px-4 py-3 hover:border-slate-300 hover:bg-slate-50/60 transition"
+        >
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              다음 수업
+            </span>
+            {nextSession.status === 'makeup' && (
+              <span className="inline-block rounded bg-orange-50 text-orange-700 text-[10px] font-medium px-1.5 py-0.5 border border-orange-200">
+                보강
+              </span>
+            )}
+          </div>
+          <p className="text-[15px] font-semibold text-slate-900 truncate">
+            {nextSession.title}
+          </p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500 mt-0.5">
+            <span className="text-slate-700 font-medium">
+              {fmtWhenLabel(nextSession.dateISO)}
+            </span>
+            <span className="tabular-nums">
+              {nextSession.startTime}–{nextSession.endTime}
+            </span>
+            {nextSession.location && <span>· {nextSession.location}</span>}
+          </div>
         </Link>
       )}
 
