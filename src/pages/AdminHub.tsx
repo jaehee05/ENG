@@ -46,6 +46,18 @@ const tools: AdminTool[] = [
     ),
   },
   {
+    to: '/admin/availability',
+    title: '가능시간 공유',
+    desc: '빈 시간대 골라 학부모에게 전달',
+    icon: (
+      <svg {...iconProps}>
+        <rect x="3" y="4" width="18" height="18" rx="2" />
+        <path d="M16 2v4M8 2v4M3 10h18" />
+        <path d="m9 16 2 2 4-4" />
+      </svg>
+    ),
+  },
+  {
     to: '/admin/notify',
     title: '알림톡 / 푸시',
     desc: '뿌리오 알림톡 · 주간 리포트 · 푸시 발송',

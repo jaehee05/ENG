@@ -66,6 +66,7 @@ export function AdminPayments() {
   const [sessions, setSessions] = useState<ClassSession[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedUid, setSelectedUid] = useState<string | null>(null)
+  const [payFilter, setPayFilter] = useState<'all' | 'due' | 'low' | 'ok'>('all')
 
   const [amount, setAmount] = useState('')
   const [dateISO, setDateISO] = useState(todayISO())
@@ -184,6 +185,30 @@ export function AdminPayments() {
 
   const selectedStudent = students.find((s) => s.id === selectedUid) ?? null
   const sel = selectedStudent ? balanceByUid.get(selectedStudent.id) : null
+
+  // 전체 개요 KPI: 결제 필요 학생 수 / 잔액 마이너스 학생 수
+  const overview = useMemo(() => {
+    let due = 0
+    let low = 0
+    for (const s of students) {
+      const b = balanceByUid.get(s.id)
+      if (!b) continue
+      if (b.dueDateISO) due++
+      if (b.balance < 0) low++
+    }
+    return { due, low }
+  }, [students, balanceByUid])
+
+  const filteredStudents = useMemo(() => {
+    return students.filter((s) => {
+      const b = balanceByUid.get(s.id)
+      if (!b) return false
+      if (payFilter === 'due') return !!b.dueDateISO
+      if (payFilter === 'low') return b.balance < 0
+      if (payFilter === 'ok') return b.balance >= 0 && !b.dueDateISO
+      return true
+    })
+  }, [students, balanceByUid, payFilter])
 
   // 선택 학생의 시간순 원장 (결제 +, 완료 수업 −) + 러닝 잔액
   const ledger = useMemo<Tx[]>(() => {
@@ -347,33 +372,92 @@ export function AdminPayments() {
       </header>
 
       {!selectedStudent && (
-        <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-lg border border-brand-200 bg-brand-50/60 p-3.5">
-            <p className="text-[11px] text-slate-500">이번 달 수입 (완료·보강)</p>
-            <p className="text-lg font-bold text-brand-700 tabular-nums mt-0.5">
-              {money(income.month)}
-            </p>
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              이번 달 입금 {money(income.received)}
-            </p>
+        <>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+            <button
+              type="button"
+              onClick={() => setPayFilter(payFilter === 'due' ? 'all' : 'due')}
+              className={`text-left rounded-xl border p-3.5 transition ${
+                payFilter === 'due'
+                  ? 'border-amber-400 bg-amber-50'
+                  : 'border-amber-200 bg-amber-50/50 hover:bg-amber-50'
+              }`}
+            >
+              <p className="text-[11px] text-slate-500">결제 필요 학생</p>
+              <p className="text-2xl font-bold text-amber-700 tabular-nums mt-0.5">
+                {overview.due}
+              </p>
+              <p className="text-[11px] text-slate-400 mt-0.5">결제 필요일 임박</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => setPayFilter(payFilter === 'low' ? 'all' : 'low')}
+              className={`text-left rounded-xl border p-3.5 transition ${
+                payFilter === 'low'
+                  ? 'border-red-400 bg-red-50'
+                  : 'border-red-200 bg-red-50/50 hover:bg-red-50'
+              }`}
+            >
+              <p className="text-[11px] text-slate-500">잔액 마이너스</p>
+              <p className="text-2xl font-bold text-red-600 tabular-nums mt-0.5">
+                {overview.low}
+              </p>
+              <p className="text-[11px] text-slate-400 mt-0.5">이미 잔액 부족</p>
+            </button>
+            <div className="rounded-xl border border-brand-200 bg-brand-50/60 p-3.5">
+              <p className="text-[11px] text-slate-500">이번 달 수입</p>
+              <p className="text-lg font-bold text-brand-700 tabular-nums mt-0.5">
+                {money(income.month)}
+              </p>
+              <p className="text-[11px] text-slate-400 mt-0.5">완료·보강 기준</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-3.5">
+              <p className="text-[11px] text-slate-500">이번 달 입금</p>
+              <p className="text-lg font-bold text-slate-900 tabular-nums mt-0.5">
+                {money(income.received)}
+              </p>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                누적 {money(income.total)}
+              </p>
+            </div>
           </div>
-          <div className="rounded-lg border border-slate-200 bg-white p-3.5">
-            <p className="text-[11px] text-slate-500">전체 누적 수입</p>
-            <p className="text-lg font-bold text-slate-900 tabular-nums mt-0.5">
-              {money(income.total)}
-            </p>
+
+          <div className="inline-flex rounded-md border border-slate-200 bg-white p-0.5">
+            {(
+              [
+                ['all', `전체 ${students.length}`],
+                ['due', `결제필요 ${overview.due}`],
+                ['low', `부족 ${overview.low}`],
+                ['ok', '정상'],
+              ] as const
+            ).map(([k, label]) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setPayFilter(k)}
+                className={`rounded px-3 py-1.5 text-xs font-medium transition ${
+                  payFilter === k
+                    ? 'bg-slate-900 text-white'
+                    : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
-        </div>
+        </>
       )}
 
       {!selectedStudent ? (
         <div className="rounded-xl border border-slate-200 bg-white overflow-hidden divide-y divide-slate-100">
-          {students.length === 0 && (
+          {filteredStudents.length === 0 && (
             <p className="px-4 py-6 text-sm text-slate-400 text-center">
-              활성 학생이 없습니다.
+              {students.length === 0
+                ? '활성 학생이 없습니다.'
+                : '조건에 맞는 학생이 없어요.'}
             </p>
           )}
-          {students.map((s) => {
+          {filteredStudents.map((s) => {
             const b = balanceByUid.get(s.id)!
             const low = b.balance <= 0
             return (

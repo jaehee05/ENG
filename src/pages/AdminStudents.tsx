@@ -99,6 +99,25 @@ function fmt(ts: UserAccount['createdAt']): string {
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
 }
 
+/** 전화번호 → tel:/sms: 에 쓸 숫자만. 없으면 null. */
+function telDigits(phone?: string): string | null {
+  if (!phone) return null
+  const d = phone.replace(/[^0-9+]/g, '')
+  return d || null
+}
+
+const PhoneGlyph = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.9.36 1.78.7 2.61a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.47-1.27a2 2 0 0 1 2.11-.45c.83.34 1.71.57 2.61.7A2 2 0 0 1 22 16.92Z" />
+  </svg>
+)
+
+const MsgGlyph = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z" />
+  </svg>
+)
+
 function StatTile({
   label,
   value,
@@ -185,7 +204,7 @@ function StudentCard({
             {account.parentPhone && ` · 학부모 ${account.parentPhone}`}
           </p>
         </div>
-        <div className="shrink-0 flex flex-col items-end gap-1">
+        <div className="shrink-0 flex flex-col items-end gap-1.5">
           <span
             className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLASS[account.status]}`}
           >
@@ -196,6 +215,30 @@ function StudentCard({
               사전 등록
             </span>
           )}
+          {(() => {
+            const tel = telDigits(account.phone || account.parentPhone)
+            if (!tel) return null
+            return (
+              <div className="flex items-center gap-1">
+                <a
+                  href={`tel:${tel}`}
+                  title="전화"
+                  aria-label="전화"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-brand-50 text-brand-700 hover:bg-brand-100 transition"
+                >
+                  <PhoneGlyph />
+                </a>
+                <a
+                  href={`sms:${tel}`}
+                  title="문자"
+                  aria-label="문자"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 transition"
+                >
+                  <MsgGlyph />
+                </a>
+              </div>
+            )
+          })()}
         </div>
       </header>
 

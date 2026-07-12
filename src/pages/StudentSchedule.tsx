@@ -10,8 +10,11 @@ import {
 } from '../lib/firestore'
 import {
   CLASS_SESSION_STATUS_LABEL,
+  isSessionRecorded,
+  SESSION_ATTENDANCE_LABEL,
   type ClassSession,
   type ClassSessionStatus,
+  type SessionAttendance,
   type UserAccount,
 } from '../lib/types'
 import { colorForStudent } from '../lib/studentColor'
@@ -100,15 +103,44 @@ function fmtCurrency(n: number): string {
   return `${n.toLocaleString('ko-KR')}원`
 }
 
-/** 'YYYY-MM-DD'에 일수를 더한 로컬 날짜 문자열 (달력 기준, TZ 안전). */
-function addDaysISO(iso: string, days: number): string {
-  const [y, m, d] = iso.split('-').map(Number)
-  const dt = new Date(Date.UTC(y, m - 1, d))
-  dt.setUTCDate(dt.getUTCDate() + days)
-  const yy = dt.getUTCFullYear()
-  const mm = String(dt.getUTCMonth() + 1).padStart(2, '0')
-  const dd = String(dt.getUTCDate()).padStart(2, '0')
-  return `${yy}-${mm}-${dd}`
+/** KST 현재 시각 'HH:mm'. */
+function nowHHmmKST(): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: KST_TZ,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(new Date())
+}
+
+/** 'YYYY-MM-DD' → 'M월 D일 (요일)'. */
+function fmtDayHeading(iso: string): string {
+  const [y, m, d] = iso.split('-').map((x) => parseInt(x, 10))
+  const wd = new Date(y, m - 1, d).toLocaleDateString('ko-KR', {
+    weekday: 'short',
+  })
+  return `${m}월 ${d}일 (${wd})`
+}
+
+/**
+ * 세션의 달력/리스트 배지. 취소·보강은 상태 그대로,
+ * 그 외에는 기록 여부/완료/지난 수업(기록 필요)/예정으로 판정.
+ */
+function sessionBadge(
+  s: ClassSession,
+  today: string,
+  nowHHmm: string,
+): { label: string; cls: string } {
+  if (s.status === 'canceled')
+    return { label: '취소', cls: 'bg-red-50 text-red-600 border-red-200' }
+  if (s.status === 'makeup')
+    return { label: '보강', cls: 'bg-orange-50 text-orange-700 border-orange-200' }
+  if (s.status === 'done' || isSessionRecorded(s))
+    return { label: '완료', cls: 'bg-brand-50 text-brand-700 border-brand-200' }
+  const past = s.dateISO < today || (s.dateISO === today && s.endTime < nowHHmm)
+  if (past)
+    return { label: '기록', cls: 'bg-amber-50 text-amber-700 border-amber-200' }
+  return { label: '예정', cls: 'bg-sky-50 text-sky-700 border-sky-200' }
 }
 
 // 학생 색상 팔레트/조회 로직은 src/lib/studentColor.ts 로 분리.
@@ -127,6 +159,7 @@ export function StudentSchedule() {
     return { year: now.getFullYear(), monthIndex: now.getMonth() }
   })
   const [selected, setSelected] = useState<ClassSession | null>(null)
+  const [selectedDateISO, setSelectedDateISO] = useState<string>(() => todayISO())
 
   // 관리자 CRUD 상태
   const [addOpen, setAddOpen] = useState(false)
@@ -248,6 +281,8 @@ export function StudentSchedule() {
   }, [sessions, isAdmin, studentNameByUid])
 
   const today = todayISO()
+  const nowHHmm = nowHHmmKST()
+  const selectedSessions = sessionsByDate.get(selectedDateISO) ?? []
 
   function shiftMonth(delta: number) {
     setCursor((c) => {
@@ -259,6 +294,7 @@ export function StudentSchedule() {
   function goToday() {
     const now = new Date()
     setCursor({ year: now.getFullYear(), monthIndex: now.getMonth() })
+    setSelectedDateISO(todayISO())
   }
 
   async function reloadAdminSessions() {
@@ -271,12 +307,11 @@ export function StudentSchedule() {
     setAddSaving(true)
     setAddError(null)
     try {
-      const weeks = Math.max(1, v.repeatWeeks || 1)
-      // 매주 같은 요일로 weeks회 생성 (첫 회는 선택한 날짜).
-      const inputs = Array.from({ length: weeks }, (_, k) => ({
+      // 반복이면 선택 요일로 기간 내 여러 날짜, 아니면 단일 날짜.
+      const inputs = v.dates.map((dateISO) => ({
         studentUid: addStudentUid,
         title: v.title,
-        dateISO: addDaysISO(v.dateISO, 7 * k),
+        dateISO,
         startTime: v.startTime,
         endTime: v.endTime,
         location: v.location,
@@ -460,112 +495,151 @@ export function StudentSchedule() {
           {cells.map((c, i) => {
             const daySessions = sessionsByDate.get(c.iso) ?? []
             const isToday = c.iso === today
+            const isSelected = c.iso === selectedDateISO
             const dow = i % 7
             return (
-              <div
+              <button
                 key={c.iso + i}
-                className={`min-h-[70px] sm:min-h-[92px] border-r border-b border-slate-100 p-1 sm:p-1.5 ${
-                  c.inMonth ? 'bg-white' : 'bg-slate-50/60'
-                } ${i % 7 === 6 ? 'border-r-0' : ''}`}
+                type="button"
+                onClick={() => setSelectedDateISO(c.iso)}
+                className={`min-h-[52px] sm:min-h-[64px] border-r border-b border-slate-100 p-1 flex flex-col items-center gap-1 transition ${
+                  c.inMonth ? 'bg-white' : 'bg-slate-50/50'
+                } ${i % 7 === 6 ? 'border-r-0' : ''} ${
+                  isSelected
+                    ? 'ring-2 ring-inset ring-brand-500 bg-brand-50/40'
+                    : 'hover:bg-slate-50'
+                }`}
               >
-                <div className="flex items-center justify-between">
-                  <span
-                    className={`inline-flex items-center justify-center text-[11px] sm:text-xs font-medium h-5 min-w-[1.25rem] px-1 rounded-full ${
-                      isToday
-                        ? 'bg-slate-900 text-white'
-                        : c.inMonth
-                          ? dow === 0
-                            ? 'text-red-500'
-                            : dow === 6
-                              ? 'text-sky-600'
-                              : 'text-slate-700'
-                          : 'text-slate-300'
-                    }`}
-                  >
-                    {c.day}
+                <span
+                  className={`inline-flex items-center justify-center text-[11px] sm:text-xs font-medium h-6 w-6 rounded-full ${
+                    isToday
+                      ? 'bg-brand-600 text-white'
+                      : c.inMonth
+                        ? dow === 0
+                          ? 'text-red-500'
+                          : dow === 6
+                            ? 'text-sky-600'
+                            : 'text-slate-700'
+                        : 'text-slate-300'
+                  }`}
+                >
+                  {c.day}
+                </span>
+                {daySessions.length > 0 && (
+                  <span className="flex items-center gap-0.5 h-2">
+                    {daySessions.slice(0, 3).map((s) => {
+                      const studentColor = isAdmin
+                        ? colorForStudent(
+                            s.studentUid,
+                            studentColorKeyByUid.get(s.studentUid),
+                          )
+                        : null
+                      return (
+                        <span
+                          key={s.id}
+                          className={`inline-block w-1.5 h-1.5 rounded-full ${
+                            s.status === 'canceled'
+                              ? 'bg-slate-300'
+                              : studentColor
+                                ? studentColor.dot
+                                : 'bg-brand-500'
+                          }`}
+                          aria-hidden
+                        />
+                      )
+                    })}
+                    {daySessions.length > 3 && (
+                      <span className="text-[9px] leading-none text-slate-400">
+                        +
+                      </span>
+                    )}
                   </span>
-                </div>
-                <div className="mt-1 space-y-0.5">
-                  {daySessions.slice(0, 3).map((s) => {
-                    const st = STATUS_STYLES[s.status]
-                    const studentColor = isAdmin
-                      ? colorForStudent(
-                          s.studentUid,
-                          studentColorKeyByUid.get(s.studentUid),
-                        )
-                      : null
-                    const studentName = studentNameByUid.get(s.studentUid)
-                    // 관리자 뷰: 학생 색상으로 pill 렌더. 취소는 회색 pill + 취소선으로 구분.
-                    const canceled = s.status === 'canceled'
-                    const adminPillCls = studentColor
-                      ? canceled
-                        ? 'bg-slate-100 text-slate-400 line-through'
-                        : `${studentColor.badge}`
-                      : ''
-                    return (
-                      <button
-                        key={s.id}
-                        type="button"
-                        onClick={() => setSelected(s)}
-                        className={
-                          studentColor
-                            ? `w-full text-left rounded px-1 py-0.5 border ${adminPillCls} hover:brightness-95`
-                            : 'w-full text-left flex items-center gap-1 rounded px-1 py-0.5 hover:bg-slate-100'
-                        }
-                      >
-                        {studentColor ? (
-                          <span className="flex items-center gap-1 text-[10px] sm:text-[11px]">
-                            <span
-                              className={`shrink-0 inline-block w-1.5 h-1.5 rounded-full ${
-                                canceled ? 'bg-slate-400' : studentColor.dot
-                              }`}
-                              aria-hidden
-                            />
-                            <span className="truncate">
-                              <span className="tabular-nums">{s.startTime}</span>{' '}
-                              {studentName && (
-                                <span className="font-medium">{studentName}</span>
-                              )}
-                              <span className="opacity-80">
-                                {studentName ? ' · ' : ''}
-                                {s.title}
-                              </span>
-                            </span>
-                          </span>
-                        ) : (
-                          <>
-                            <span
-                              className={`shrink-0 inline-block w-1 h-3 sm:h-3.5 rounded-full ${st.bar}`}
-                              aria-hidden
-                            />
-                            <span
-                              className={`truncate text-[10px] sm:text-[11px] ${st.text}`}
-                            >
-                              <span className="tabular-nums">{s.startTime}</span>{' '}
-                              <span className="opacity-80">{s.title}</span>
-                            </span>
-                          </>
-                        )}
-                      </button>
-                    )
-                  })}
-                  {daySessions.length > 3 && (
-                    <p className="text-[10px] text-slate-400 pl-2">
-                      +{daySessions.length - 3}
-                    </p>
-                  )}
-                </div>
-              </div>
+                )}
+              </button>
             )
           })}
         </div>
       </div>
 
-      {!loading && sessions.length === 0 && (
-        <p className="text-xs text-slate-500 text-center">
-          등록된 수업이 없습니다.
-        </p>
-      )}
+      {/* 선택한 날짜의 수업 리스트 */}
+      <section className="space-y-2">
+        <div className="flex items-baseline gap-2">
+          <h2 className="text-base font-semibold text-slate-900">
+            {fmtDayHeading(selectedDateISO)}
+          </h2>
+          {selectedSessions.length > 0 && (
+            <span className="text-xs text-slate-400">
+              {selectedSessions.length}개
+            </span>
+          )}
+        </div>
+        {loading ? (
+          <p className="text-xs text-slate-400 py-6 text-center">불러오는 중…</p>
+        ) : selectedSessions.length === 0 ? (
+          <p className="text-xs text-slate-400 py-6 text-center rounded-xl border border-dashed border-slate-200">
+            이 날 등록된 수업이 없습니다.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {selectedSessions.map((s) => {
+              const badge = sessionBadge(s, today, nowHHmm)
+              const studentName = isAdmin
+                ? studentNameByUid.get(s.studentUid)
+                : null
+              const studentColor = isAdmin
+                ? colorForStudent(
+                    s.studentUid,
+                    studentColorKeyByUid.get(s.studentUid),
+                  )
+                : null
+              const canceled = s.status === 'canceled'
+              return (
+                <li key={s.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelected(s)}
+                    className="w-full text-left rounded-xl border border-slate-200 bg-white px-4 py-3 hover:border-slate-300 hover:bg-slate-50/60 transition flex items-center justify-between gap-3"
+                  >
+                    <div className="min-w-0 flex items-stretch gap-3">
+                      <span
+                        className={`w-1 rounded-full shrink-0 ${
+                          studentColor ? studentColor.dot : 'bg-brand-500'
+                        } ${canceled ? 'opacity-40' : ''}`}
+                        aria-hidden
+                      />
+                      <div className="min-w-0">
+                        <p className="text-xs text-slate-500 tabular-nums">
+                          {s.startTime} ~ {s.endTime}
+                        </p>
+                        <p
+                          className={`text-sm font-semibold truncate ${
+                            canceled
+                              ? 'line-through text-slate-400'
+                              : 'text-slate-900'
+                          }`}
+                        >
+                          {studentName ? `${studentName} · ` : ''}
+                          {s.title}
+                        </p>
+                        {s.location && (
+                          <p className="text-xs text-slate-400 truncate">
+                            {s.location}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <span
+                      className={`shrink-0 inline-block rounded-full text-[10px] font-medium px-2 py-0.5 border ${badge.cls}`}
+                    >
+                      {badge.label}
+                    </span>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </section>
 
       {isAdmin && makeupDeficits.length > 0 && (
         <section className="space-y-2">
@@ -764,6 +838,42 @@ function SessionModal({
     }
   }
 
+  // ── 수업 기록 (출석 + 일지) ──
+  const [attendance, setAttendance] = useState<SessionAttendance | undefined>(
+    session.attendance,
+  )
+  const [lessonContent, setLessonContent] = useState(session.lessonContent ?? '')
+  const [feedback, setFeedback] = useState(session.feedback ?? '')
+  const [savingRecord, setSavingRecord] = useState(false)
+  const [recordSaved, setRecordSaved] = useState(false)
+
+  async function saveRecord() {
+    if (!isAdmin) return
+    setSavingRecord(true)
+    setPayError(null)
+    try {
+      const patch: Partial<ClassSession> = {
+        attendance,
+        lessonContent,
+        feedback,
+      }
+      // 기록을 남기면 예정 → 완료로 자동 처리(취소/보강은 그대로).
+      const hasRecord =
+        !!attendance || !!lessonContent.trim() || !!feedback.trim()
+      if (session.status === 'scheduled' && hasRecord) patch.status = 'done'
+      await updateClassSession(session.id, patch)
+      onPatch(patch)
+      setRecordSaved(true)
+    } catch (e) {
+      setPayError(e instanceof Error ? e.message : '수업 기록 저장 실패')
+    } finally {
+      setSavingRecord(false)
+    }
+  }
+
+  const recordInputCls =
+    'rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500'
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -872,6 +982,114 @@ function SessionModal({
                 </div>
               )}
             </dl>
+
+            {/* 수업 기록: 출석 + 진행내용 + 피드백 */}
+            <div className="pt-2 border-t border-slate-100 space-y-2.5">
+              <p className="text-[11px] font-medium text-slate-500">수업 기록</p>
+              {isAdmin ? (
+                <>
+                  <div className="flex gap-1.5">
+                    {(Object.keys(SESSION_ATTENDANCE_LABEL) as SessionAttendance[]).map(
+                      (a) => {
+                        const on = attendance === a
+                        const tone =
+                          a === 'present'
+                            ? 'bg-brand-600 border-brand-600'
+                            : a === 'late'
+                              ? 'bg-amber-500 border-amber-500'
+                              : 'bg-red-500 border-red-500'
+                        return (
+                          <button
+                            key={a}
+                            type="button"
+                            onClick={() => {
+                              setAttendance(on ? undefined : a)
+                              setRecordSaved(false)
+                            }}
+                            className={`rounded-full px-3 py-1.5 text-xs font-medium border transition ${
+                              on
+                                ? `${tone} text-white`
+                                : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+                            }`}
+                          >
+                            {SESSION_ATTENDANCE_LABEL[a]}
+                          </button>
+                        )
+                      },
+                    )}
+                  </div>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[11px] text-slate-500">진행 내용</span>
+                    <textarea
+                      value={lessonContent}
+                      onChange={(e) => {
+                        setLessonContent(e.target.value)
+                        setRecordSaved(false)
+                      }}
+                      rows={2}
+                      placeholder="오늘 진행한 내용"
+                      className={recordInputCls}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[11px] text-slate-500">피드백</span>
+                    <textarea
+                      value={feedback}
+                      onChange={(e) => {
+                        setFeedback(e.target.value)
+                        setRecordSaved(false)
+                      }}
+                      rows={2}
+                      placeholder="학생·학부모에게 전할 피드백"
+                      className={recordInputCls}
+                    />
+                  </label>
+                  <div className="flex items-center justify-end gap-2">
+                    {recordSaved && (
+                      <span className="text-[11px] text-brand-600">저장됨 ✓</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={saveRecord}
+                      disabled={savingRecord}
+                      className="rounded-md bg-brand-600 text-white text-xs font-medium px-3 py-1.5 hover:bg-brand-700 disabled:opacity-50"
+                    >
+                      {savingRecord ? '저장 중…' : '수업 기록 저장'}
+                    </button>
+                  </div>
+                </>
+              ) : isSessionRecorded(session) ? (
+                <dl className="space-y-1.5 text-sm">
+                  {session.attendance && (
+                    <div className="flex gap-2">
+                      <dt className="w-14 shrink-0 text-slate-500">출석</dt>
+                      <dd className="text-slate-900">
+                        {SESSION_ATTENDANCE_LABEL[session.attendance]}
+                      </dd>
+                    </div>
+                  )}
+                  {session.lessonContent && (
+                    <div className="flex gap-2">
+                      <dt className="w-14 shrink-0 text-slate-500">진행</dt>
+                      <dd className="text-slate-900 whitespace-pre-wrap">
+                        {session.lessonContent}
+                      </dd>
+                    </div>
+                  )}
+                  {session.feedback && (
+                    <div className="flex gap-2">
+                      <dt className="w-14 shrink-0 text-slate-500">피드백</dt>
+                      <dd className="text-slate-900 whitespace-pre-wrap">
+                        {session.feedback}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+              ) : (
+                <p className="text-xs text-slate-400">아직 수업 기록이 없습니다.</p>
+              )}
+            </div>
+
             {isAdmin && (
               <div className="pt-2 border-t border-slate-100">
                 <p className="text-[11px] font-medium text-slate-500 mb-1.5">

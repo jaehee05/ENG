@@ -647,6 +647,15 @@ export const CLASS_SESSION_STATUS_LABEL: Record<ClassSessionStatus, string> = {
   makeup: '보강',
 }
 
+/** 출석 상태 (수업 기록 시 체크). 미기록이면 세션에 attendance 없음. */
+export type SessionAttendance = 'present' | 'late' | 'absent'
+
+export const SESSION_ATTENDANCE_LABEL: Record<SessionAttendance, string> = {
+  present: '출석',
+  late: '지각',
+  absent: '결석',
+}
+
 export interface ClassSession {
   id: string
   studentUid: string
@@ -662,9 +671,27 @@ export interface ClassSession {
   status: ClassSessionStatus
   /** 결제 완료 여부. 관리자만 편집. */
   paid?: boolean
+  /** 출석 체크(출석/지각/결석). 수업 기록 전에는 undefined. */
+  attendance?: SessionAttendance
+  /** 수업 일지: 오늘 진행한 내용. */
+  lessonContent?: string
+  /** 수업 일지: 피드백. */
+  feedback?: string
   note?: string
   createdAt: Timestamp | null
   updatedAt: Timestamp | null
+}
+
+/**
+ * 수업 기록 작성 여부 = 진행 내용/피드백/출석 중 하나라도 있으면 기록된 것으로 본다.
+ * (달력의 '완료' vs '기록' 배지 판정에 사용.)
+ */
+export function isSessionRecorded(s: ClassSession): boolean {
+  return (
+    !!s.attendance ||
+    !!(s.lessonContent && s.lessonContent.trim()) ||
+    !!(s.feedback && s.feedback.trim())
+  )
 }
 
 /** 학생 선불 결제 기록. 잔액 = Σ결제 − Σ(완료된 수업 cost). */

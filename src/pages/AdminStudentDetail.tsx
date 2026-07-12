@@ -466,13 +466,38 @@ export function AdminStudentDetail() {
           <span>학부모 {account.parentPhone || '-'}</span>
           <span>가입 {fmtDate(account.createdAt)}</span>
         </div>
-        <div className="mt-3 flex flex-wrap gap-1.5">
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
           <Link
             to={`/vocab/new?student=${account.id}`}
             className="rounded-md bg-slate-900 text-white text-xs font-medium px-3 py-1.5 hover:bg-slate-800"
           >
             + 이 학생 단어 시험지
           </Link>
+          {(() => {
+            const tel = (account.phone || account.parentPhone || '').replace(
+              /[^0-9+]/g,
+              '',
+            )
+            if (!tel) return null
+            return (
+              <>
+                <a
+                  href={`tel:${tel}`}
+                  title="전화"
+                  className="rounded-md border border-brand-200 bg-brand-50 text-brand-700 text-xs font-medium px-3 py-1.5 hover:bg-brand-100"
+                >
+                  전화
+                </a>
+                <a
+                  href={`sms:${tel}`}
+                  title="문자"
+                  className="rounded-md border border-slate-200 text-slate-600 text-xs font-medium px-3 py-1.5 hover:bg-slate-50"
+                >
+                  문자
+                </a>
+              </>
+            )
+          })()}
         </div>
         <SubjectPicker
           account={account}

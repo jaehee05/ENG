@@ -44,6 +44,7 @@ import { KoreanMockTake } from './pages/KoreanMockTake'
 import { KoreanMockResult } from './pages/KoreanMockResult'
 import { StudentSchedule } from './pages/StudentSchedule'
 import { AdminPayments } from './pages/AdminPayments'
+import { AdminAvailability } from './pages/AdminAvailability'
 
 function App() {
   return (
@@ -108,6 +109,7 @@ function App() {
               <Route path="/admin/announce" element={<AdminAnnounce />} />
               <Route path="/admin/categories" element={<AdminCategories />} />
               <Route path="/admin/payments" element={<AdminPayments />} />
+              <Route path="/admin/availability" element={<AdminAvailability />} />
             </Route>
           </Route>
 

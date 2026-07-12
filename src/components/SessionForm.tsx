@@ -30,8 +30,48 @@ export interface SessionFormValues {
   status: ClassSessionStatus
   paid: boolean
   note: string
-  /** 반복 생성 주 수 ('1'=반복 안 함). 신규 추가 시에만 사용. */
-  repeatWeeks: string
+  /** 반복 생성 켜짐 여부. 신규 추가 시에만 사용. */
+  repeat: boolean
+  /** 반복 종료일(포함). repeat=true 일 때 사용. */
+  endDateISO: string
+  /** 반복할 요일 (0=일 … 6=토). */
+  weekdays: number[]
+}
+
+export const WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토']
+
+/** 'YYYY-MM-DD' 요일 (0=일 … 6=토). TZ 안전(UTC 파싱). */
+export function weekdayOf(iso: string): number {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay()
+}
+
+/** 'YYYY-MM-DD'에 일수를 더한 로컬 날짜 문자열. */
+function addDaysISO(iso: string, days: number): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  const dt = new Date(Date.UTC(y, m - 1, d))
+  dt.setUTCDate(dt.getUTCDate() + days)
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}-${String(dt.getUTCDate()).padStart(2, '0')}`
+}
+
+/**
+ * [startISO, endISO] 범위에서 weekdays 요일에 해당하는 모든 날짜를 반환.
+ * weekdays 가 비어있으면 시작일만 반환. 최대 366일로 안전 상한.
+ */
+export function expandWeekdayDates(
+  startISO: string,
+  endISO: string,
+  weekdays: number[],
+): string[] {
+  if (!weekdays.length || endISO < startISO) return [startISO]
+  const set = new Set(weekdays)
+  const out: string[] = []
+  let cur = startISO
+  for (let i = 0; i < 366 && cur <= endISO; i++) {
+    if (set.has(weekdayOf(cur))) out.push(cur)
+    cur = addDaysISO(cur, 1)
+  }
+  return out.length ? out : [startISO]
 }
 
 export const EMPTY_SESSION_FORM: SessionFormValues = {
@@ -44,7 +84,9 @@ export const EMPTY_SESSION_FORM: SessionFormValues = {
   status: 'scheduled',
   paid: false,
   note: '',
-  repeatWeeks: '1',
+  repeat: false,
+  endDateISO: '',
+  weekdays: [weekdayOf(todayISO())],
 }
 
 export function fromSession(s: ClassSession): SessionFormValues {
@@ -58,7 +100,9 @@ export function fromSession(s: ClassSession): SessionFormValues {
     status: s.status,
     paid: !!s.paid,
     note: s.note ?? '',
-    repeatWeeks: '1',
+    repeat: false,
+    endDateISO: '',
+    weekdays: [weekdayOf(s.dateISO)],
   }
 }
 
@@ -72,8 +116,8 @@ export interface SessionFormResult {
   status: ClassSessionStatus
   paid: boolean
   note?: string
-  /** 1이면 단일 수업, N이면 매주 같은 요일로 N주간 생성. */
-  repeatWeeks: number
+  /** 생성할 날짜 목록. 단일이면 [dateISO], 반복이면 요일 확장 결과. 편집 시 무시. */
+  dates: string[]
 }
 
 interface Props {
@@ -125,9 +169,18 @@ export function SessionForm({
       setLocalErr('금액은 0 이상의 숫자여야 합니다.')
       return
     }
-    const repeatWeeks = allowRepeat
-      ? Math.max(1, parseInt(value.repeatWeeks, 10) || 1)
-      : 1
+    let dates = [value.dateISO]
+    if (allowRepeat && value.repeat) {
+      if (!value.weekdays.length) {
+        setLocalErr('반복할 요일을 하나 이상 선택하세요.')
+        return
+      }
+      if (!value.endDateISO || value.endDateISO < value.dateISO) {
+        setLocalErr('반복 종료일을 시작일 이후로 선택하세요.')
+        return
+      }
+      dates = expandWeekdayDates(value.dateISO, value.endDateISO, value.weekdays)
+    }
     await onSubmit({
       title: value.title.trim(),
       dateISO: value.dateISO,
@@ -138,7 +191,7 @@ export function SessionForm({
       status: value.status,
       paid: value.paid,
       note: value.note,
-      repeatWeeks,
+      dates,
     })
   }
 
@@ -178,7 +231,9 @@ export function SessionForm({
           />
         </label>
         <label className="col-span-2 sm:col-span-2 flex flex-col gap-1">
-          <span className="text-xs font-medium text-slate-600">날짜</span>
+          <span className="text-xs font-medium text-slate-600">
+            {allowRepeat && value.repeat ? '시작일' : '날짜'}
+          </span>
           <input
             type="date"
             value={value.dateISO}
@@ -246,24 +301,77 @@ export function SessionForm({
           </select>
         </label>
         {allowRepeat && (
-          <label className="col-span-2 sm:col-span-4 flex flex-col gap-1">
-            <span className="text-xs font-medium text-slate-600">
+          <div className="col-span-2 sm:col-span-4 rounded-md border border-slate-200 bg-slate-50/60 p-3 space-y-2.5">
+            <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={value.repeat}
+                onChange={(e) => onChange({ ...value, repeat: e.target.checked })}
+                className="h-4 w-4 accent-brand-600"
+              />
               반복 생성{' '}
               <span className="font-normal text-slate-400">
-                (매주 같은 요일로 자동 추가)
+                (선택 요일로 기간 내 자동 추가)
               </span>
-            </span>
-            <select
-              value={value.repeatWeeks}
-              onChange={(e) => onChange({ ...value, repeatWeeks: e.target.value })}
-              className={inputCls}
-            >
-              <option value="1">반복 안 함 (1회)</option>
-              <option value="4">매주 · 4주 (4회)</option>
-              <option value="8">매주 · 8주 (8회)</option>
-              <option value="12">매주 · 12주 (12회)</option>
-            </select>
-          </label>
+            </label>
+            {value.repeat && (
+              <>
+                <div className="flex flex-col gap-1">
+                  <span className="text-[11px] font-medium text-slate-500">요일</span>
+                  <div className="flex gap-1">
+                    {WEEKDAY_LABELS.map((lbl, dow) => {
+                      const on = value.weekdays.includes(dow)
+                      return (
+                        <button
+                          key={dow}
+                          type="button"
+                          onClick={() =>
+                            onChange({
+                              ...value,
+                              weekdays: on
+                                ? value.weekdays.filter((d) => d !== dow)
+                                : [...value.weekdays, dow].sort(),
+                            })
+                          }
+                          className={`h-8 w-8 rounded-full text-xs font-medium transition ${
+                            on
+                              ? 'bg-brand-600 text-white'
+                              : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-100'
+                          } ${dow === 0 ? 'text-red-400' : ''} ${
+                            on && dow === 0 ? 'text-white' : ''
+                          }`}
+                        >
+                          {lbl}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <label className="flex flex-col gap-1">
+                  <span className="text-[11px] font-medium text-slate-500">
+                    반복 종료일
+                  </span>
+                  <input
+                    type="date"
+                    value={value.endDateISO}
+                    min={value.dateISO}
+                    onChange={(e) =>
+                      onChange({ ...value, endDateISO: e.target.value })
+                    }
+                    className={inputCls}
+                  />
+                </label>
+                <p className="text-[11px] text-slate-400">
+                  {value.repeat &&
+                  value.weekdays.length &&
+                  value.endDateISO &&
+                  value.endDateISO >= value.dateISO
+                    ? `${expandWeekdayDates(value.dateISO, value.endDateISO, value.weekdays).length}개 수업이 생성됩니다.`
+                    : '시작일·요일·종료일을 지정하세요.'}
+                </p>
+              </>
+            )}
+          </div>
         )}
         <label className="col-span-2 sm:col-span-4 inline-flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
           <input

@@ -1243,15 +1243,20 @@ export async function updateClassSession(
       | 'cost'
       | 'status'
       | 'paid'
+      | 'attendance'
+      | 'lessonContent'
+      | 'feedback'
       | 'note'
     >
   >,
 ): Promise<void> {
   const update: Record<string, unknown> = { updatedAt: serverTimestamp() }
+  // 빈 문자열이면 필드를 지운다(수업 일지/메모 등 텍스트 필드).
+  const clearable = new Set(['note', 'lessonContent', 'feedback'])
   for (const [k, v] of Object.entries(patch)) {
     if (v === undefined) continue
-    if (k === 'note' && typeof v === 'string' && v.trim() === '') {
-      update.note = deleteField()
+    if (clearable.has(k) && typeof v === 'string' && v.trim() === '') {
+      update[k] = deleteField()
       continue
     }
     update[k] = v
