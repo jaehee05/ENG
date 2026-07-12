@@ -503,24 +503,26 @@ export function StudentSchedule() {
                 type="button"
                 onClick={() => setSelectedDateISO(c.iso)}
                 className={`min-h-[52px] sm:min-h-[64px] border-r border-b border-slate-100 p-1 flex flex-col items-center gap-1 transition ${
-                  c.inMonth ? 'bg-white' : 'bg-slate-50/50'
-                } ${i % 7 === 6 ? 'border-r-0' : ''} ${
                   isSelected
-                    ? 'ring-2 ring-inset ring-brand-500 bg-brand-50/40'
-                    : 'hover:bg-slate-50'
-                }`}
+                    ? 'bg-slate-50'
+                    : c.inMonth
+                      ? 'bg-white hover:bg-slate-50'
+                      : 'bg-slate-50/50'
+                } ${i % 7 === 6 ? 'border-r-0' : ''}`}
               >
                 <span
-                  className={`inline-flex items-center justify-center text-[11px] sm:text-xs font-medium h-6 w-6 rounded-full ${
-                    isToday
+                  className={`inline-flex items-center justify-center text-[11px] sm:text-xs font-semibold h-6 w-6 rounded-full ${
+                    isSelected
                       ? 'bg-brand-600 text-white'
-                      : c.inMonth
-                        ? dow === 0
-                          ? 'text-red-500'
-                          : dow === 6
-                            ? 'text-sky-600'
-                            : 'text-slate-700'
-                        : 'text-slate-300'
+                      : isToday
+                        ? 'bg-brand-100 text-brand-700'
+                        : c.inMonth
+                          ? dow === 0
+                            ? 'text-red-500'
+                            : dow === 6
+                              ? 'text-sky-600'
+                              : 'text-slate-700 font-medium'
+                          : 'text-slate-300 font-medium'
                   }`}
                 >
                   {c.day}

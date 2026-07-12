@@ -46,6 +46,67 @@ function isOverdue(a: Assignment): boolean {
   return a.dueAt.toMillis() < Date.now()
 }
 
+// ───── 과제 캘린더 헬퍼 ─────
+const KST_TZ = 'Asia/Seoul'
+const WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토']
+
+function todayISO(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: KST_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date())
+}
+
+/** Timestamp → KST 'YYYY-MM-DD'. */
+function tsToISO(ts: { toDate(): Date } | null | undefined): string | null {
+  if (!ts) return null
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: KST_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(ts.toDate())
+}
+
+function pad2(n: number): string {
+  return String(n).padStart(2, '0')
+}
+
+function buildMonthCells(
+  year: number,
+  monthIndex: number,
+): { iso: string; day: number; inMonth: boolean }[] {
+  const first = new Date(year, monthIndex, 1)
+  const firstDow = first.getDay()
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate()
+  const prevLast = new Date(year, monthIndex, 0).getDate()
+  const prevY = monthIndex === 0 ? year - 1 : year
+  const prevM = monthIndex === 0 ? 11 : monthIndex - 1
+  const nextY = monthIndex === 11 ? year + 1 : year
+  const nextM = monthIndex === 11 ? 0 : monthIndex + 1
+  const cells: { iso: string; day: number; inMonth: boolean }[] = []
+  for (let i = firstDow - 1; i >= 0; i--) {
+    const d = prevLast - i
+    cells.push({ iso: `${prevY}-${pad2(prevM + 1)}-${pad2(d)}`, day: d, inMonth: false })
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push({ iso: `${year}-${pad2(monthIndex + 1)}-${pad2(d)}`, day: d, inMonth: true })
+  }
+  const trailing = (7 - (cells.length % 7)) % 7
+  for (let d = 1; d <= trailing; d++) {
+    cells.push({ iso: `${nextY}-${pad2(nextM + 1)}-${pad2(d)}`, day: d, inMonth: false })
+  }
+  return cells
+}
+
+function fmtDayHeading(iso: string): string {
+  const [y, m, d] = iso.split('-').map((x) => parseInt(x, 10))
+  const wd = new Date(y, m - 1, d).toLocaleDateString('ko-KR', { weekday: 'short' })
+  return `${m}월 ${d}일 (${wd})`
+}
+
 export function Assignments() {
   const { profile } = useAuth()
   // 관리자는 본인 과제 대신 학생에게 과제를 부여하는 진입 화면을 본다.
@@ -63,6 +124,11 @@ function StudentAssignments() {
   const [loading, setLoading] = useState(true)
   const [newTodo, setNewTodo] = useState('')
   const [adding, setAdding] = useState(false)
+  const [cursor, setCursor] = useState(() => {
+    const [y, m] = todayISO().split('-').map(Number)
+    return { year: y, monthIndex: m - 1 }
+  })
+  const [selectedDateISO, setSelectedDateISO] = useState<string>(() => todayISO())
 
   useEffect(() => {
     if (!profile) return
@@ -190,6 +256,36 @@ function StudentAssignments() {
     [todos],
   )
 
+  // ── 학습 계획표 캘린더 ──
+  const monthCells = useMemo(
+    () => buildMonthCells(cursor.year, cursor.monthIndex),
+    [cursor],
+  )
+  const asnByDate = useMemo(() => {
+    const map = new Map<string, Assignment[]>()
+    for (const a of assignments) {
+      const iso = tsToISO(a.dueAt)
+      if (!iso) continue
+      const arr = map.get(iso) ?? []
+      arr.push(a)
+      map.set(iso, arr)
+    }
+    return map
+  }, [assignments])
+  const today = todayISO()
+  const selectedDayAsn = asnByDate.get(selectedDateISO) ?? []
+  function dayStatus(iso: string): 'allDone' | 'incomplete' | 'none' {
+    const arr = asnByDate.get(iso)
+    if (!arr || arr.length === 0) return 'none'
+    return arr.every((a) => isAssignmentDone(a, attempts)) ? 'allDone' : 'incomplete'
+  }
+  function shiftMonth(delta: number) {
+    setCursor((c) => {
+      const total = c.year * 12 + c.monthIndex + delta
+      return { year: Math.floor(total / 12), monthIndex: ((total % 12) + 12) % 12 }
+    })
+  }
+
   return (
     <div className="space-y-6">
       <header className="flex items-start justify-between gap-3">
@@ -217,6 +313,144 @@ function StudentAssignments() {
       </header>
 
       {loading && <p className="text-slate-500 text-sm">불러오는 중…</p>}
+
+      {/* 학습 계획표 캘린더 (마감일 기준) */}
+      {!loading && (
+        <section className="space-y-3">
+          <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+              <button
+                type="button"
+                onClick={() => shiftMonth(-1)}
+                className="rounded-md px-2 py-1 text-slate-500 hover:bg-slate-100"
+                aria-label="이전 달"
+              >
+                ‹
+              </button>
+              <div className="text-center leading-tight">
+                <p className="text-[11px] text-slate-400">{cursor.year}년</p>
+                <h2 className="text-sm font-semibold text-slate-900">
+                  {cursor.monthIndex + 1}월
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => shiftMonth(1)}
+                className="rounded-md px-2 py-1 text-slate-500 hover:bg-slate-100"
+                aria-label="다음 달"
+              >
+                ›
+              </button>
+            </div>
+
+            <div className="grid grid-cols-7 text-center text-[10px] sm:text-xs font-medium text-slate-500 border-b border-slate-100">
+              {WEEKDAY_LABELS.map((d, i) => (
+                <div
+                  key={d}
+                  className={`py-1.5 ${i === 0 ? 'text-red-500' : i === 6 ? 'text-sky-500' : ''}`}
+                >
+                  {d}
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-7">
+              {monthCells.map((c, i) => {
+                const isToday = c.iso === today
+                const isSelected = c.iso === selectedDateISO
+                const status = dayStatus(c.iso)
+                const dow = i % 7
+                const numCls = isSelected
+                  ? 'bg-brand-600 text-white'
+                  : status === 'allDone'
+                    ? 'bg-brand-100 text-brand-700'
+                    : status === 'incomplete'
+                      ? 'bg-red-100 text-red-600'
+                      : c.inMonth
+                        ? dow === 0
+                          ? 'text-red-500'
+                          : dow === 6
+                            ? 'text-sky-600'
+                            : 'text-slate-700'
+                        : 'text-slate-300'
+                return (
+                  <button
+                    key={c.iso + i}
+                    type="button"
+                    onClick={() => setSelectedDateISO(c.iso)}
+                    className={`min-h-[44px] sm:min-h-[52px] border-r border-b border-slate-100 flex items-center justify-center ${
+                      i % 7 === 6 ? 'border-r-0' : ''
+                    } ${!c.inMonth ? 'bg-slate-50/50' : 'hover:bg-slate-50'}`}
+                  >
+                    <span
+                      className={`inline-flex items-center justify-center h-7 w-7 rounded-full text-xs font-semibold ${numCls} ${
+                        isToday && !isSelected ? 'ring-1 ring-slate-300' : ''
+                      }`}
+                    >
+                      {c.day}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-center text-[11px] font-medium text-slate-400">
+              학습 계획 · {fmtDayHeading(selectedDateISO)}
+            </p>
+            {selectedDayAsn.length === 0 ? (
+              <p className="text-xs text-slate-400 py-5 text-center rounded-xl border border-dashed border-slate-200">
+                이 날 마감인 과제가 없습니다.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {selectedDayAsn.map((a) => {
+                  const done = isAssignmentDone(a, attempts)
+                  const path = assignmentPath(a)
+                  const inner = (
+                    <>
+                      <span
+                        className={`shrink-0 h-5 w-5 rounded-full border-2 flex items-center justify-center ${
+                          done ? 'bg-brand-600 border-brand-600' : 'border-slate-300'
+                        }`}
+                      >
+                        {done && (
+                          <span className="h-2 w-2 rounded-full bg-white" aria-hidden />
+                        )}
+                      </span>
+                      <p
+                        className={`flex-1 min-w-0 text-sm truncate ${
+                          done ? 'text-slate-400 line-through' : 'text-slate-900'
+                        }`}
+                      >
+                        {a.refTitle}
+                      </p>
+                      {path && <span className="text-slate-300 text-lg shrink-0">→</span>}
+                    </>
+                  )
+                  return (
+                    <li key={a.id}>
+                      {path ? (
+                        <Link
+                          to={path}
+                          className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 hover:bg-slate-50"
+                        >
+                          {inner}
+                        </Link>
+                      ) : (
+                        <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
+                          {inner}
+                        </div>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </div>
+        </section>
+      )}
 
       {!loading &&
         categories.map((cat) => {
