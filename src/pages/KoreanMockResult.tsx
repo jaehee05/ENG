@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { getAttempt, getKoreanMock } from '../lib/firestore'
 import {
   MOCK_SUBJECT_LABEL,
@@ -15,7 +15,6 @@ const SUBJECT_BADGE_CLASS: Record<MockSubject, string> = {
 
 export function KoreanMockResult() {
   const { id, attemptId } = useParams<{ id: string; attemptId: string }>()
-  const navigate = useNavigate()
   const [attempt, setAttempt] = useState<Attempt | null>(null)
   const [mock, setMock] = useState<KoreanMock | null>(null)
   const [loading, setLoading] = useState(true)
@@ -92,17 +91,14 @@ export function KoreanMockResult() {
           />
         </div>
         {mock?.explanationPdfUrl && (
-          <button
-            type="button"
-            onClick={() =>
-              navigate(`/korean-mocks/${id}/explanation`, {
-                state: { from: `/korean-mocks/${id}/result/${attemptId}` },
-              })
-            }
+          <a
+            href={mock.explanationPdfUrl}
+            target="_blank"
+            rel="noopener noreferrer"
             className="mt-4 inline-flex items-center gap-2 rounded-md bg-brand-600 text-white text-sm font-semibold px-4 py-2 hover:bg-brand-700 transition"
           >
             <span aria-hidden>📄</span> 해설 보기
-          </button>
+          </a>
         )}
       </div>
 

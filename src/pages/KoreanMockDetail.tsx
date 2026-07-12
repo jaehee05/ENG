@@ -326,20 +326,17 @@ export function KoreanMockDetail() {
             />
             {mock.explanationPdfUrl ? (
               <div className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigate(`/korean-mocks/${mock.id}/explanation`, {
-                      state: { from: `/korean-mocks/${mock.id}` },
-                    })
-                  }
+                <a
+                  href={mock.explanationPdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="min-w-0 flex items-center gap-2 text-sm text-brand-700 hover:underline"
                 >
                   <span aria-hidden>📄</span>
                   <span className="truncate">
                     {mock.explanationPdfName ?? '해설 PDF'}
                   </span>
-                </button>
+                </a>
                 <div className="flex items-center gap-2 shrink-0">
                   <button
                     type="button"
