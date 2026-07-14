@@ -14,12 +14,16 @@ import {
   uploadMockExplanationPdf,
 } from '../lib/mockStorage'
 import { MyAttemptsBox } from '../components/MyAttemptsBox'
+import { estimateMockCutoffs } from '../lib/api'
 import {
   getMockSubject,
   MOCK_SUBJECT_LABEL,
+  questionPoints,
   type Attempt,
   type KoreanMock,
+  type KoreanMockElective,
   type KoreanMockQuestion,
+  type MockGradeCut,
   type MockSubject,
 } from '../lib/types'
 
@@ -47,6 +51,11 @@ export function KoreanMockDetail() {
   const [eTitle, setETitle] = useState('')
   const [eSubject, setESubject] = useState<MockSubject>('korean')
   const [eQuestions, setEQuestions] = useState<KoreanMockQuestion[]>([])
+  const [eElectives, setEElectives] = useState<KoreanMockElective[]>([])
+  const [eComment, setEComment] = useState('')
+  const [eCutoffs, setECutoffs] = useState<MockGradeCut[] | null>(null)
+  const [cutoffBusy, setCutoffBusy] = useState(false)
+  const [cutoffError, setCutoffError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
   // 해설 PDF (관리자)
@@ -98,7 +107,44 @@ export function KoreanMockDetail() {
     setETitle(mock.title)
     setESubject(getMockSubject(mock))
     setEQuestions(mock.questions.map((q) => ({ ...q })))
+    setEElectives(
+      (mock.electives ?? []).map((el) => ({
+        ...el,
+        questions: el.questions.map((q) => ({ ...q })),
+      })),
+    )
+    setEComment(mock.examinerComment ?? '')
+    setECutoffs(mock.gradeCutoffs ?? null)
+    setCutoffError(null)
     setEditing(true)
+  }
+
+  async function handleGenerateCutoffs() {
+    setCutoffError(null)
+    const commonPts = eQuestions.reduce((s, q) => s + questionPoints(q), 0)
+    const elPts = eElectives[0]
+      ? eElectives[0].questions.reduce((s, q) => s + questionPoints(q), 0)
+      : 0
+    const totalPoints = commonPts + elPts
+    if (totalPoints <= 0) {
+      setCutoffError('먼저 정답을 입력하세요.')
+      return
+    }
+    setCutoffBusy(true)
+    try {
+      const cuts = await estimateMockCutoffs({
+        subject: eSubject,
+        title: eTitle.trim() || undefined,
+        totalQuestions: eQuestions.length + (eElectives[0]?.questions.length ?? 0),
+        totalPoints,
+        practice: true,
+      })
+      setECutoffs(cuts)
+    } catch (err) {
+      setCutoffError(err instanceof Error ? err.message : 'AI 등급컷 생성 실패')
+    } finally {
+      setCutoffBusy(false)
+    }
   }
 
   async function saveEdit() {
@@ -106,16 +152,23 @@ export function KoreanMockDetail() {
     if (!eTitle.trim()) return
     setSaving(true)
     try {
-      await updateKoreanMock(mock.id, {
+      const patch = {
         title: eTitle.trim(),
         subject: eSubject,
         questions: eQuestions,
-      })
+        electives: eElectives,
+        examinerComment: eComment,
+        gradeCutoffs: eCutoffs ?? [],
+      }
+      await updateKoreanMock(mock.id, patch)
       setMock({
         ...mock,
         title: eTitle.trim(),
         subject: eSubject,
         questions: eQuestions,
+        electives: eElectives.length ? eElectives : undefined,
+        examinerComment: eComment.trim() || undefined,
+        gradeCutoffs: eCutoffs && eCutoffs.length ? eCutoffs : undefined,
       })
       setEditing(false)
     } catch (err) {
@@ -289,6 +342,14 @@ export function KoreanMockDetail() {
                 setSubject={setESubject}
                 questions={eQuestions}
                 setQuestions={setEQuestions}
+                electives={eElectives}
+                setElectives={setEElectives}
+                comment={eComment}
+                setComment={setEComment}
+                cutoffs={eCutoffs}
+                onGenerateCutoffs={handleGenerateCutoffs}
+                cutoffBusy={cutoffBusy}
+                cutoffError={cutoffError}
               />
             ) : (
               <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5 text-[12px]">
@@ -423,6 +484,96 @@ export function KoreanMockDetail() {
   )
 }
 
+/** 문항별 정답 + 3점 토글 편집기 (공통·선택과목 공용). */
+function QuestionsEditor({
+  label,
+  questions,
+  setQuestions,
+}: {
+  label: string
+  questions: KoreanMockQuestion[]
+  setQuestions: (q: KoreanMockQuestion[]) => void
+}) {
+  function setAnswer(idx: number, answer: number) {
+    setQuestions(questions.map((q, i) => (i === idx ? { ...q, answer } : q)))
+  }
+  function togglePoints(idx: number) {
+    setQuestions(
+      questions.map((q, i) =>
+        i === idx ? { ...q, points: questionPoints(q) === 3 ? 2 : 3 } : q,
+      ),
+    )
+  }
+  function addOne() {
+    const last = questions[questions.length - 1]
+    setQuestions([...questions, { number: last ? last.number + 1 : 1, answer: 1 }])
+  }
+  function removeLast() {
+    setQuestions(questions.slice(0, -1))
+  }
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs font-medium text-slate-600">
+        {label} ({questions.length}문항) · 우측 배점 눌러 2/3점 전환
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {questions.map((q, i) => (
+          <div
+            key={i}
+            className="flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-2 py-1.5"
+          >
+            <span className="text-xs text-slate-500 w-7 shrink-0">{q.number}.</span>
+            <div className="flex gap-1">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setAnswer(i, n)}
+                  className={`w-6 h-6 rounded-full text-[11px] font-medium border transition ${
+                    q.answer === n
+                      ? 'bg-slate-900 text-white border-slate-900'
+                      : 'bg-white text-slate-500 border-slate-300 hover:bg-slate-100'
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => togglePoints(i)}
+              className={`ml-auto shrink-0 rounded px-1.5 py-1 text-[10px] font-semibold border ${
+                questionPoints(q) === 3
+                  ? 'bg-amber-100 text-amber-700 border-amber-300'
+                  : 'bg-white text-slate-400 border-slate-300'
+              }`}
+            >
+              {questionPoints(q)}점
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={addOne}
+          className="rounded-md border border-slate-300 text-slate-700 text-xs font-medium px-2.5 py-1 hover:bg-slate-50"
+        >
+          + 문항 추가
+        </button>
+        <button
+          type="button"
+          onClick={removeLast}
+          disabled={questions.length === 0}
+          className="rounded-md border border-slate-300 text-slate-700 text-xs font-medium px-2.5 py-1 hover:bg-slate-50 disabled:opacity-50"
+        >
+          − 마지막 삭제
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function EditAnswerGrid({
   title,
   setTitle,
@@ -430,6 +581,14 @@ function EditAnswerGrid({
   setSubject,
   questions,
   setQuestions,
+  electives,
+  setElectives,
+  comment,
+  setComment,
+  cutoffs,
+  onGenerateCutoffs,
+  cutoffBusy,
+  cutoffError,
 }: {
   title: string
   setTitle: (s: string) => void
@@ -437,21 +596,35 @@ function EditAnswerGrid({
   setSubject: (s: MockSubject) => void
   questions: KoreanMockQuestion[]
   setQuestions: (q: KoreanMockQuestion[]) => void
+  electives: KoreanMockElective[]
+  setElectives: (e: KoreanMockElective[]) => void
+  comment: string
+  setComment: (s: string) => void
+  cutoffs: MockGradeCut[] | null
+  onGenerateCutoffs: () => void
+  cutoffBusy: boolean
+  cutoffError: string | null
 }) {
-  function setAnswer(idx: number, answer: number) {
-    const next = questions.map((q, i) => (i === idx ? { ...q, answer } : q))
-    setQuestions(next)
+  function updateElective(i: number, patch: Partial<KoreanMockElective>) {
+    setElectives(electives.map((el, j) => (j === i ? { ...el, ...patch } : el)))
   }
-  function addOne() {
-    const last = questions[questions.length - 1]
-    const nextNumber = last ? last.number + 1 : 1
-    setQuestions([...questions, { number: nextNumber, answer: 1 }])
+  function addElective() {
+    const nums = [
+      ...questions.map((q) => q.number),
+      ...electives.flatMap((el) => el.questions.map((q) => q.number)),
+    ]
+    const next = (nums.length ? Math.max(...nums) : 0) + 1
+    setElectives([
+      ...electives,
+      { name: '선택과목', startNumber: next, questions: [{ number: next, answer: 1 }] },
+    ])
   }
-  function removeLast() {
-    setQuestions(questions.slice(0, -1))
+  function removeElective(i: number) {
+    setElectives(electives.filter((_, j) => j !== i))
   }
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div>
         <label className="block text-xs font-medium text-slate-600 mb-1">제목</label>
         <input
@@ -488,53 +661,91 @@ function EditAnswerGrid({
           })}
         </div>
       </div>
-      <div className="space-y-1.5">
-        <p className="text-xs font-medium text-slate-600">
-          정답 ({questions.length}문항)
-        </p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-          {questions.map((q, i) => (
-            <div
-              key={i}
-              className="flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-2 py-1.5"
-            >
-              <span className="text-xs text-slate-500 w-7">{q.number}.</span>
-              <div className="flex gap-1">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => setAnswer(i, n)}
-                    className={`w-6 h-6 rounded-full text-[11px] font-medium border transition ${
-                      q.answer === n
-                        ? 'bg-slate-900 text-white border-slate-900'
-                        : 'bg-white text-slate-500 border-slate-300 hover:bg-slate-100'
-                    }`}
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
+
+      <QuestionsEditor
+        label="공통 과목 정답"
+        questions={questions}
+        setQuestions={setQuestions}
+      />
+
+      {/* 선택과목 */}
+      <div className="space-y-2 pt-1 border-t border-slate-100">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-medium text-slate-600">선택과목 (택1)</p>
+          <button
+            type="button"
+            onClick={addElective}
+            className="text-xs font-medium text-brand-700 hover:underline"
+          >
+            + 선택과목 추가
+          </button>
         </div>
+        {electives.map((el, i) => (
+          <div key={i} className="rounded-lg border border-slate-200 bg-slate-50/60 p-2.5 space-y-2">
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={el.name}
+                onChange={(e) => updateElective(i, { name: e.target.value })}
+                placeholder="선택과목 이름"
+                className="flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+              <button
+                type="button"
+                onClick={() => removeElective(i)}
+                className="text-[11px] text-slate-400 hover:text-red-500 px-1"
+              >
+                삭제
+              </button>
+            </div>
+            <QuestionsEditor
+              label="정답"
+              questions={el.questions}
+              setQuestions={(qs) => updateElective(i, { questions: qs })}
+            />
+          </div>
+        ))}
       </div>
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={addOne}
-          className="rounded-md border border-slate-300 text-slate-700 text-xs font-medium px-2.5 py-1 hover:bg-slate-50"
-        >
-          + 문항 추가
-        </button>
-        <button
-          type="button"
-          onClick={removeLast}
-          disabled={questions.length === 0}
-          className="rounded-md border border-slate-300 text-slate-700 text-xs font-medium px-2.5 py-1 hover:bg-slate-50 disabled:opacity-50"
-        >
-          − 마지막 삭제
-        </button>
+
+      {/* 출제자 한마디 */}
+      <div className="pt-1 border-t border-slate-100">
+        <label className="block text-xs font-medium text-slate-600 mb-1">
+          출제자 한마디 <span className="font-normal text-slate-400">(결과 화면 표시)</span>
+        </label>
+        <textarea
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          rows={2}
+          className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+        />
+      </div>
+
+      {/* AI 등급컷 */}
+      <div className="pt-1 border-t border-slate-100">
+        <div className="flex items-center justify-between gap-2">
+          <label className="text-xs font-medium text-slate-600">AI 등급컷</label>
+          <button
+            type="button"
+            onClick={onGenerateCutoffs}
+            disabled={cutoffBusy}
+            className="rounded-md bg-brand-600 text-white text-xs font-semibold px-3 py-1.5 hover:bg-brand-700 disabled:opacity-50"
+          >
+            {cutoffBusy ? '생성 중…' : 'AI 등급컷 생성'}
+          </button>
+        </div>
+        {cutoffError && <p className="text-[11px] text-red-600 mt-1">{cutoffError}</p>}
+        {cutoffs && cutoffs.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {cutoffs.map((c) => (
+              <span
+                key={c.grade}
+                className="rounded bg-amber-50 border border-amber-200 text-amber-700 text-[11px] font-medium px-2 py-1 tabular-nums"
+              >
+                {c.grade}등급 {c.minScore}점
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

@@ -62,6 +62,7 @@ interface ElectiveDraft {
   name: string
   startNumberRaw: string
   rawAnswers: string
+  threePointRaw: string
 }
 
 const inputCls =
@@ -115,17 +116,18 @@ export function KoreanMockNew() {
   const parsedElectives = useMemo<KoreanMockElective[]>(() => {
     return electives.map((el) => {
       const start = Number.parseInt(el.startNumberRaw, 10)
+      const startNum = Number.isFinite(start) && start > 0 ? start : commonNext
       const qs = withPoints(
-        parseAnswerKey(el.rawAnswers, Number.isFinite(start) && start > 0 ? start : commonNext),
-        threeSet,
+        parseAnswerKey(el.rawAnswers, startNum),
+        parseNumberSet(el.threePointRaw),
       )
       return {
         name: el.name.trim() || '선택과목',
-        startNumber: Number.isFinite(start) && start > 0 ? start : commonNext,
+        startNumber: startNum,
         questions: qs,
       }
     })
-  }, [electives, commonNext, threeSet])
+  }, [electives, commonNext])
 
   // 등급컷 산출용 총점 = 공통 + (첫 선택과목).
   const totalPoints = useMemo(() => {
@@ -142,7 +144,7 @@ export function KoreanMockNew() {
   function addElective() {
     setElectives((prev) => [
       ...prev,
-      { name: '', startNumberRaw: String(commonNext), rawAnswers: '' },
+      { name: '', startNumberRaw: String(commonNext), rawAnswers: '', threePointRaw: '' },
     ])
   }
   function updateElective(i: number, patch: Partial<ElectiveDraft>) {
@@ -293,7 +295,8 @@ export function KoreanMockNew() {
 
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">
-            3점 문항 번호 <span className="font-normal text-slate-400">(선택, 나머지는 2점)</span>
+            공통 과목 3점 문항 번호{' '}
+            <span className="font-normal text-slate-400">(선택, 나머지는 2점)</span>
           </label>
           <input
             type="text"
@@ -345,6 +348,13 @@ export function KoreanMockNew() {
                   rows={3}
                   placeholder="선택과목 답안 (예: 1 3 2 5 4 ...)"
                   className={`${inputCls} font-mono`}
+                />
+                <input
+                  type="text"
+                  value={el.threePointRaw}
+                  onChange={(e) => updateElective(i, { threePointRaw: e.target.value })}
+                  placeholder="3점 문항 번호 (예: 37, 42)"
+                  className={inputCls}
                 />
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] text-slate-500">
