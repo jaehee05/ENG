@@ -15,6 +15,7 @@ import {
 } from '../lib/mockStorage'
 import { MyAttemptsBox } from '../components/MyAttemptsBox'
 import { estimateMockCutoffs } from '../lib/api'
+import { MockCutoffEditor } from '../components/MockCutoffEditor'
 import {
   getMockSubject,
   MOCK_SUBJECT_LABEL,
@@ -347,6 +348,7 @@ export function KoreanMockDetail() {
                 comment={eComment}
                 setComment={setEComment}
                 cutoffs={eCutoffs}
+                setCutoffs={setECutoffs}
                 onGenerateCutoffs={handleGenerateCutoffs}
                 cutoffBusy={cutoffBusy}
                 cutoffError={cutoffError}
@@ -586,6 +588,7 @@ function EditAnswerGrid({
   comment,
   setComment,
   cutoffs,
+  setCutoffs,
   onGenerateCutoffs,
   cutoffBusy,
   cutoffError,
@@ -601,6 +604,7 @@ function EditAnswerGrid({
   comment: string
   setComment: (s: string) => void
   cutoffs: MockGradeCut[] | null
+  setCutoffs: (c: MockGradeCut[]) => void
   onGenerateCutoffs: () => void
   cutoffBusy: boolean
   cutoffError: string | null
@@ -720,32 +724,15 @@ function EditAnswerGrid({
         />
       </div>
 
-      {/* AI 등급컷 */}
+      {/* 등급컷 (직접 편집 + AI 초안) */}
       <div className="pt-1 border-t border-slate-100">
-        <div className="flex items-center justify-between gap-2">
-          <label className="text-xs font-medium text-slate-600">AI 등급컷</label>
-          <button
-            type="button"
-            onClick={onGenerateCutoffs}
-            disabled={cutoffBusy}
-            className="rounded-md bg-brand-600 text-white text-xs font-semibold px-3 py-1.5 hover:bg-brand-700 disabled:opacity-50"
-          >
-            {cutoffBusy ? '생성 중…' : 'AI 등급컷 생성'}
-          </button>
-        </div>
-        {cutoffError && <p className="text-[11px] text-red-600 mt-1">{cutoffError}</p>}
-        {cutoffs && cutoffs.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-2">
-            {cutoffs.map((c) => (
-              <span
-                key={c.grade}
-                className="rounded bg-amber-50 border border-amber-200 text-amber-700 text-[11px] font-medium px-2 py-1 tabular-nums"
-              >
-                {c.grade}등급 {c.minScore}점
-              </span>
-            ))}
-          </div>
-        )}
+        <MockCutoffEditor
+          cutoffs={cutoffs ?? []}
+          onChange={setCutoffs}
+          onGenerate={onGenerateCutoffs}
+          generating={cutoffBusy}
+          generateError={cutoffError}
+        />
       </div>
     </div>
   )

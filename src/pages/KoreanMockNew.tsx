@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import { createKoreanMock } from '../lib/firestore'
 import { estimateMockCutoffs } from '../lib/api'
+import { MockCutoffEditor } from '../components/MockCutoffEditor'
 import {
   questionPoints,
   type KoreanMockElective,
@@ -387,37 +388,16 @@ export function KoreanMockNew() {
           />
         </div>
 
-        {/* AI 등급컷 */}
-        <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-2">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-medium text-slate-700">AI 등급컷</p>
-              <p className="text-[11px] text-slate-500">
-                총점 {totalPoints}점 · {totalQuestions}문항 기준 추정
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={handleGenerateCutoffs}
-              disabled={cutoffBusy}
-              className="shrink-0 rounded-md bg-brand-600 text-white text-xs font-semibold px-3 py-1.5 hover:bg-brand-700 disabled:opacity-50"
-            >
-              {cutoffBusy ? '생성 중…' : 'AI 등급컷 생성'}
-            </button>
-          </div>
-          {cutoffError && <p className="text-[11px] text-red-600">{cutoffError}</p>}
-          {cutoffs && (
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              {cutoffs.map((c) => (
-                <span
-                  key={c.grade}
-                  className="rounded bg-amber-50 border border-amber-200 text-amber-700 text-[11px] font-medium px-2 py-1 tabular-nums"
-                >
-                  {c.grade}등급 {c.minScore}점
-                </span>
-              ))}
-            </div>
-          )}
+        {/* 등급컷 (직접 편집 + AI 초안) */}
+        <div className="rounded-lg border border-slate-200 bg-white p-3">
+          <MockCutoffEditor
+            cutoffs={cutoffs ?? []}
+            onChange={setCutoffs}
+            onGenerate={handleGenerateCutoffs}
+            generating={cutoffBusy}
+            generateError={cutoffError}
+            totalPoints={totalPoints}
+          />
         </div>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
