@@ -35,7 +35,7 @@ function BubbleRow({
   return (
     <div
       data-qidx={idx}
-      className={`grid grid-cols-[1.5rem_1fr] items-center border-b border-slate-100 last:border-b-0 scroll-mt-24 ${
+      className={`grid grid-cols-[1.7rem_1fr] items-center border-b border-slate-100 last:border-b-0 scroll-mt-24 ${
         focused ? 'bg-brand-50' : ''
       }`}
     >
@@ -48,16 +48,16 @@ function BubbleRow({
       >
         {number}
       </button>
-      <div className="flex justify-center gap-[2px] py-1">
+      <div className="flex justify-center gap-[3px] py-1">
         {[1, 2, 3, 4, 5].map((n) => (
           <button
             key={n}
             type="button"
             onClick={() => onPick(n)}
-            className={`w-[16px] h-[22px] rounded-[50%] border-2 text-[11px] font-bold leading-none transition ${
+            className={`w-[18px] h-[18px] rounded-full text-[9px] font-semibold border transition ${
               sel === n
-                ? 'bg-slate-900 text-slate-300 border-slate-900'
-                : 'bg-white text-violet-500 border-violet-500 active:bg-violet-50'
+                ? 'bg-slate-900 text-white border-slate-900'
+                : 'bg-white text-slate-400 border-slate-300 active:bg-slate-100'
             }`}
             aria-label={`${number}번 ${n}`}
           >
@@ -92,7 +92,7 @@ function SheetColumn({
   return (
     <div className={`flex-1 min-w-[7rem] rounded-lg border ${border} overflow-hidden`}>
       <div className={`${head} text-[11px] font-bold text-center py-1`}>{title}</div>
-      <div className={`grid grid-cols-[1.5rem_1fr] text-[10px] font-semibold text-center ${sub} border-y ${border}`}>
+      <div className={`grid grid-cols-[1.7rem_1fr] text-[10px] font-semibold text-center ${sub} border-y ${border}`}>
         <div className="py-0.5 border-r border-slate-200/60">문번</div>
         <div className="py-0.5">답란</div>
       </div>
