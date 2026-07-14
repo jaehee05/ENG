@@ -331,6 +331,25 @@ export interface KoreanMockQuestion {
   number: number
   /** 정답 (1-5). */
   answer: number
+  /** 배점 (기본 2). */
+  points?: number
+}
+
+/** 선택과목 옵션 (수능형: 공통 + 택1). */
+export interface KoreanMockElective {
+  /** 옵션 이름 (예: 화법과 작문, 언어와 매체). */
+  name: string
+  /** 이 선택과목 첫 문항 번호 (보통 공통 다음, 예: 35). */
+  startNumber: number
+  questions: KoreanMockQuestion[]
+}
+
+/** 등급컷 한 줄 (원점수 기준). */
+export interface MockGradeCut {
+  /** 1~9 등급. */
+  grade: number
+  /** 이 원점수 이상이면 해당 등급. */
+  minScore: number
 }
 
 /** 모의고사 과목. 기존 레코드는 'korean'으로 간주. */
@@ -343,7 +362,14 @@ export interface KoreanMock {
   subject?: MockSubject
   /** 답안 일괄 입력 시 첫 문항 번호. 영어는 보통 18. 미설정이면 1. */
   startNumber?: number
+  /** 공통 과목 문항 (선택과목 없으면 전체 문항). */
   questions: KoreanMockQuestion[]
+  /** 선택과목 옵션들. 있으면 학생이 하나 선택해 응시. 없으면 공통만. */
+  electives?: KoreanMockElective[]
+  /** 출제자 한마디 (결과 화면 표시). */
+  examinerComment?: string
+  /** AI 산출 등급컷 (원점수 기준). */
+  gradeCutoffs?: MockGradeCut[]
   /** 해설 PDF 다운로드 URL(Storage). 설정 시 채점 후 학생에게 제공, 없으면 생략. */
   explanationPdfUrl?: string
   /** 해설 PDF 원본 파일명(표시용). */
@@ -357,6 +383,23 @@ export interface KoreanMock {
 
 export function getMockSubject(m: KoreanMock): MockSubject {
   return m.subject ?? 'korean'
+}
+
+/** 문항 배점 (미설정=2). */
+export function questionPoints(q: KoreanMockQuestion): number {
+  return q.points && q.points > 0 ? q.points : 2
+}
+
+/** 등급컷 + 원점수로 등급 산출 (없으면 null). 1등급이 가장 높은 점수. */
+export function gradeFromScore(
+  score: number,
+  cuts?: MockGradeCut[],
+): number | null {
+  if (!cuts || cuts.length === 0) return null
+  const sorted = [...cuts].sort((a, b) => b.minScore - a.minScore)
+  for (const c of sorted) if (score >= c.minScore) return c.grade
+  // 가장 낮은 등급컷보다 낮으면 그 다음 등급(최대 9).
+  return Math.min(9, sorted[sorted.length - 1].grade + 1)
 }
 
 export function getMockStartNumber(m: KoreanMock): number {

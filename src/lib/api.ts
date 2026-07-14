@@ -282,6 +282,39 @@ export async function gradeVocabAI(items: GradeVocabItem[]): Promise<boolean[]> 
   return (data.results ?? []).map((r) => Boolean(r.correct))
 }
 
+export interface MockCutoffInput {
+  subject?: 'korean' | 'english'
+  title?: string
+  totalQuestions?: number
+  totalPoints: number
+  practice?: boolean
+}
+
+/** AI 등급컷 추정. { grade, minScore } 배열 반환. */
+export async function estimateMockCutoffs(
+  input: MockCutoffInput,
+): Promise<{ grade: number; minScore: number }[]> {
+  const res = await fetch('/api/mock-cutoffs', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  if (!res.ok) {
+    let message = `요청 실패 (HTTP ${res.status})`
+    try {
+      const body = (await res.json()) as { error?: string }
+      if (body.error) message = body.error
+    } catch {
+      // ignore
+    }
+    throw new Error(message)
+  }
+  const data = (await res.json()) as {
+    cutoffs: { grade: number; minScore: number }[]
+  }
+  return data.cutoffs ?? []
+}
+
 export async function defineWords(input: {
   words: string[]
   passage: string

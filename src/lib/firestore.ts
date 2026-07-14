@@ -27,6 +27,8 @@ import type {
   ClassSessionStatus,
   KoreanMock,
   KoreanMockQuestion,
+  KoreanMockElective,
+  MockGradeCut,
   KoreanMockResult,
   MockSubject,
   NotificationKind,
@@ -494,6 +496,9 @@ export async function createKoreanMock(input: {
   subject?: 'korean' | 'english'
   startNumber?: number
   questions: KoreanMockQuestion[]
+  electives?: KoreanMockElective[]
+  examinerComment?: string
+  gradeCutoffs?: MockGradeCut[]
   createdBy: string
   createdByName: string
 }): Promise<string> {
@@ -506,6 +511,11 @@ export async function createKoreanMock(input: {
     createdByName: input.createdByName,
     createdAt: serverTimestamp(),
   }
+  if (input.electives && input.electives.length) payload.electives = input.electives
+  if (input.examinerComment && input.examinerComment.trim())
+    payload.examinerComment = input.examinerComment.trim()
+  if (input.gradeCutoffs && input.gradeCutoffs.length)
+    payload.gradeCutoffs = input.gradeCutoffs
   const ref = await addDoc(collection(db, 'koreanMocks'), payload)
   return ref.id
 }
@@ -513,7 +523,16 @@ export async function createKoreanMock(input: {
 export async function updateKoreanMock(
   id: string,
   patch: Partial<
-    Pick<KoreanMock, 'title' | 'subject' | 'startNumber' | 'questions'>
+    Pick<
+      KoreanMock,
+      | 'title'
+      | 'subject'
+      | 'startNumber'
+      | 'questions'
+      | 'electives'
+      | 'examinerComment'
+      | 'gradeCutoffs'
+    >
   > & {
     /** 해설 PDF 설정 정보. null 이면 해설 PDF 를 제거(필드 삭제). */
     explanationPdf?: {
@@ -530,6 +549,19 @@ export async function updateKoreanMock(
     update.startNumber = patch.startNumber && patch.startNumber > 0 ? patch.startNumber : 1
   }
   if (patch.questions !== undefined) update.questions = patch.questions
+  if (patch.electives !== undefined) {
+    update.electives = patch.electives.length ? patch.electives : deleteField()
+  }
+  if (patch.examinerComment !== undefined) {
+    update.examinerComment = patch.examinerComment.trim()
+      ? patch.examinerComment.trim()
+      : deleteField()
+  }
+  if (patch.gradeCutoffs !== undefined) {
+    update.gradeCutoffs = patch.gradeCutoffs.length
+      ? patch.gradeCutoffs
+      : deleteField()
+  }
   if (patch.explanationPdf !== undefined) {
     if (patch.explanationPdf === null) {
       update.explanationPdfUrl = deleteField()
