@@ -10,7 +10,13 @@ import {
   type KoreanMockResult,
 } from '../lib/types'
 
-/** 버블시트 한 문항 행 (문번 + 답란 1~5). */
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
+  return out
+}
+
+/** 버블시트 한 문항 행 (문번 + 답란 1~5). 컬럼 안에서 컴팩트하게. */
 function BubbleRow({
   idx,
   number,
@@ -29,26 +35,26 @@ function BubbleRow({
   return (
     <div
       data-qidx={idx}
-      className={`grid grid-cols-[2.4rem_1fr] items-center border-b border-slate-100 last:border-b-0 scroll-mt-24 ${
-        focused ? 'bg-brand-50/70' : ''
+      className={`grid grid-cols-[1.7rem_1fr] items-center border-b border-slate-100 last:border-b-0 scroll-mt-24 ${
+        focused ? 'bg-brand-50' : ''
       }`}
     >
       <button
         type="button"
         onClick={onFocus}
-        className={`py-1.5 text-center text-xs font-semibold tabular-nums border-r border-slate-100 ${
+        className={`py-1 text-center text-[11px] font-semibold tabular-nums border-r border-slate-100 ${
           focused ? 'text-brand-700' : 'text-slate-500'
         }`}
       >
         {number}
       </button>
-      <div className="flex justify-center gap-1.5 py-1.5">
+      <div className="flex justify-center gap-[3px] py-1">
         {[1, 2, 3, 4, 5].map((n) => (
           <button
             key={n}
             type="button"
             onClick={() => onPick(n)}
-            className={`w-6 h-6 rounded-full text-[11px] font-semibold border transition ${
+            className={`w-[18px] h-[18px] rounded-full text-[9px] font-semibold border transition ${
               sel === n
                 ? 'bg-slate-900 text-white border-slate-900'
                 : 'bg-white text-slate-400 border-slate-300 active:bg-slate-100'
@@ -63,7 +69,7 @@ function BubbleRow({
   )
 }
 
-function SheetSection({
+function SheetColumn({
   title,
   accent,
   items,
@@ -82,16 +88,13 @@ function SheetSection({
 }) {
   const border = accent === 'brand' ? 'border-brand-300' : 'border-rose-300'
   const head = accent === 'brand' ? 'bg-brand-50 text-brand-700' : 'bg-rose-50 text-rose-700'
-  const subHead =
-    accent === 'brand' ? 'text-brand-600 bg-brand-50/40' : 'text-rose-600 bg-rose-50/40'
+  const sub = accent === 'brand' ? 'text-brand-600' : 'text-rose-600'
   return (
-    <div className={`rounded-lg border ${border} overflow-hidden`}>
-      <div className={`${head} text-xs font-bold text-center py-1.5`}>{title}</div>
-      <div
-        className={`grid grid-cols-[2.4rem_1fr] text-[11px] font-semibold text-center ${subHead} border-y ${border}`}
-      >
-        <div className="py-1 border-r border-slate-200/60">문번</div>
-        <div className="py-1">답란</div>
+    <div className={`flex-1 min-w-[7rem] rounded-lg border ${border} overflow-hidden`}>
+      <div className={`${head} text-[11px] font-bold text-center py-1`}>{title}</div>
+      <div className={`grid grid-cols-[1.7rem_1fr] text-[10px] font-semibold text-center ${sub} border-y ${border}`}>
+        <div className="py-0.5 border-r border-slate-200/60">문번</div>
+        <div className="py-0.5">답란</div>
       </div>
       <div>
         {items.map(({ q, idx }) => (
@@ -134,11 +137,12 @@ export function KoreanMockTake() {
       .finally(() => setLoading(false))
   }, [id])
 
-  // 답 입력으로 다음 문항으로 넘어갈 때, 해당 문항이 보이도록 스크롤.
+  // 포커스된 문항이 화면 밖이면 보이도록(이미 보이면 그대로).
   useEffect(() => {
     if (!started) return
-    const el = document.querySelector(`[data-qidx="${focused}"]`)
-    el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    document
+      .querySelector(`[data-qidx="${focused}"]`)
+      ?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   }, [focused, started])
 
   const hasElectives = !!mock?.electives && mock.electives.length > 0
@@ -220,7 +224,7 @@ export function KoreanMockTake() {
     const canStart = !hasElectives || electiveIdx != null
     const total = mock.questions.length + (chosenElective?.questions.length ?? 0)
     return (
-      <div className="max-w-lg mx-auto pb-24">
+      <div className="max-w-lg mx-auto pb-28">
         <header className="flex items-center justify-between mb-5">
           <Link
             to={`/korean-mocks/${mock.id}`}
@@ -233,7 +237,6 @@ export function KoreanMockTake() {
           <span className="w-9" />
         </header>
 
-        {/* 시험 정보 */}
         <div className="rounded-2xl bg-slate-100/70 p-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -251,7 +254,6 @@ export function KoreanMockTake() {
           </div>
         </div>
 
-        {/* 선택과목 선택 */}
         {hasElectives && (
           <div className="rounded-2xl bg-slate-100/70 p-5 mt-3">
             <h3 className="text-base font-bold text-slate-900">응시 정보를 선택해주세요</h3>
@@ -279,16 +281,13 @@ export function KoreanMockTake() {
           </div>
         )}
 
-        {/* 응시하기 버튼 */}
-        <div className="fixed bottom-0 inset-x-0 safe-bottom bg-gradient-to-t from-white via-white to-transparent px-4 pt-6 pb-4">
+        <div className="fixed bottom-0 lg:bottom-12 inset-x-0 safe-bottom bg-gradient-to-t from-white via-white to-transparent px-4 pt-6 pb-4">
           <button
             type="button"
             onClick={beginTake}
             disabled={!canStart}
             className={`block w-full max-w-lg mx-auto text-center rounded-2xl py-4 text-[15px] font-bold transition ${
-              canStart
-                ? 'bg-brand-600 text-white hover:bg-brand-700'
-                : 'bg-slate-200 text-slate-400'
+              canStart ? 'bg-brand-600 text-white hover:bg-brand-700' : 'bg-slate-200 text-slate-400'
             }`}
           >
             응시하기
@@ -298,17 +297,18 @@ export function KoreanMockTake() {
     )
   }
 
-  // ── 2단계: OMR 답안 입력 ──
+  // ── 2단계: OMR (한 화면 다열 레이아웃) ──
   const answeredCount = answers.filter((a) => a > 0).length
   const focusedNumber = items[focused]?.number ?? 0
   const commonItems = items.slice(0, commonCount).map((q, i) => ({ q, idx: i }))
-  const electiveItems = items
-    .slice(commonCount)
-    .map((q, i) => ({ q, idx: commonCount + i }))
+  const electiveItems = items.slice(commonCount).map((q, i) => ({ q, idx: commonCount + i }))
+  // 한 화면에 담기도록 열당 최대 17문항으로 분할.
+  const commonCols = chunk(commonItems, 17)
+  const electiveCols = chunk(electiveItems, 17)
 
   return (
-    <div className="max-w-lg mx-auto pb-40">
-      <header className="flex items-center justify-between gap-3 mb-4">
+    <div className="max-w-2xl mx-auto pb-36 lg:pb-48">
+      <header className="flex items-center justify-between gap-3 mb-3">
         <button
           type="button"
           onClick={() => setStarted(false)}
@@ -329,33 +329,37 @@ export function KoreanMockTake() {
         </button>
       </header>
 
-      <div className="space-y-3">
-        <SheetSection
-          title="공통 과목"
-          accent="brand"
-          items={commonItems}
-          answers={answers}
-          focused={focused}
-          setFocused={setFocused}
-          pick={pick}
-        />
-        {chosenElective && (
-          <SheetSection
-            title={`선택 과목 · ${chosenElective.name}`}
-            accent="rose"
-            items={electiveItems}
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {commonCols.map((col, ci) => (
+          <SheetColumn
+            key={`c${ci}`}
+            title="공통 과목"
+            accent="brand"
+            items={col}
             answers={answers}
             focused={focused}
             setFocused={setFocused}
             pick={pick}
           />
-        )}
+        ))}
+        {electiveCols.map((col, ei) => (
+          <SheetColumn
+            key={`e${ei}`}
+            title={chosenElective ? `선택 · ${chosenElective.name}` : '선택 과목'}
+            accent="rose"
+            items={col}
+            answers={answers}
+            focused={focused}
+            setFocused={setFocused}
+            pick={pick}
+          />
+        ))}
       </div>
 
       {error && <p className="text-sm text-red-600 mt-3">{error}</p>}
 
-      {/* 하단: 문제 네비 + 답 선택 */}
-      <div className="fixed bottom-0 inset-x-0 safe-bottom bg-white border-t border-slate-200 shadow-[0_-4px_16px_-8px_rgba(0,0,0,0.15)]">
+      {/* 하단: 문제 네비 + 답 선택 (PC는 하단 탭바 위로) */}
+      <div className="fixed bottom-0 lg:bottom-12 inset-x-0 safe-bottom bg-white border-t border-slate-200 shadow-[0_-4px_16px_-8px_rgba(0,0,0,0.15)]">
         <div className="max-w-lg mx-auto px-4 py-3">
           <div className="flex items-center justify-between mb-2">
             <button

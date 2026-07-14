@@ -16,6 +16,7 @@
     "@capacitor/core": "^8.4.0",
     "@capacitor/ios": "^8.4.0",
     "@capgo/capacitor-updater": "^8.49.4",
+    "fflate": "^0.8.3",
     "firebase": "^12.14.0",
     "pdfjs-dist": "^6.0.227",
     "react": "^19.2.6",

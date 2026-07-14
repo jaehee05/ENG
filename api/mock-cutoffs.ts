@@ -6,8 +6,9 @@ export const config = {
 }
 
 const SYSTEM_PROMPT = `당신은 한국 수능/평가원 모의고사 등급컷 추정 전문가입니다.
-주어진 모의고사 정보(과목, 총 문항 수, 총점, 실전 모의고사 여부)를 바탕으로,
-여태까지의 평가원 모의고사·수능의 난이도와 등급컷 경향을 고려해 1~8등급의 원점수 등급컷을 대략 추정하세요.
+주어진 모의고사 정보(과목, 총 문항 수, 총점, 실전 모의고사 여부)와 — 제공된 경우 — 시험지 본문을 바탕으로,
+여태까지의 평가원 모의고사·수능의 난이도와 등급컷 경향을 고려해 1~8등급의 원점수 등급컷을 추정하세요.
+시험지 본문이 제공되면 지문의 길이·난도, 문항의 까다로움을 실제로 판단해 등급컷에 반영하세요(어려우면 등급컷을 낮게).
 
 원칙:
 - minScore는 "이 원점수 이상이면 해당 등급"인 원점수(정수). 총점을 넘지 않게.
@@ -57,14 +58,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return
   }
 
-  const { subject, title, totalQuestions, totalPoints, practice } = (req.body ??
-    {}) as {
-    subject?: string
-    title?: string
-    totalQuestions?: number
-    totalPoints?: number
-    practice?: boolean
-  }
+  const { subject, title, totalQuestions, totalPoints, practice, examText } =
+    (req.body ?? {}) as {
+      subject?: string
+      title?: string
+      totalQuestions?: number
+      totalPoints?: number
+      practice?: boolean
+      examText?: string
+    }
   const total = Number(totalPoints)
   if (!Number.isFinite(total) || total <= 0) {
     res.status(400).json({ error: 'totalPoints가 필요합니다.' })
@@ -78,6 +80,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     총점: total,
     실전모의고사: practice !== false,
   })
+  // 시험지 본문(있으면). 너무 길면 잘라서 토큰 보호.
+  const paper =
+    typeof examText === 'string' && examText.trim()
+      ? `\n\n[시험지 본문 (실제 난이도 판단용, 일부 생략 가능)]\n${examText.slice(0, 60000)}`
+      : ''
 
   const client = new Anthropic({ apiKey })
 
@@ -112,7 +119,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         },
       ],
       tool_choice: { type: 'tool', name: 'submit_cutoffs' },
-      messages: [{ role: 'user', content: `[모의고사 정보]\n${userText}` }],
+      messages: [{ role: 'user', content: `[모의고사 정보]\n${userText}${paper}` }],
     })
 
     const toolUse = msg.content.find((b) => b.type === 'tool_use')

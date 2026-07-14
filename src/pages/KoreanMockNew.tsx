@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/useAuth'
 import { createKoreanMock } from '../lib/firestore'
 import { estimateMockCutoffs } from '../lib/api'
 import { MockCutoffEditor } from '../components/MockCutoffEditor'
+import { ExamFilePicker } from '../components/ExamFilePicker'
 import {
   questionPoints,
   type KoreanMockElective,
@@ -80,6 +81,7 @@ export function KoreanMockNew() {
   const [threePointRaw, setThreePointRaw] = useState('')
   const [examinerComment, setExaminerComment] = useState('')
   const [electives, setElectives] = useState<ElectiveDraft[]>([])
+  const [examText, setExamText] = useState('')
   const [cutoffs, setCutoffs] = useState<MockGradeCut[] | null>(null)
   const [cutoffBusy, setCutoffBusy] = useState(false)
   const [cutoffError, setCutoffError] = useState<string | null>(null)
@@ -170,6 +172,7 @@ export function KoreanMockNew() {
         totalQuestions: commonQuestions.length + el.questions.length,
         totalPoints: total,
         practice: true,
+        examText: examText || undefined,
       })
       updateElective(i, { cutoffs: cuts })
     } catch {
@@ -199,6 +202,7 @@ export function KoreanMockNew() {
         totalQuestions,
         totalPoints,
         practice: true,
+        examText: examText || undefined,
       })
       setCutoffs(cuts)
     } catch (err) {
@@ -336,6 +340,14 @@ export function KoreanMockNew() {
             placeholder="예: 5, 9, 13, 21"
             className={inputCls}
           />
+        </div>
+
+        {/* 시험지 첨부 (AI 등급컷용) */}
+        <div className="rounded-lg border border-slate-200 bg-white p-3">
+          <p className="text-sm font-medium text-slate-700 mb-1.5">
+            시험지 <span className="font-normal text-slate-400">(AI 등급컷 판단용)</span>
+          </p>
+          <ExamFilePicker onText={setExamText} />
         </div>
 
         {/* 선택과목 */}

@@ -17,6 +17,7 @@ import {
 import { MyAttemptsBox } from '../components/MyAttemptsBox'
 import { estimateMockCutoffs } from '../lib/api'
 import { MockCutoffEditor } from '../components/MockCutoffEditor'
+import { ExamFilePicker } from '../components/ExamFilePicker'
 import {
   getMockSubject,
   MOCK_SUBJECT_LABEL,
@@ -56,6 +57,7 @@ export function KoreanMockDetail() {
   const [eElectives, setEElectives] = useState<KoreanMockElective[]>([])
   const [eComment, setEComment] = useState('')
   const [eCutoffs, setECutoffs] = useState<MockGradeCut[] | null>(null)
+  const [examText, setExamText] = useState('')
   const [cutoffBusy, setCutoffBusy] = useState(false)
   const [cutoffError, setCutoffError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -140,6 +142,7 @@ export function KoreanMockDetail() {
         totalQuestions: eQuestions.length + (eElectives[0]?.questions.length ?? 0),
         totalPoints,
         practice: true,
+        examText: examText || undefined,
       })
       setECutoffs(cuts)
     } catch (err) {
@@ -365,6 +368,8 @@ export function KoreanMockDetail() {
                 onGenerateCutoffs={handleGenerateCutoffs}
                 cutoffBusy={cutoffBusy}
                 cutoffError={cutoffError}
+                examText={examText}
+                onExamText={setExamText}
               />
             ) : (
               <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5 text-[12px]">
@@ -618,6 +623,8 @@ function EditAnswerGrid({
   onGenerateCutoffs,
   cutoffBusy,
   cutoffError,
+  examText,
+  onExamText,
 }: {
   title: string
   setTitle: (s: string) => void
@@ -634,6 +641,8 @@ function EditAnswerGrid({
   onGenerateCutoffs: () => void
   cutoffBusy: boolean
   cutoffError: string | null
+  examText: string
+  onExamText: (t: string) => void
 }) {
   const [elBusy, setElBusy] = useState<number | null>(null)
   function updateElective(i: number, patch: Partial<KoreanMockElective>) {
@@ -654,6 +663,7 @@ function EditAnswerGrid({
         totalQuestions: questions.length + el.questions.length,
         totalPoints: total,
         practice: true,
+        examText: examText || undefined,
       })
       updateElective(i, { gradeCutoffs: cuts })
     } catch {
@@ -721,6 +731,14 @@ function EditAnswerGrid({
         questions={questions}
         setQuestions={setQuestions}
       />
+
+      {/* 시험지 첨부 (AI 등급컷용) */}
+      <div className="pt-1 border-t border-slate-100">
+        <p className="text-xs font-medium text-slate-600 mb-1">
+          시험지 <span className="font-normal text-slate-400">(AI 등급컷 판단용)</span>
+        </p>
+        <ExamFilePicker onText={onExamText} />
+      </div>
 
       {/* 선택과목 */}
       <div className="space-y-2 pt-1 border-t border-slate-100">

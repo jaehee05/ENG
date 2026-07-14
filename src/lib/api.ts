@@ -288,6 +288,8 @@ export interface MockCutoffInput {
   totalQuestions?: number
   totalPoints: number
   practice?: boolean
+  /** 시험지에서 추출한 텍스트 (있으면 AI가 실제 난이도를 보고 판단). */
+  examText?: string
 }
 
 /** AI 등급컷 추정. { grade, minScore } 배열 반환. */

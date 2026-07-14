@@ -392,16 +392,20 @@ export function questionPoints(q: KoreanMockQuestion): number {
   return q.points && q.points > 0 ? q.points : 2
 }
 
-/** 등급컷 + 원점수로 등급 산출 (없으면 null). 1등급이 가장 높은 점수. */
+/**
+ * 등급컷 + 원점수로 등급 산출 (없으면 null). minScore 이상이면 그 등급.
+ * 입력 순서/단조성과 무관하게, 점수가 만족하는 등급컷 중 가장 좋은(번호가 작은) 등급을 반환.
+ */
 export function gradeFromScore(
   score: number,
   cuts?: MockGradeCut[],
 ): number | null {
-  if (!cuts || cuts.length === 0) return null
-  const sorted = [...cuts].sort((a, b) => b.minScore - a.minScore)
-  for (const c of sorted) if (score >= c.minScore) return c.grade
-  // 가장 낮은 등급컷보다 낮으면 그 다음 등급(최대 9).
-  return Math.min(9, sorted[sorted.length - 1].grade + 1)
+  const valid = (cuts ?? []).filter((c) => Number.isFinite(c.minScore))
+  if (valid.length === 0) return null
+  const satisfied = valid.filter((c) => score >= c.minScore)
+  if (satisfied.length > 0) return Math.min(...satisfied.map((c) => c.grade))
+  // 어떤 등급컷도 못 넘으면 가장 낮은 등급의 다음 등급(최대 9).
+  return Math.min(9, Math.max(...valid.map((c) => c.grade)) + 1)
 }
 
 export function getMockStartNumber(m: KoreanMock): number {
