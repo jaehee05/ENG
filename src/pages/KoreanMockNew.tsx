@@ -2,21 +2,25 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import { createKoreanMock } from '../lib/firestore'
-import type { KoreanMockQuestion, MockSubject } from '../lib/types'
+import { estimateMockCutoffs } from '../lib/api'
+import {
+  questionPoints,
+  type KoreanMockElective,
+  type KoreanMockQuestion,
+  type MockGradeCut,
+  type MockSubject,
+} from '../lib/types'
 
 /**
  * 답안 일괄 입력 텍스트 파싱.
- * 허용 포맷:
- *   - "3 5 1 2 4 ..." (공백/줄바꿈 구분, startNumber부터 순서대로 번호 매김)
- *   - "1:3, 2:5, 3:1" 또는 "1.3 2.5" 등 (번호 명시)
- *   - 1~5 외의 문자는 무시
+ *   - "3 5 1 2 4 ..." (공백/줄바꿈 구분, startNumber부터 순서대로)
+ *   - "1:3, 2:5, 3:1" 또는 "1.3 2.5" (번호 명시)
  */
 function parseAnswerKey(raw: string, startNumber: number): KoreanMockQuestion[] {
   const lines = raw
     .split(/[\n,]/)
     .map((s) => s.trim())
     .filter((s) => s.length > 0)
-  // 번호 명시형 (예: "12: 3")
   const explicit: KoreanMockQuestion[] = []
   let allExplicit = true
   for (const line of lines) {
@@ -32,13 +36,36 @@ function parseAnswerKey(raw: string, startNumber: number): KoreanMockQuestion[] 
     explicit.sort((a, b) => a.number - b.number)
     return explicit
   }
-  // 순서형: 1~5 숫자만 추출. 첫 항목은 startNumber로 매김.
   const digits = raw.match(/[1-5]/g) ?? []
   return digits.map((d, i) => ({
     number: startNumber + i,
     answer: Number.parseInt(d, 10),
   }))
 }
+
+function parseNumberSet(raw: string): Set<number> {
+  return new Set((raw.match(/\d+/g) ?? []).map(Number))
+}
+
+function withPoints(
+  qs: KoreanMockQuestion[],
+  three: Set<number>,
+): KoreanMockQuestion[] {
+  return qs.map((q) => (three.has(q.number) ? { ...q, points: 3 } : q))
+}
+
+function sumPoints(qs: KoreanMockQuestion[]): number {
+  return qs.reduce((s, q) => s + questionPoints(q), 0)
+}
+
+interface ElectiveDraft {
+  name: string
+  startNumberRaw: string
+  rawAnswers: string
+}
+
+const inputCls =
+  'w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500'
 
 export function KoreanMockNew() {
   const { profile } = useAuth()
@@ -47,18 +74,21 @@ export function KoreanMockNew() {
   const [subject, setSubject] = useState<MockSubject>('korean')
   const [startNumberRaw, setStartNumberRaw] = useState('1')
   const [rawAnswers, setRawAnswers] = useState('')
+  const [threePointRaw, setThreePointRaw] = useState('')
+  const [examinerComment, setExaminerComment] = useState('')
+  const [electives, setElectives] = useState<ElectiveDraft[]>([])
+  const [cutoffs, setCutoffs] = useState<MockGradeCut[] | null>(null)
+  const [cutoffBusy, setCutoffBusy] = useState(false)
+  const [cutoffError, setCutoffError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   function setSubjectAndDefaults(s: MockSubject) {
     setSubject(s)
-    // 영어 모의고사는 일반적으로 18번부터 시작 (1~17은 듣기평가).
     if (s === 'english' && (startNumberRaw === '1' || startNumberRaw === '')) {
       setStartNumberRaw('18')
     }
-    if (s === 'korean' && startNumberRaw === '18') {
-      setStartNumberRaw('1')
-    }
+    if (s === 'korean' && startNumberRaw === '18') setStartNumberRaw('1')
   }
 
   const startNumber = useMemo(() => {
@@ -66,10 +96,84 @@ export function KoreanMockNew() {
     return Number.isFinite(n) && n > 0 ? n : 1
   }, [startNumberRaw])
 
-  const parsed = useMemo(
-    () => parseAnswerKey(rawAnswers, startNumber),
-    [rawAnswers, startNumber],
+  const threeSet = useMemo(() => parseNumberSet(threePointRaw), [threePointRaw])
+
+  const commonQuestions = useMemo(
+    () => withPoints(parseAnswerKey(rawAnswers, startNumber), threeSet),
+    [rawAnswers, startNumber, threeSet],
   )
+
+  // 공통 마지막 번호+1 (선택과목 기본 시작 번호 제안)
+  const commonNext = useMemo(
+    () =>
+      commonQuestions.length
+        ? Math.max(...commonQuestions.map((q) => q.number)) + 1
+        : startNumber,
+    [commonQuestions, startNumber],
+  )
+
+  const parsedElectives = useMemo<KoreanMockElective[]>(() => {
+    return electives.map((el) => {
+      const start = Number.parseInt(el.startNumberRaw, 10)
+      const qs = withPoints(
+        parseAnswerKey(el.rawAnswers, Number.isFinite(start) && start > 0 ? start : commonNext),
+        threeSet,
+      )
+      return {
+        name: el.name.trim() || '선택과목',
+        startNumber: Number.isFinite(start) && start > 0 ? start : commonNext,
+        questions: qs,
+      }
+    })
+  }, [electives, commonNext, threeSet])
+
+  // 등급컷 산출용 총점 = 공통 + (첫 선택과목).
+  const totalPoints = useMemo(() => {
+    const common = sumPoints(commonQuestions)
+    const el = parsedElectives[0] ? sumPoints(parsedElectives[0].questions) : 0
+    return common + el
+  }, [commonQuestions, parsedElectives])
+
+  const totalQuestions = useMemo(
+    () => commonQuestions.length + (parsedElectives[0]?.questions.length ?? 0),
+    [commonQuestions, parsedElectives],
+  )
+
+  function addElective() {
+    setElectives((prev) => [
+      ...prev,
+      { name: '', startNumberRaw: String(commonNext), rawAnswers: '' },
+    ])
+  }
+  function updateElective(i: number, patch: Partial<ElectiveDraft>) {
+    setElectives((prev) => prev.map((el, j) => (j === i ? { ...el, ...patch } : el)))
+  }
+  function removeElective(i: number) {
+    setElectives((prev) => prev.filter((_, j) => j !== i))
+  }
+
+  async function handleGenerateCutoffs() {
+    setCutoffError(null)
+    if (totalPoints <= 0) {
+      setCutoffError('먼저 답안을 입력해 총점을 확정하세요.')
+      return
+    }
+    setCutoffBusy(true)
+    try {
+      const cuts = await estimateMockCutoffs({
+        subject,
+        title: title.trim() || undefined,
+        totalQuestions,
+        totalPoints,
+        practice: true,
+      })
+      setCutoffs(cuts)
+    } catch (err) {
+      setCutoffError(err instanceof Error ? err.message : 'AI 등급컷 생성 실패')
+    } finally {
+      setCutoffBusy(false)
+    }
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -79,8 +183,13 @@ export function KoreanMockNew() {
       setError('제목을 입력하세요.')
       return
     }
-    if (parsed.length === 0) {
-      setError('답안을 1개 이상 입력하세요.')
+    if (commonQuestions.length === 0) {
+      setError('공통 과목 답안을 1개 이상 입력하세요.')
+      return
+    }
+    const badElective = parsedElectives.find((el) => el.questions.length === 0)
+    if (badElective) {
+      setError(`선택과목 "${badElective.name}"의 답안을 입력하세요.`)
       return
     }
     setSubmitting(true)
@@ -89,7 +198,10 @@ export function KoreanMockNew() {
         title: title.trim(),
         subject,
         startNumber,
-        questions: parsed,
+        questions: commonQuestions,
+        electives: parsedElectives.length ? parsedElectives : undefined,
+        examinerComment: examinerComment.trim() || undefined,
+        gradeCutoffs: cutoffs ?? undefined,
         createdBy: profile.id,
         createdByName: profile.displayName,
       })
@@ -107,7 +219,7 @@ export function KoreanMockNew() {
           관리
         </p>
         <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
-          모의고사 등록
+          모고 등록
         </h1>
       </header>
 
@@ -128,9 +240,7 @@ export function KoreanMockNew() {
                   type="button"
                   onClick={() => setSubjectAndDefaults(opt.key)}
                   className={`rounded px-3 py-1.5 text-sm font-medium transition ${
-                    active
-                      ? 'bg-slate-900 text-white'
-                      : 'text-slate-600 hover:bg-slate-100'
+                    active ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'
                   }`}
                 >
                   {opt.label}
@@ -142,74 +252,163 @@ export function KoreanMockNew() {
 
         <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px] gap-3">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              제목
-            </label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">제목</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder={
-                subject === 'english'
-                  ? '예: 2026 6월 모의평가 영어'
-                  : '예: 2026 6월 모의평가 국어'
+                subject === 'english' ? '예: 2026 6월 모평 영어' : '예: 2026 6월 모평 국어'
               }
-              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className={inputCls}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              시작 번호
-            </label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">시작 번호</label>
             <input
               type="number"
               min={1}
               value={startNumberRaw}
               onChange={(e) => setStartNumberRaw(e.target.value)}
-              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className={inputCls}
             />
-            <p className="text-[11px] text-slate-500 mt-1">
-              {subject === 'english'
-                ? '영어는 보통 18번부터'
-                : '국어는 보통 1번부터'}
-            </p>
           </div>
         </div>
 
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">
-            답안 일괄 입력
+            공통 과목 답안 일괄 입력
           </label>
           <textarea
             value={rawAnswers}
             onChange={(e) => setRawAnswers(e.target.value)}
-            rows={6}
-            placeholder={'예시 1 (순서대로 입력)\n3 5 1 2 4 3 5 1 ...\n\n예시 2 (번호 명시)\n1:3, 2:5, 3:1\n또는\n1. 3\n2. 5\n3. 1'}
-            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500"
+            rows={5}
+            placeholder={'예: 3 5 1 2 4 ...  또는  1:3, 2:5, 3:1'}
+            className={`${inputCls} font-mono`}
           />
           <p className="text-[11px] text-slate-500 mt-1">
-            공백·줄바꿈·쉼표로 구분된 1~5 숫자만 답으로 인식합니다. 등록 후 상세에서 개별 수정 가능.
+            공백·줄바꿈·쉼표로 구분된 1~5 숫자. {commonQuestions.length}문항 인식됨.
           </p>
         </div>
 
-        {parsed.length > 0 && (
-          <div className="rounded-md border border-slate-200 bg-slate-50 p-3 space-y-2">
-            <p className="text-xs font-semibold text-slate-600">
-              파싱 결과: 총 {parsed.length}문항
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            3점 문항 번호 <span className="font-normal text-slate-400">(선택, 나머지는 2점)</span>
+          </label>
+          <input
+            type="text"
+            value={threePointRaw}
+            onChange={(e) => setThreePointRaw(e.target.value)}
+            placeholder="예: 5, 9, 13, 21"
+            className={inputCls}
+          />
+        </div>
+
+        {/* 선택과목 */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-slate-700">
+              선택과목 <span className="font-normal text-slate-400">(수능형 · 학생이 택1)</span>
             </p>
-            <div className="grid grid-cols-5 sm:grid-cols-10 gap-1 text-[11px]">
-              {parsed.map((q) => (
-                <div
-                  key={q.number}
-                  className="rounded bg-white border border-slate-200 px-1.5 py-1 text-center"
-                >
-                  <span className="text-slate-400">{q.number}.</span>{' '}
-                  <span className="font-semibold text-slate-900">{q.answer}</span>
+            <button
+              type="button"
+              onClick={addElective}
+              className="text-xs font-medium text-brand-700 hover:underline"
+            >
+              + 선택과목 추가
+            </button>
+          </div>
+          {electives.map((el, i) => {
+            const p = parsedElectives[i]
+            return (
+              <div key={i} className="rounded-lg border border-slate-200 bg-slate-50/60 p-3 space-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px] gap-2">
+                  <input
+                    type="text"
+                    value={el.name}
+                    onChange={(e) => updateElective(i, { name: e.target.value })}
+                    placeholder="선택과목 이름 (예: 화법과 작문)"
+                    className={inputCls}
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    value={el.startNumberRaw}
+                    onChange={(e) => updateElective(i, { startNumberRaw: e.target.value })}
+                    placeholder="시작 번호"
+                    className={inputCls}
+                  />
                 </div>
+                <textarea
+                  value={el.rawAnswers}
+                  onChange={(e) => updateElective(i, { rawAnswers: e.target.value })}
+                  rows={3}
+                  placeholder="선택과목 답안 (예: 1 3 2 5 4 ...)"
+                  className={`${inputCls} font-mono`}
+                />
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-slate-500">
+                    {p?.questions.length ?? 0}문항 인식됨
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeElective(i)}
+                    className="text-[11px] text-slate-400 hover:text-red-500"
+                  >
+                    삭제
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* 출제자 한마디 */}
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            출제자 한마디 <span className="font-normal text-slate-400">(선택, 결과 화면 표시)</span>
+          </label>
+          <textarea
+            value={examinerComment}
+            onChange={(e) => setExaminerComment(e.target.value)}
+            rows={2}
+            placeholder="예: 이번 시험은 시간 관리가 관건입니다."
+            className={inputCls}
+          />
+        </div>
+
+        {/* AI 등급컷 */}
+        <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-slate-700">AI 등급컷</p>
+              <p className="text-[11px] text-slate-500">
+                총점 {totalPoints}점 · {totalQuestions}문항 기준 추정
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleGenerateCutoffs}
+              disabled={cutoffBusy}
+              className="shrink-0 rounded-md bg-brand-600 text-white text-xs font-semibold px-3 py-1.5 hover:bg-brand-700 disabled:opacity-50"
+            >
+              {cutoffBusy ? '생성 중…' : 'AI 등급컷 생성'}
+            </button>
+          </div>
+          {cutoffError && <p className="text-[11px] text-red-600">{cutoffError}</p>}
+          {cutoffs && (
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {cutoffs.map((c) => (
+                <span
+                  key={c.grade}
+                  className="rounded bg-amber-50 border border-amber-200 text-amber-700 text-[11px] font-medium px-2 py-1 tabular-nums"
+                >
+                  {c.grade}등급 {c.minScore}점
+                </span>
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
 

@@ -41,7 +41,7 @@ function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
     >
       <span
         className={`inline-block h-5 w-5 rounded-full bg-white shadow transition ${
-          on ? 'translate-x-5' : 'translate-x-0.5'
+          on ? 'translate-x-[22px]' : 'translate-x-0.5'
         }`}
       />
     </button>

@@ -139,12 +139,14 @@ export function KoreanMockTake() {
   }, [mock, hasElectives, electiveIdx, items.length])
 
   function pick(idx: number, choice: number) {
+    const isToggleOff = answers[idx] === choice
     setAnswers((prev) => {
       const next = [...prev]
-      next[idx] = next[idx] === choice ? 0 : choice
+      next[idx] = isToggleOff ? 0 : choice
       return next
     })
-    setFocused(idx)
+    // 답을 선택하면 자동으로 다음 문항으로. 같은 답 눌러 해제하면 그대로.
+    setFocused(isToggleOff ? idx : Math.min(items.length - 1, idx + 1))
   }
 
   async function handleSubmit() {
