@@ -48,16 +48,16 @@ function BubbleRow({
       >
         {number}
       </button>
-      <div className="flex justify-center gap-[3px] py-1">
+      <div className="flex justify-center gap-[2px] py-1">
         {[1, 2, 3, 4, 5].map((n) => (
           <button
             key={n}
             type="button"
             onClick={() => onPick(n)}
-            className={`w-[16px] h-[22px] rounded-[50%] text-[9px] font-semibold border transition ${
+            className={`w-[15px] h-[23px] rounded-[50%] text-[9px] font-semibold border transition ${
               sel === n
                 ? 'bg-slate-900 text-white border-slate-900'
-                : 'bg-white text-slate-400 border-slate-300 active:bg-slate-100'
+                : 'bg-white text-violet-500 border-violet-400 active:bg-violet-50'
             }`}
             aria-label={`${number}번 ${n}`}
           >
