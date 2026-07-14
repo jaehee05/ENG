@@ -210,12 +210,24 @@ export function VocabTake() {
                   )}
                 </div>
                 <input
+                  id={`vocab-input-${slotIdx}`}
                   type="text"
                   value={answers[slotIdx] ?? ''}
                   onChange={(e) => {
                     const next = [...answers]
                     next[slotIdx] = e.target.value
                     setAnswers(next)
+                  }}
+                  onKeyDown={(e) => {
+                    // 엔터: 폼 제출 막고 다음 단어로 이동. 마지막 단어는 이동만 없이 제출 안 됨.
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      if (slotIdx < order.length - 1) {
+                        document
+                          .getElementById(`vocab-input-${slotIdx + 1}`)
+                          ?.focus()
+                      }
+                    }
                   }}
                   placeholder="한국어 뜻"
                   className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-[16px] text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-slate-400 focus:outline-none transition"
