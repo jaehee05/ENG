@@ -588,6 +588,7 @@ export async function createKoreanMockAttempt(input: {
   refTitle: string
   koreanMockResults: KoreanMockResult[]
   mockSubject?: MockSubject
+  mockElectiveName?: string
 }): Promise<string> {
   const total = input.koreanMockResults.length
   const correct = input.koreanMockResults.filter((r) => r.correct).length
@@ -603,6 +604,7 @@ export async function createKoreanMockAttempt(input: {
     createdAt: serverTimestamp(),
   }
   if (input.mockSubject) payload.mockSubject = input.mockSubject
+  if (input.mockElectiveName) payload.mockElectiveName = input.mockElectiveName
   const ref = await addDoc(collection(db, 'attempts'), payload)
   return ref.id
 }

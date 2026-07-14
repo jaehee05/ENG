@@ -104,7 +104,15 @@ export function KoreanMockResult() {
   const score = results.reduce((s, r) => s + (r.correct ? pointsOf(r.number) : 0), 0)
   const correctCount = results.filter((r) => r.correct).length
   const wrongCount = results.length - correctCount
-  const grade = gradeFromScore(score, mock?.gradeCutoffs)
+  // 선택과목마다 등급컷이 다르다: 응시한 선택과목 등급컷 우선, 없으면 공통.
+  const activeCutoffs = (() => {
+    if (attempt.mockElectiveName && mock?.electives) {
+      const el = mock.electives.find((e) => e.name === attempt.mockElectiveName)
+      if (el?.gradeCutoffs && el.gradeCutoffs.length) return el.gradeCutoffs
+    }
+    return mock?.gradeCutoffs
+  })()
+  const grade = gradeFromScore(score, activeCutoffs)
 
   return (
     <div className="space-y-4 max-w-lg mx-auto">

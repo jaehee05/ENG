@@ -64,6 +64,7 @@ interface ElectiveDraft {
   startNumberRaw: string
   rawAnswers: string
   threePointRaw: string
+  cutoffs: MockGradeCut[]
 }
 
 const inputCls =
@@ -126,6 +127,7 @@ export function KoreanMockNew() {
         name: el.name.trim() || '선택과목',
         startNumber: startNum,
         questions: qs,
+        gradeCutoffs: el.cutoffs.length ? el.cutoffs : undefined,
       }
     })
   }, [electives, commonNext])
@@ -145,8 +147,36 @@ export function KoreanMockNew() {
   function addElective() {
     setElectives((prev) => [
       ...prev,
-      { name: '', startNumberRaw: String(commonNext), rawAnswers: '', threePointRaw: '' },
+      {
+        name: '',
+        startNumberRaw: String(commonNext),
+        rawAnswers: '',
+        threePointRaw: '',
+        cutoffs: [],
+      },
     ])
+  }
+  const [electiveCutoffBusy, setElectiveCutoffBusy] = useState<number | null>(null)
+  async function handleGenerateElectiveCutoffs(i: number) {
+    const el = parsedElectives[i]
+    if (!el) return
+    const total = sumPoints(commonQuestions) + sumPoints(el.questions)
+    if (total <= 0) return
+    setElectiveCutoffBusy(i)
+    try {
+      const cuts = await estimateMockCutoffs({
+        subject,
+        title: `${title} ${el.name}`.trim() || undefined,
+        totalQuestions: commonQuestions.length + el.questions.length,
+        totalPoints: total,
+        practice: true,
+      })
+      updateElective(i, { cutoffs: cuts })
+    } catch {
+      // 무시 (수동 입력 가능)
+    } finally {
+      setElectiveCutoffBusy(null)
+    }
   }
   function updateElective(i: number, patch: Partial<ElectiveDraft>) {
     setElectives((prev) => prev.map((el, j) => (j === i ? { ...el, ...patch } : el)))
@@ -357,6 +387,18 @@ export function KoreanMockNew() {
                   placeholder="3점 문항 번호 (예: 37, 42)"
                   className={inputCls}
                 />
+                <div className="rounded-md border border-slate-200 bg-white p-2.5">
+                  <MockCutoffEditor
+                    cutoffs={el.cutoffs}
+                    onChange={(next) => updateElective(i, { cutoffs: next })}
+                    onGenerate={() => handleGenerateElectiveCutoffs(i)}
+                    generating={electiveCutoffBusy === i}
+                    generateLabel="AI 등급컷"
+                    totalPoints={
+                      sumPoints(commonQuestions) + sumPoints(p?.questions ?? [])
+                    }
+                  />
+                </div>
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] text-slate-500">
                     {p?.questions.length ?? 0}문항 인식됨
@@ -388,17 +430,19 @@ export function KoreanMockNew() {
           />
         </div>
 
-        {/* 등급컷 (직접 편집 + AI 초안) */}
-        <div className="rounded-lg border border-slate-200 bg-white p-3">
-          <MockCutoffEditor
-            cutoffs={cutoffs ?? []}
-            onChange={setCutoffs}
-            onGenerate={handleGenerateCutoffs}
-            generating={cutoffBusy}
-            generateError={cutoffError}
-            totalPoints={totalPoints}
-          />
-        </div>
+        {/* 등급컷 — 선택과목 없을 때만 공통 등급컷(선택과목 있으면 과목별 카드에서) */}
+        {electives.length === 0 && (
+          <div className="rounded-lg border border-slate-200 bg-white p-3">
+            <MockCutoffEditor
+              cutoffs={cutoffs ?? []}
+              onChange={setCutoffs}
+              onGenerate={handleGenerateCutoffs}
+              generating={cutoffBusy}
+              generateError={cutoffError}
+              totalPoints={totalPoints}
+            />
+          </div>
+        )}
 
         {error && <p className="text-sm text-red-600">{error}</p>}
 

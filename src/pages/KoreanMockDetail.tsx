@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import {
+  deleteAttempt,
   deleteKoreanMock,
   formatDate,
   getKoreanMock,
@@ -176,6 +177,18 @@ export function KoreanMockDetail() {
       setError(err instanceof Error ? err.message : '저장 실패')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleDeleteAttempt(a: Attempt) {
+    if (!window.confirm(`${a.studentName} 님의 응시 기록을 삭제할까요? (되돌릴 수 없음)`))
+      return
+    const prev = allAttempts
+    setAllAttempts((cur) => cur.filter((x) => x.id !== a.id))
+    try {
+      await deleteAttempt(a.id)
+    } catch {
+      setAllAttempts(prev)
     }
   }
 
@@ -450,14 +463,19 @@ export function KoreanMockDetail() {
                 const ratio =
                   a.total > 0 ? Math.round((a.correct / a.total) * 100) : 0
                 return (
-                  <li key={a.id}>
+                  <li key={a.id} className="flex items-center">
                     <Link
                       to={`/korean-mocks/${mock.id}/result/${a.id}`}
-                      className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50"
+                      className="flex-1 min-w-0 flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50"
                     >
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-slate-900">
                           {a.studentName}
+                          {a.mockElectiveName && (
+                            <span className="ml-1.5 text-[11px] font-normal text-slate-400">
+                              {a.mockElectiveName}
+                            </span>
+                          )}
                         </p>
                         <p className="text-[11px] text-slate-500 mt-0.5">
                           {formatDate(a.createdAt)} · {a.correct}/{a.total}
@@ -475,6 +493,14 @@ export function KoreanMockDetail() {
                         {ratio}%
                       </span>
                     </Link>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteAttempt(a)}
+                      className="shrink-0 px-3 py-3 text-slate-300 hover:text-red-500"
+                      aria-label="응시 기록 삭제"
+                    >
+                      ✕
+                    </button>
                   </li>
                 )
               })}
@@ -609,8 +635,32 @@ function EditAnswerGrid({
   cutoffBusy: boolean
   cutoffError: string | null
 }) {
+  const [elBusy, setElBusy] = useState<number | null>(null)
   function updateElective(i: number, patch: Partial<KoreanMockElective>) {
     setElectives(electives.map((el, j) => (j === i ? { ...el, ...patch } : el)))
+  }
+  async function genElectiveCutoffs(i: number) {
+    const el = electives[i]
+    if (!el) return
+    const total =
+      questions.reduce((s, q) => s + questionPoints(q), 0) +
+      el.questions.reduce((s, q) => s + questionPoints(q), 0)
+    if (total <= 0) return
+    setElBusy(i)
+    try {
+      const cuts = await estimateMockCutoffs({
+        subject,
+        title: `${title} ${el.name}`.trim() || undefined,
+        totalQuestions: questions.length + el.questions.length,
+        totalPoints: total,
+        practice: true,
+      })
+      updateElective(i, { gradeCutoffs: cuts })
+    } catch {
+      // 무시 (수동 입력 가능)
+    } finally {
+      setElBusy(null)
+    }
   }
   function addElective() {
     const nums = [
@@ -707,6 +757,15 @@ function EditAnswerGrid({
               questions={el.questions}
               setQuestions={(qs) => updateElective(i, { questions: qs })}
             />
+            <div className="rounded-md border border-slate-200 bg-white p-2.5">
+              <MockCutoffEditor
+                cutoffs={el.gradeCutoffs ?? []}
+                onChange={(next) => updateElective(i, { gradeCutoffs: next })}
+                onGenerate={() => genElectiveCutoffs(i)}
+                generating={elBusy === i}
+                generateLabel="AI 등급컷"
+              />
+            </div>
           </div>
         ))}
       </div>
@@ -724,16 +783,18 @@ function EditAnswerGrid({
         />
       </div>
 
-      {/* 등급컷 (직접 편집 + AI 초안) */}
-      <div className="pt-1 border-t border-slate-100">
-        <MockCutoffEditor
-          cutoffs={cutoffs ?? []}
-          onChange={setCutoffs}
-          onGenerate={onGenerateCutoffs}
-          generating={cutoffBusy}
-          generateError={cutoffError}
-        />
-      </div>
+      {/* 공통 등급컷 — 선택과목 없을 때만(있으면 과목별 카드에서) */}
+      {electives.length === 0 && (
+        <div className="pt-1 border-t border-slate-100">
+          <MockCutoffEditor
+            cutoffs={cutoffs ?? []}
+            onChange={setCutoffs}
+            onGenerate={onGenerateCutoffs}
+            generating={cutoffBusy}
+            generateError={cutoffError}
+          />
+        </div>
+      )}
     </div>
   )
 }

@@ -12,12 +12,14 @@ import {
 
 /** 버블시트 한 문항 행 (문번 + 답란 1~5). */
 function BubbleRow({
+  idx,
   number,
   sel,
   focused,
   onFocus,
   onPick,
 }: {
+  idx: number
   number: number
   sel: number
   focused: boolean
@@ -26,7 +28,8 @@ function BubbleRow({
 }) {
   return (
     <div
-      className={`grid grid-cols-[2.4rem_1fr] items-center border-b border-slate-100 last:border-b-0 ${
+      data-qidx={idx}
+      className={`grid grid-cols-[2.4rem_1fr] items-center border-b border-slate-100 last:border-b-0 scroll-mt-24 ${
         focused ? 'bg-brand-50/70' : ''
       }`}
     >
@@ -94,6 +97,7 @@ function SheetSection({
         {items.map(({ q, idx }) => (
           <BubbleRow
             key={idx}
+            idx={idx}
             number={q.number}
             sel={answers[idx] ?? 0}
             focused={focused === idx}
@@ -129,6 +133,13 @@ export function KoreanMockTake() {
       .catch((e) => setError(e.message ?? '불러오기 실패'))
       .finally(() => setLoading(false))
   }, [id])
+
+  // 답 입력으로 다음 문항으로 넘어갈 때, 해당 문항이 보이도록 스크롤.
+  useEffect(() => {
+    if (!started) return
+    const el = document.querySelector(`[data-qidx="${focused}"]`)
+    el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }, [focused, started])
 
   const hasElectives = !!mock?.electives && mock.electives.length > 0
   const chosenElective =
@@ -189,6 +200,7 @@ export function KoreanMockTake() {
         refTitle: mock.title,
         koreanMockResults: results,
         mockSubject: getMockSubject(mock),
+        mockElectiveName: chosenElective?.name,
       })
       navigate(`/korean-mocks/${mock.id}/result/${attemptId}`)
     } catch (err) {

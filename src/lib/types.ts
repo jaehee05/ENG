@@ -342,6 +342,8 @@ export interface KoreanMockElective {
   /** 이 선택과목 첫 문항 번호 (보통 공통 다음, 예: 35). */
   startNumber: number
   questions: KoreanMockQuestion[]
+  /** 이 선택과목(공통+선택 총점 기준) 등급컷. 선택과목마다 다르다. */
+  gradeCutoffs?: MockGradeCut[]
 }
 
 /** 등급컷 한 줄 (원점수 기준). */
@@ -435,6 +437,8 @@ export interface Attempt {
   koreanMockResults?: KoreanMockResult[]
   /** 'korean_mock' type 한정: 국어/영어 모의고사 과목. 없으면 'korean'으로 간주(레거시). */
   mockSubject?: MockSubject
+  /** 'korean_mock' 한정: 학생이 응시한 선택과목 이름(있을 때). 등급컷 판정에 사용. */
+  mockElectiveName?: string
   /** reading 한정: 오답 검토(재시도 1회) 완료 시각. */
   wrongReviewedAt?: Timestamp | null
   /** reading 한정: 오답 문항별 재시도에서 고른 선지 인덱스. 키는 문항 인덱스 문자열. */
