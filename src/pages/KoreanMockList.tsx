@@ -117,10 +117,10 @@ export function KoreanMockList({ manage = false }: { manage?: boolean }) {
       <header className="flex items-end justify-between gap-2 flex-wrap">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-            {manage ? '관리' : '모고'}
+            {manage ? '관리' : '모의고사'}
           </p>
           <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
-            모고
+            모의고사
           </h1>
           <p className="text-xs text-slate-500 mt-1">
             답안을 OMR 방식으로 입력하여 채점받을 수 있습니다.

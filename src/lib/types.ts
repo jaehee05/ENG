@@ -564,7 +564,7 @@ export interface CategoryConfig {
 export const DEFAULT_CATEGORIES: Omit<CategoryConfig, 'id'>[] = [
   { key: 'problem', label: '문제 풀이', color: '#0ea5e9', order: 0, builtin: true },
   { key: 'vocab', label: '단어 시험', color: '#8b5cf6', order: 1, builtin: true },
-  { key: 'mock', label: '모고', color: '#f43f5e', order: 2, builtin: true },
+  { key: 'mock', label: '모의고사', color: '#f43f5e', order: 2, builtin: true },
   { key: 'etc', label: '기타', color: '#10b981', order: 3, builtin: true },
 ]
 

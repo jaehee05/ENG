@@ -111,7 +111,7 @@ export function KoreanMockTake() {
     if (!id) return
     getKoreanMock(id)
       .then((m) => {
-        if (!m) setError('모고를 찾을 수 없습니다.')
+        if (!m) setError('모의고사를 찾을 수 없습니다.')
         else setMock(m)
       })
       .catch((e) => setError(e.message ?? '불러오기 실패'))

@@ -219,7 +219,7 @@ export function KoreanMockNew() {
           관리
         </p>
         <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
-          모고 등록
+          모의고사 등록
         </h1>
       </header>
 

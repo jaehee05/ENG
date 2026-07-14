@@ -36,7 +36,7 @@ function ScoreRing({ score, total }: { score: number; total: number }) {
           cy="100"
           r={r}
           fill="none"
-          stroke="#0b9212"
+          stroke="#72b768"
           strokeWidth="14"
           strokeLinecap="round"
           strokeDasharray={c}
@@ -260,7 +260,7 @@ export function KoreanMockResult() {
           to={`/korean-mocks/${id}`}
           className="flex-1 text-center rounded-xl border border-slate-300 text-slate-700 text-sm font-medium px-4 py-2.5 hover:bg-slate-100"
         >
-          모고로
+          모의고사로
         </Link>
         <Link
           to="/korean-mocks"

@@ -159,7 +159,7 @@ export function More() {
         {showEnglish && <LinkRow to="/reading" label="지문 문제풀이" />}
         {showEnglish && <LinkRow to="/vocab" label="단어 시험지" />}
         {showEnglish && <LinkRow to="/wordbook" label="내 단어장" />}
-        {showMock && <LinkRow to="/korean-mocks" label="모고" />}
+        {showMock && <LinkRow to="/korean-mocks" label="모의고사" />}
         <LinkRow to="/history" label="내 기록" />
       </Card>
 
