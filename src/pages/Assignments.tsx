@@ -226,11 +226,9 @@ function StudentAssignments() {
     const map: Record<string, Assignment[]> = {}
     for (const c of categories) map[c.key] = []
     for (const a of assignments) {
-      // 마감 지난 것/완료한 것은 다음날부터 리스트에서 숨김
+      // 마감일 다음날부터 숨김 (당일까지는 완료해도 계속 표시)
       const dueISO = tsToISO(a.dueAt)
-      const done = isAssignmentDone(a, attempts)
       if (dueISO && dueISO < todayStr) continue
-      if (done && (!dueISO || dueISO < todayStr)) continue
       const key = assignmentCategory(a)
       if (map[key]) map[key].push(a)
       else if (map['etc']) map['etc'].push(a)

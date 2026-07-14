@@ -8,7 +8,7 @@ const TYPE_LABEL: Record<Attempt['type'], string> = {
   vocab: '단어 시험지',
   reading: '지문 문제풀이',
   wordbook: '내 단어장 시험',
-  korean_mock: '모의고사',
+  korean_mock: '모고',
 }
 
 const SUBJECT_BADGE_CLASS: Record<MockSubject, string> = {
@@ -34,7 +34,7 @@ function resultPath(a: Attempt): string {
 function bucketLabel(b: Bucket): string {
   if (b.type === 'korean_mock') {
     const subj = b.mockSubject ?? 'korean'
-    return `${MOCK_SUBJECT_LABEL[subj]} 모의고사`
+    return `${MOCK_SUBJECT_LABEL[subj]} 모고`
   }
   return TYPE_LABEL[b.type]
 }

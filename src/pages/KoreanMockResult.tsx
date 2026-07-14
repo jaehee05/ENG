@@ -159,7 +159,7 @@ export function KoreanMockResult() {
           to={`/korean-mocks/${id}`}
           className="rounded-md border border-slate-300 text-slate-700 text-sm font-medium px-4 py-2 hover:bg-slate-100"
         >
-          모의고사로
+          모고로
         </Link>
         <Link
           to="/korean-mocks"

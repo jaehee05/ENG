@@ -196,7 +196,7 @@ export function Layout() {
 
   const mockNavItem: NavItem = {
     to: '/korean-mocks',
-    label: '모의고사',
+    label: '모고',
     icon: mockIcon,
   }
   const koreanOnly = !isAdmin && subj.korean && !subj.english

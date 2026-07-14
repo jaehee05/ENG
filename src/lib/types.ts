@@ -521,7 +521,7 @@ export interface CategoryConfig {
 export const DEFAULT_CATEGORIES: Omit<CategoryConfig, 'id'>[] = [
   { key: 'problem', label: '문제 풀이', color: '#0ea5e9', order: 0, builtin: true },
   { key: 'vocab', label: '단어 시험', color: '#8b5cf6', order: 1, builtin: true },
-  { key: 'mock', label: '모의고사', color: '#f43f5e', order: 2, builtin: true },
+  { key: 'mock', label: '모고', color: '#f43f5e', order: 2, builtin: true },
   { key: 'etc', label: '기타', color: '#10b981', order: 3, builtin: true },
 ]
 
@@ -732,13 +732,31 @@ export function parseWordList(text: string): WordEntry[] {
     .filter((w) => w.en && w.ko)
 }
 
+/**
+ * 대괄호 대체 표기를 여러 후보로 확장한다.
+ * 예) "확대 [확장]하다" → ["확대 하다", "확대 확장하다", "확장하다", 원본]
+ *  - 대괄호 내용 버림(선택 항목 off): 확대하다
+ *  - 대괄호만 제거(내용 유지): 확대확장하다
+ *  - 앞 단어를 대괄호 내용으로 치환(대체어): 확장하다
+ */
+function expandBracketVariants(s: string): string[] {
+  if (!s.includes('[')) return [s]
+  const out = new Set<string>()
+  out.add(s)
+  out.add(s.replace(/\s*\[[^\]]*\]/g, '')) // 내용 버림
+  out.add(s.replace(/[[\]]/g, '')) // 대괄호만 제거
+  out.add(s.replace(/(\S+?)\s*\[([^\]]+)\]/g, (_all, _prev, inner) => inner)) // 앞 단어 치환
+  return [...out]
+}
+
 export function isCorrectKo(userAnswer: string, expected: string): boolean {
   const norm = (s: string) =>
-    s.trim().replace(/\s+/g, '').replace(/[.,/·•~∙]/g, '').toLowerCase()
+    s.trim().replace(/\s+/g, '').replace(/[.,/·•~∙[\]]/g, '').toLowerCase()
   const user = norm(userAnswer)
   if (!user) return false
   const candidates = expected
     .split(/[,/·•∙、]/)
+    .flatMap(expandBracketVariants)
     .map((s) => norm(s))
     .filter(Boolean)
   return candidates.some((c) => c === user || c.includes(user) || user.includes(c))
