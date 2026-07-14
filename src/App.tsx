@@ -45,6 +45,7 @@ import { KoreanMockResult } from './pages/KoreanMockResult'
 import { StudentSchedule } from './pages/StudentSchedule'
 import { AdminPayments } from './pages/AdminPayments'
 import { AdminAvailability } from './pages/AdminAvailability'
+import { More } from './pages/More'
 
 function App() {
   return (
@@ -85,6 +86,7 @@ function App() {
               <Route path="/assignments" element={<Assignments />} />
               <Route path="/schedule" element={<StudentSchedule />} />
               <Route path="/notifications" element={<Notifications />} />
+              <Route path="/more" element={<More />} />
               <Route path="/notice" element={<Notice />} />
             </Route>
           </Route>

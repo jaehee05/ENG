@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { Clover, CloverCheck, progressToLeaves } from '../components/Clover'
 import { useAuth } from '../contexts/useAuth'
 import { listAccounts } from '../lib/account'
 import type { UserAccount } from '../lib/types'
@@ -107,6 +106,54 @@ function fmtDayHeading(iso: string): string {
   return `${m}월 ${d}일 (${wd})`
 }
 
+/** 완료 여부 체크 원 (클로버 대체). onToggle 있으면 버튼, 없으면 상태 표시. */
+function DoneCircle({
+  done,
+  color,
+  onToggle,
+}: {
+  done: boolean
+  color?: string
+  onToggle?: () => void
+}) {
+  const cls = `shrink-0 h-6 w-6 rounded-full border-2 flex items-center justify-center transition ${
+    done ? 'border-transparent' : 'border-slate-300'
+  }`
+  const style = done ? { backgroundColor: color ?? '#0a8210' } : undefined
+  const inner = done ? (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="white"
+      strokeWidth="3.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  ) : null
+  if (onToggle) {
+    return (
+      <button
+        type="button"
+        onClick={onToggle}
+        className={cls}
+        style={style}
+        aria-label={done ? '완료됨' : '미완료'}
+      >
+        {inner}
+      </button>
+    )
+  }
+  return (
+    <span className={cls} style={style} aria-hidden>
+      {inner}
+    </span>
+  )
+}
+
 export function Assignments() {
   const { profile } = useAuth()
   // 관리자는 본인 과제 대신 학생에게 과제를 부여하는 진입 화면을 본다.
@@ -175,9 +222,15 @@ function StudentAssignments() {
 
   // 카테고리별로 과제 묶기 (모르는 키는 etc로 합침)
   const byCategory = useMemo(() => {
+    const todayStr = todayISO()
     const map: Record<string, Assignment[]> = {}
     for (const c of categories) map[c.key] = []
     for (const a of assignments) {
+      // 마감 지난 것/완료한 것은 다음날부터 리스트에서 숨김
+      const dueISO = tsToISO(a.dueAt)
+      const done = isAssignmentDone(a, attempts)
+      if (dueISO && dueISO < todayStr) continue
+      if (done && (!dueISO || dueISO < todayStr)) continue
       const key = assignmentCategory(a)
       if (map[key]) map[key].push(a)
       else if (map['etc']) map['etc'].push(a)
@@ -195,10 +248,14 @@ function StudentAssignments() {
     return map
   }, [assignments, attempts, categories])
 
-  const totalOpen = useMemo(
-    () => assignments.filter((a) => !isAssignmentDone(a, attempts)).length,
-    [assignments, attempts],
-  )
+  const totalOpen = useMemo(() => {
+    const todayStr = todayISO()
+    return assignments.filter((a) => {
+      const dueISO = tsToISO(a.dueAt)
+      if (dueISO && dueISO < todayStr) return false // 마감 지난 건 제외
+      return !isAssignmentDone(a, attempts)
+    }).length
+  }, [assignments, attempts])
 
   const overallDone = useMemo(() => {
     const doneAsn = assignments.filter((a) => isAssignmentDone(a, attempts)).length
@@ -207,10 +264,6 @@ function StudentAssignments() {
   }, [assignments, attempts, todos])
 
   const overallTotal = assignments.length + todos.length
-
-  /** 헤더 클로버는 모든 카테고리 중 첫 번째 색을 쓴다 (보통 problem 색). */
-  const headerColor = categories[0]?.color ?? '#10b981'
-  const headerLeaves = progressToLeaves(overallDone, overallTotal)
 
   async function handleAddTodo(e: FormEvent) {
     e.preventDefault()
@@ -307,9 +360,6 @@ function StudentAssignments() {
             </p>
           )}
         </div>
-        {!loading && overallTotal > 0 && (
-          <Clover filled={headerLeaves} color={headerColor} size={44} />
-        )}
       </header>
 
       {loading && <p className="text-slate-500 text-sm">불러오는 중…</p>}
@@ -487,7 +537,7 @@ function StudentAssignments() {
                     a.type === 'korean_mock' ? mockSubjectById[a.refId] : undefined
                   const inner = (
                     <>
-                      <CloverCheck done={done} color={cat.color} size={26} />
+                      <DoneCircle done={done} color={cat.color} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 min-w-0">
                           {mockSubj && (
@@ -541,10 +591,9 @@ function StudentAssignments() {
                 {isEtc &&
                   sortedTodos.map((t) => (
                     <div key={t.id} className="flex items-center gap-3 px-4 py-3 group">
-                      <CloverCheck
+                      <DoneCircle
                         done={t.done}
                         color={etcMeta?.color ?? cat.color}
-                        size={26}
                         onToggle={() => toggleTodo(t)}
                       />
                       <p

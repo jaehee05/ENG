@@ -86,6 +86,13 @@ const mockIcon = (
     <path d="M9 12l2 2 4-4" />
   </svg>
 )
+const moreIcon = (
+  <svg {...iconProps}>
+    <circle cx="5" cy="12" r="1.5" />
+    <circle cx="12" cy="12" r="1.5" />
+    <circle cx="19" cy="12" r="1.5" />
+  </svg>
+)
 
 const adminGearIcon = (
   <svg {...iconProps}>
@@ -102,12 +109,12 @@ const studentNav: NavItem[] = [
   { to: '/schedule', label: '일정', icon: calendarIcon },
 ]
 
-const adminMobileNav: NavItem[] = [
+// 하단 탭바: 홈·과제·일정·더보기 4개 고정 (학생·관리자 공통). 나머지는 더보기로.
+const bottomTabs: NavItem[] = [
   { to: '/', label: '홈', end: true, icon: homeIcon },
   { to: '/assignments', label: '과제', icon: checkIcon },
-  { to: '/vocab', label: '단어', icon: vocabIcon },
   { to: '/schedule', label: '일정', icon: calendarIcon },
-  { to: '/admin', label: '관리', icon: adminGearIcon },
+  { to: '/more', label: '더보기', icon: moreIcon },
 ]
 
 const studentExtraNav: NavItem[] = [
@@ -200,12 +207,8 @@ export function Layout() {
     : koreanOnly
       ? [...filterForSubjects(studentNav), mockNavItem]
       : filterForSubjects([...studentNav, ...studentExtraNav])
-  // 모바일 + iPad portrait 하단 탭바: 관리자는 단어장 자리에 "관리"
-  const mobileNav = isAdmin
-    ? adminMobileNav
-    : koreanOnly
-      ? [...filterForSubjects(studentNav), mockNavItem]
-      : filterForSubjects(studentNav)
+  // 모바일 + iPad portrait 하단 탭바: 홈·과제·일정·더보기 4개 고정
+  const mobileNav = bottomTabs
 
   return (
     <div className="h-dvh flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
