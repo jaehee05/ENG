@@ -1,109 +1,88 @@
+import { useState, type ReactNode } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import type { ReactNode } from 'react'
 import { useAuth } from '../contexts/useAuth'
+import { deleteAccount } from '../lib/account'
 import { accountSubjects } from '../lib/types'
 
-interface MoreLink {
-  to: string
-  label: string
-  desc?: string
-  icon: ReactNode
+/** 로컬 저장 토글 (알림/마케팅 수신 선호). */
+function useLocalToggle(key: string, initial = true) {
+  const [on, setOn] = useState<boolean>(() => {
+    try {
+      const v = localStorage.getItem(key)
+      return v === null ? initial : v === '1'
+    } catch {
+      return initial
+    }
+  })
+  const toggle = () => {
+    setOn((prev) => {
+      const next = !prev
+      try {
+        localStorage.setItem(key, next ? '1' : '0')
+      } catch {
+        // ignore
+      }
+      return next
+    })
+  }
+  return [on, toggle] as const
 }
 
-const ico = {
-  width: 20,
-  height: 20,
-  viewBox: '0 0 24 24',
-  fill: 'none' as const,
-  stroke: 'currentColor',
-  strokeWidth: 1.7,
-  strokeLinecap: 'round' as const,
-  strokeLinejoin: 'round' as const,
-}
-
-const icons = {
-  user: (
-    <svg {...ico}>
-      <circle cx="12" cy="8" r="4" />
-      <path d="M4 20c0-4 4-6 8-6s8 2 8 6" />
-    </svg>
-  ),
-  bell: (
-    <svg {...ico}>
-      <path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8" />
-      <path d="M10 21a2 2 0 0 0 4 0" />
-    </svg>
-  ),
-  megaphone: (
-    <svg {...ico}>
-      <path d="m3 11 18-5v12L3 14v-3z" />
-      <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
-    </svg>
-  ),
-  reading: (
-    <svg {...ico}>
-      <path d="M4 5a2 2 0 0 1 2-2h5v18H6a2 2 0 0 1-2-2V5Z" />
-      <path d="M20 5a2 2 0 0 0-2-2h-5v18h5a2 2 0 0 0 2-2V5Z" />
-    </svg>
-  ),
-  vocab: (
-    <svg {...ico}>
-      <path d="M9 4h6a2 2 0 0 1 2 2v14l-5-2-5 2V6a2 2 0 0 1 2-2Z" />
-      <path d="M9 8h6M9 11h4" />
-    </svg>
-  ),
-  wordbook: (
-    <svg {...ico}>
-      <path d="M5 3h11a2 2 0 0 1 2 2v16l-3-2-3 2-3-2-3 2V5a2 2 0 0 1 2-2Z" />
-    </svg>
-  ),
-  history: (
-    <svg {...ico}>
-      <path d="M3 12a9 9 0 1 0 3.4-7.04" />
-      <path d="M3 4v5h5" />
-      <path d="M12 8v4l3 2" />
-    </svg>
-  ),
-  mock: (
-    <svg {...ico}>
-      <path d="M9 2h6l2 2h3v18H4V4h3l2-2Z" />
-      <path d="M9 12l2 2 4-4" />
-    </svg>
-  ),
-  gear: (
-    <svg {...ico}>
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-    </svg>
-  ),
-}
-
-function MoreSection({ title, items }: { title: string; items: MoreLink[] }) {
-  if (items.length === 0) return null
+function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   return (
-    <section className="space-y-2">
-      <h2 className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 px-1">
-        {title}
-      </h2>
-      <div className="rounded-xl border border-slate-200 bg-white overflow-hidden divide-y divide-slate-100">
-        {items.map((m) => (
-          <Link
-            key={m.to}
-            to={m.to}
-            className="flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50"
-          >
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
-              {m.icon}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-slate-900">{m.label}</p>
-              {m.desc && <p className="text-xs text-slate-400 truncate">{m.desc}</p>}
-            </div>
-            <span className="text-slate-300 text-lg shrink-0">›</span>
-          </Link>
-        ))}
-      </div>
-    </section>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      onClick={onToggle}
+      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition ${
+        on ? 'bg-brand-500' : 'bg-slate-300'
+      }`}
+    >
+      <span
+        className={`inline-block h-5 w-5 rounded-full bg-white shadow transition ${
+          on ? 'translate-x-5' : 'translate-x-0.5'
+        }`}
+      />
+    </button>
+  )
+}
+
+/** 설정 카드 (회색 배경, 행 구분선). */
+function Card({ children }: { children: ReactNode }) {
+  return (
+    <div className="rounded-2xl bg-slate-100/80 overflow-hidden divide-y divide-slate-200/70">
+      {children}
+    </div>
+  )
+}
+
+function LinkRow({ to, label }: { to: string; label: string }) {
+  return (
+    <Link
+      to={to}
+      className="flex items-center justify-between gap-3 px-4 py-4 hover:bg-slate-200/40 active:bg-slate-200/60"
+    >
+      <span className="text-[15px] font-medium text-slate-900">{label}</span>
+      <span className="text-slate-400 text-lg">›</span>
+    </Link>
+  )
+}
+
+function ToggleRow({
+  label,
+  on,
+  onToggle,
+}: {
+  label: string
+  on: boolean
+  onToggle: () => void
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-4 py-3.5">
+      <span className="text-[15px] font-medium text-slate-900">{label}</span>
+      <Toggle on={on} onToggle={onToggle} />
+    </div>
   )
 }
 
@@ -115,77 +94,110 @@ export function More() {
   const showEnglish = subj.english || isAdmin
   const showMock = isAdmin || subj.korean
 
+  const [noti, toggleNoti] = useLocalToggle('pref_noti', true)
+  const [marketing, toggleMarketing] = useLocalToggle('pref_marketing', true)
+
   async function handleLogout() {
     await logOut()
     navigate('/login')
   }
 
-  const learning: MoreLink[] = []
-  if (showEnglish) {
-    learning.push(
-      { to: '/reading', label: '지문 문제풀이', icon: icons.reading },
-      { to: '/vocab', label: '단어 시험지', icon: icons.vocab },
-      { to: '/wordbook', label: '내 단어장', icon: icons.wordbook },
+  async function handleWithdraw() {
+    if (!profile) return
+    const ok = window.confirm(
+      '정말 회원탈퇴 하시겠어요?\n계정과 학습 정보가 삭제되며 되돌릴 수 없습니다.',
     )
+    if (!ok) return
+    try {
+      await deleteAccount(profile.id)
+      await logOut()
+      navigate('/login')
+    } catch {
+      window.alert('탈퇴 처리에 실패했습니다. 잠시 후 다시 시도해주세요.')
+    }
   }
-  if (showMock) {
-    learning.push({ to: '/korean-mocks', label: '모의고사', icon: icons.mock })
-  }
-  learning.push({ to: '/history', label: '내 기록', desc: '지난 시험 점수', icon: icons.history })
-
-  const news: MoreLink[] = [
-    { to: '/notifications', label: '알림', icon: icons.bell },
-    { to: '/notice', label: '공지사항 및 이벤트', icon: icons.megaphone },
-  ]
-
-  const admin: MoreLink[] = isAdmin
-    ? [{ to: '/admin', label: '관리자 도구', desc: '학생·정산·수업 관리', icon: icons.gear }]
-    : []
 
   return (
-    <div className="space-y-6">
-      <header>
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-          더보기
-        </p>
-        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
-          내 정보
-        </h1>
+    <div className="space-y-5 max-w-lg">
+      {/* 인사말 */}
+      <header className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm text-slate-400">안녕하세요</p>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-0.5">
+            {profile?.displayName}님
+          </h1>
+        </div>
+        {isAdmin && (
+          <span className="mt-1 inline-block rounded-full bg-brand-50 text-brand-700 px-2.5 py-1 text-xs font-medium">
+            관리자
+          </span>
+        )}
       </header>
 
-      {/* 내 정보 카드 */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4 flex items-center gap-3">
-        <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-brand-100 text-brand-700 text-lg font-semibold">
-          {profile?.displayName?.slice(0, 1) ?? '?'}
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <p className="text-base font-semibold text-slate-900 truncate">
-              {profile?.displayName}
-            </p>
-            {isAdmin && (
-              <span className="inline-block rounded bg-brand-50 text-brand-700 px-1.5 py-0.5 text-[10px] font-medium">
-                관리자
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-slate-500 truncate">
-            {[profile?.school, profile?.phone].filter(Boolean).join(' · ') || '—'}
-          </p>
+      {/* 내 정보 관리 */}
+      <Card>
+        <LinkRow to="/profile" label="내 정보 관리" />
+      </Card>
+
+      {/* 알림 설정 */}
+      <Card>
+        <ToggleRow label="알림" on={noti} onToggle={toggleNoti} />
+        <ToggleRow
+          label="마케팅 정보 알림"
+          on={marketing}
+          onToggle={toggleMarketing}
+        />
+      </Card>
+
+      {/* 공지 */}
+      <Card>
+        <LinkRow to="/notice" label="공지사항 및 이벤트" />
+      </Card>
+
+      {/* 학습 콘텐츠 (하단탭에서 빠진 항목들) */}
+      <Card>
+        {showEnglish && <LinkRow to="/reading" label="지문 문제풀이" />}
+        {showEnglish && <LinkRow to="/vocab" label="단어 시험지" />}
+        {showEnglish && <LinkRow to="/wordbook" label="내 단어장" />}
+        {showMock && <LinkRow to="/korean-mocks" label="모의고사" />}
+        <LinkRow to="/history" label="내 기록" />
+      </Card>
+
+      {/* 관리자 */}
+      {isAdmin && (
+        <Card>
+          <LinkRow to="/admin" label="관리자 도구" />
+        </Card>
+      )}
+
+      {/* 앱 버전 */}
+      <Card>
+        <div className="flex items-center justify-between gap-3 px-4 py-4">
+          <span className="text-[15px] font-medium text-slate-900">앱 버전</span>
+          <span className="text-sm text-slate-400 tabular-nums">
+            {__APP_VERSION__}
+          </span>
         </div>
-      </div>
+      </Card>
 
-      <MoreSection title="관리" items={admin} />
-      <MoreSection title="학습" items={learning} />
-      <MoreSection title="소식" items={news} />
-
+      {/* 로그아웃 */}
       <button
         type="button"
         onClick={handleLogout}
-        className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3.5 text-sm font-medium text-red-600 hover:bg-red-50"
+        className="w-full rounded-2xl bg-red-50 px-4 py-4 text-[15px] font-semibold text-red-600 hover:bg-red-100"
       >
         로그아웃
       </button>
+
+      <div className="text-center pt-1 pb-2">
+        <button
+          type="button"
+          onClick={handleWithdraw}
+          className="text-xs text-slate-400 underline underline-offset-2 hover:text-slate-600"
+        >
+          회원탈퇴
+        </button>
+      </div>
     </div>
   )
 }

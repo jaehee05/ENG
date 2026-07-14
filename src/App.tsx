@@ -46,6 +46,7 @@ import { StudentSchedule } from './pages/StudentSchedule'
 import { AdminPayments } from './pages/AdminPayments'
 import { AdminAvailability } from './pages/AdminAvailability'
 import { More } from './pages/More'
+import { Profile } from './pages/Profile'
 
 function App() {
   return (
@@ -87,6 +88,7 @@ function App() {
               <Route path="/schedule" element={<StudentSchedule />} />
               <Route path="/notifications" element={<Notifications />} />
               <Route path="/more" element={<More />} />
+              <Route path="/profile" element={<Profile />} />
               <Route path="/notice" element={<Notice />} />
             </Route>
           </Route>
