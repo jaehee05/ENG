@@ -158,11 +158,18 @@ export function KoreanMockResult() {
       {/* 출제자 한마디 */}
       {mock?.examinerComment && (
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
-          <p className="text-2xl text-slate-300 leading-none">“</p>
-          <p className="text-sm font-bold text-slate-900 -mt-1">출제자의 한마디</p>
-          <p className="mt-1.5 text-sm text-slate-600 whitespace-pre-wrap">
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-300 text-3xl font-serif leading-[0]">
+            &ldquo;
+          </span>
+          <p className="mt-3 text-base font-bold text-slate-900">출제자의 한마디</p>
+          <p className="mt-1.5 text-sm text-slate-500 leading-relaxed whitespace-pre-wrap">
             {mock.examinerComment}
           </p>
+          <div className="flex justify-end mt-2">
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-300 text-3xl font-serif leading-[0] pt-2">
+              &rdquo;
+            </span>
+          </div>
         </div>
       )}
 
