@@ -52,6 +52,11 @@ const STATUS_STYLES: Record<
     text: 'text-orange-800',
     badge: 'bg-orange-50 text-orange-700 border-orange-200',
   },
+  off: {
+    bar: 'bg-slate-400',
+    text: 'text-slate-500 line-through',
+    badge: 'bg-slate-100 text-slate-500 border-slate-200',
+  },
 }
 
 function todayISO(): string {
@@ -133,6 +138,8 @@ function sessionBadge(
 ): { label: string; cls: string } {
   if (s.status === 'canceled')
     return { label: '취소', cls: 'bg-red-50 text-red-600 border-red-200' }
+  if (s.status === 'off')
+    return { label: '휴강', cls: 'bg-slate-100 text-slate-500 border-slate-200' }
   if (s.status === 'makeup')
     return { label: '보강', cls: 'bg-orange-50 text-orange-700 border-orange-200' }
   if (s.status === 'done' || isSessionRecorded(s))
@@ -540,7 +547,7 @@ export function StudentSchedule() {
                         <span
                           key={s.id}
                           className={`inline-block w-1.5 h-1.5 rounded-full ${
-                            s.status === 'canceled'
+                            s.status === 'canceled' || s.status === 'off'
                               ? 'bg-slate-300'
                               : studentColor
                                 ? studentColor.dot
@@ -594,7 +601,7 @@ export function StudentSchedule() {
                     studentColorKeyByUid.get(s.studentUid),
                   )
                 : null
-              const canceled = s.status === 'canceled'
+              const canceled = s.status === 'canceled' || s.status === 'off'
               return (
                 <li key={s.id}>
                   <button

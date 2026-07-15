@@ -697,13 +697,19 @@ export interface DDaySetting {
 }
 
 /** 학생별 개별 수업 일정 (관리형 캘린더). */
-export type ClassSessionStatus = 'scheduled' | 'done' | 'canceled' | 'makeup'
+export type ClassSessionStatus =
+  | 'scheduled'
+  | 'done'
+  | 'canceled'
+  | 'makeup'
+  | 'off'
 
 export const CLASS_SESSION_STATUS_LABEL: Record<ClassSessionStatus, string> = {
   scheduled: '예정',
   done: '완료',
   canceled: '취소',
   makeup: '보강',
+  off: '휴강',
 }
 
 /** 출석 상태 (수업 기록 시 체크). 미기록이면 세션에 attendance 없음. */

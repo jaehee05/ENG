@@ -8,7 +8,13 @@ import {
 
 const KST_TZ = 'Asia/Seoul'
 
-const STATUSES: ClassSessionStatus[] = ['scheduled', 'done', 'canceled', 'makeup']
+const STATUSES: ClassSessionStatus[] = [
+  'scheduled',
+  'done',
+  'canceled',
+  'makeup',
+  'off',
+]
 
 function todayISO(): string {
   const fmt = new Intl.DateTimeFormat('en-CA', {
