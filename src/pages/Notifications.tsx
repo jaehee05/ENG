@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useState, type ReactNode } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import {
   deleteAllNotificationsForUser,
   deleteNotification,
-  formatDate,
   listNotificationsForUser,
   markAllNotificationsRead,
   markNotificationRead,
@@ -14,21 +13,69 @@ import type { UserNotification } from '../lib/types'
 function fmtDateTime(ts: { toDate: () => Date } | null | undefined): string {
   if (!ts) return ''
   const d = ts.toDate()
-  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  return `${d.getMonth() + 1}월 ${d.getDate()}일 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
-const KIND_LABEL: Record<string, string> = {
-  push: '푸시',
-  announcement: '공지',
-  assignment: '과제',
-  system: '시스템',
+const megaphone = (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m3 11 18-5v12L3 14v-3z" />
+    <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
+  </svg>
+)
+const docIcon = (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <path d="M14 2v6h6M8 13h8M8 17h6" />
+  </svg>
+)
+const bell = (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8" />
+    <path d="M10 21a2 2 0 0 0 4 0" />
+  </svg>
+)
+
+interface KindCfg {
+  label: string
+  labelCls: string
+  iconBg: string
+  icon: ReactNode
 }
+const KIND: Record<string, KindCfg> = {
+  announcement: {
+    label: '공지사항',
+    labelCls: 'text-red-500',
+    iconBg: 'bg-red-50 text-red-500',
+    icon: megaphone,
+  },
+  assignment: {
+    label: '과제',
+    labelCls: 'text-violet-600',
+    iconBg: 'bg-violet-50 text-violet-600',
+    icon: docIcon,
+  },
+  push: {
+    label: '알림',
+    labelCls: 'text-slate-500',
+    iconBg: 'bg-slate-100 text-slate-500',
+    icon: bell,
+  },
+  system: {
+    label: '시스템',
+    labelCls: 'text-slate-500',
+    iconBg: 'bg-slate-100 text-slate-500',
+    icon: bell,
+  },
+}
+const kindOf = (k?: string): KindCfg => KIND[k ?? 'system'] ?? KIND.system
 
 export function Notifications() {
   const { profile } = useAuth()
+  const navigate = useNavigate()
   const [items, setItems] = useState<UserNotification[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [editing, setEditing] = useState(false)
 
   async function load() {
     if (!profile) return
@@ -45,21 +92,9 @@ export function Notifications() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile])
 
-  async function handleMarkAllRead() {
-    if (!profile) return
-    setBusy(true)
-    try {
-      await markAllNotificationsRead(profile.id)
-      await load()
-    } finally {
-      setBusy(false)
-    }
-  }
-
   async function handleDeleteAll() {
     if (!profile) return
-    if (!window.confirm('알림함의 모든 알림을 삭제할까요? 되돌릴 수 없어요.'))
-      return
+    if (!window.confirm('알림함의 모든 알림을 삭제할까요? 되돌릴 수 없어요.')) return
     setBusy(true)
     try {
       await deleteAllNotificationsForUser(profile.id)
@@ -80,6 +115,9 @@ export function Notifications() {
 
   async function handleItemClick(n: UserNotification) {
     if (!n.readAt) {
+      setItems((prev) =>
+        prev.map((x) => (x.id === n.id ? { ...x, readAt: x.readAt ?? null } : x)),
+      )
       try {
         await markNotificationRead(n.id)
       } catch {
@@ -91,120 +129,126 @@ export function Notifications() {
   const unread = items.filter((n) => !n.readAt).length
 
   return (
-    <div className="space-y-5 max-w-3xl">
-      <header className="flex items-end justify-between gap-2 flex-wrap">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-            나의 활동
-          </p>
-          <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
-            알림함
-          </h1>
-          {!loading && (
-            <p className="text-xs text-slate-500 mt-1">
-              {unread > 0 ? `안 읽은 알림 ${unread}건` : '모두 확인했어요'}
-            </p>
-          )}
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {unread > 0 && (
-            <button
-              type="button"
-              onClick={handleMarkAllRead}
-              disabled={busy}
-              className="rounded-md border border-slate-200 text-slate-700 text-xs font-medium px-3 py-1.5 hover:bg-slate-50 disabled:opacity-50"
-            >
-              모두 읽음 처리
-            </button>
-          )}
-          {items.length > 0 && (
+    <div className="max-w-lg mx-auto">
+      <header className="flex items-center gap-2 mb-2">
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          aria-label="뒤로"
+          className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-slate-100 text-slate-600"
+        >
+          ‹
+        </button>
+        <h1 className="flex-1 text-center text-base font-bold text-slate-900">알림</h1>
+        {items.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => setEditing((v) => !v)}
+            className="h-9 min-w-[2.25rem] px-2 inline-flex items-center justify-center rounded-full bg-slate-100 text-slate-600 text-sm font-medium"
+          >
+            {editing ? '완료' : '편집'}
+          </button>
+        ) : (
+          <span className="w-9" />
+        )}
+      </header>
+
+      {editing && items.length > 0 && (
+        <div className="flex items-center justify-between px-1 py-2">
+          <span className="text-xs text-slate-400">
+            {unread > 0 ? `안 읽음 ${unread}` : '모두 확인함'}
+          </span>
+          <div className="flex items-center gap-3">
+            {unread > 0 && (
+              <button
+                type="button"
+                onClick={() => profile && markAllNotificationsRead(profile.id).then(load)}
+                disabled={busy}
+                className="text-xs text-slate-500 hover:text-slate-900"
+              >
+                모두 읽음
+              </button>
+            )}
             <button
               type="button"
               onClick={handleDeleteAll}
               disabled={busy}
-              className="rounded-md border border-red-200 text-red-600 text-xs font-medium px-3 py-1.5 hover:bg-red-50 disabled:opacity-50"
+              className="text-xs text-red-500 hover:text-red-700"
             >
               모두 삭제
             </button>
-          )}
-        </div>
-      </header>
-
-      {loading && <p className="text-slate-500 text-sm">불러오는 중…</p>}
-      {!loading && items.length === 0 && (
-        <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
-          알림이 없어요.
+          </div>
         </div>
       )}
 
-      {items.length > 0 && (
-      <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white overflow-hidden">
+      {loading && <p className="text-slate-500 text-sm py-6 text-center">불러오는 중…</p>}
+      {!loading && items.length === 0 && (
+        <p className="text-slate-400 text-sm py-16 text-center">알림이 없어요.</p>
+      )}
+
+      <ul>
         {items.map((n) => {
-          const body = (
-            <div className="flex items-start gap-3 px-4 py-3">
-              {!n.readAt && (
-                <span className="mt-1.5 inline-block w-1.5 h-1.5 rounded-full bg-brand-500 shrink-0" />
-              )}
-              <div className={`flex-1 min-w-0 ${n.readAt ? 'pl-[18px]' : ''}`}>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="inline-block rounded bg-slate-100 text-slate-600 text-[10px] font-medium px-1.5 py-0.5">
-                    {KIND_LABEL[n.kind ?? 'system'] ?? '알림'}
-                  </span>
-                  <span
-                    className={`text-sm truncate ${n.readAt ? 'text-slate-600 font-normal' : 'text-slate-900 font-semibold'}`}
-                  >
-                    {n.title}
-                  </span>
-                </div>
+          const cfg = kindOf(n.kind)
+          const inner = (
+            <div className="flex items-start gap-3 py-4">
+              <span
+                className={`shrink-0 inline-flex h-11 w-11 items-center justify-center rounded-full ${cfg.iconBg}`}
+              >
+                {cfg.icon}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm">
+                  <span className={`font-bold ${cfg.labelCls}`}>{cfg.label}</span>
+                  <span className="text-slate-400"> · {fmtDateTime(n.createdAt)}</span>
+                </p>
+                <p
+                  className={`mt-0.5 text-[15px] truncate ${
+                    n.readAt ? 'text-slate-500' : 'text-slate-900 font-semibold'
+                  }`}
+                >
+                  {n.title}
+                </p>
                 {n.body && (
-                  <p className="text-sm text-slate-600 mt-1 whitespace-pre-wrap leading-relaxed">
+                  <p className="mt-0.5 text-sm text-slate-500 line-clamp-2 whitespace-pre-wrap">
                     {n.body}
                   </p>
                 )}
-                <p className="text-[10px] text-slate-400 mt-1">
-                  {fmtDateTime(n.createdAt) || formatDate(n.createdAt)}
-                </p>
               </div>
+              {editing && (
+                <button
+                  type="button"
+                  aria-label="삭제"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    void handleDeleteOne(n.id)
+                  }}
+                  className="shrink-0 self-center rounded-full bg-red-50 text-red-500 text-xs font-medium px-3 py-1.5"
+                >
+                  삭제
+                </button>
+              )}
             </div>
           )
           return (
-            <li key={n.id} className="relative group">
-              {n.link ? (
-                <Link
-                  to={n.link}
-                  onClick={() => handleItemClick(n)}
-                  className="block hover:bg-slate-50 pr-10"
-                >
-                  {body}
+            <li key={n.id} className="border-b border-slate-100 last:border-0">
+              {n.link && !editing ? (
+                <Link to={n.link} onClick={() => handleItemClick(n)} className="block">
+                  {inner}
                 </Link>
               ) : (
                 <button
                   type="button"
-                  onClick={() => handleItemClick(n)}
-                  className="w-full text-left hover:bg-slate-50 pr-10"
+                  onClick={() => !editing && handleItemClick(n)}
+                  className="w-full text-left"
                 >
-                  {body}
+                  {inner}
                 </button>
               )}
-              <button
-                type="button"
-                aria-label="알림 삭제"
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  void handleDeleteOne(n.id)
-                }}
-                className="absolute top-2 right-2 h-7 w-7 inline-flex items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-red-600"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18 6 6 18M6 6l12 12" />
-                </svg>
-              </button>
             </li>
           )
         })}
       </ul>
-      )}
     </div>
   )
 }
