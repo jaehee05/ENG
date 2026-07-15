@@ -110,7 +110,7 @@ export function KoreanMockResult() {
 
   const results =
     editing && editResults ? editResults : attempt.koreanMockResults
-  const canEdit = profile?.role === 'admin' || attempt.studentUid === profile?.id
+  const canEdit = profile?.role === 'admin'
   const subj: MockSubject = attempt.mockSubject ?? mock?.subject ?? 'korean'
 
   function startEditAnswers() {
