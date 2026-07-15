@@ -235,16 +235,14 @@ export function Layout() {
             <Link
               to="/notifications"
               aria-label="알림함"
-              className="relative h-8 w-8 inline-flex items-center justify-center rounded-md text-slate-600 hover:bg-slate-100"
+              className="relative h-9 w-9 inline-flex items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 transition"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8" />
                 <path d="M10 21a2 2 0 0 0 4 0" />
               </svg>
               {unread > 0 && (
-                <span className="absolute top-1 right-1 min-w-[14px] h-[14px] px-1 rounded-full bg-red-500 text-white text-[9px] font-semibold inline-flex items-center justify-center">
-                  {unread > 9 ? '9+' : unread}
-                </span>
+                <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
               )}
             </Link>
             <button

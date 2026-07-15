@@ -2,17 +2,40 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import {
+  clearDDay,
   formatDate,
+  getDDay,
   isAssignmentDone,
   listAnnouncements,
   listAssignmentsForStudent,
   listAttemptsForUser,
   listClassSessionsForStudent,
   listPaymentsForStudent,
+  setDDay,
 } from '../lib/firestore'
 import { accountSubjects, isAssignmentVisibleToStudent } from '../lib/types'
 import { computeStudentBalance, fmtDateLabel, todayISO } from '../lib/payments'
-import type { Announcement, Assignment, Attempt, ClassSession } from '../lib/types'
+import type {
+  Announcement,
+  Assignment,
+  Attempt,
+  ClassSession,
+  DDaySetting,
+} from '../lib/types'
+
+/** 목표일까지 남은 일수 (KST 날짜 기준). */
+function daysUntil(iso: string): number {
+  const [y, m, d] = iso.split('-').map(Number)
+  const [ty, tm, td] = todayISO().split('-').map(Number)
+  return Math.round(
+    (Date.UTC(y, m - 1, d) - Date.UTC(ty, tm - 1, td)) / 86400000,
+  )
+}
+
+function fmtDDayDate(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  return `${y}년 ${m}월 ${d}일`
+}
 
 interface ShortcutCard {
   to: string
@@ -156,6 +179,13 @@ export function Dashboard() {
   const [dueDateISO, setDueDateISO] = useState<string | null>(null)
   // 학생 본인의 다음(진행 중 포함) 수업(없으면 null → 표시 안 함).
   const [nextSession, setNextSession] = useState<ClassSession | null>(null)
+  // 홈 D-day (관리자 설정, 전체 공통).
+  const [dday, setDdayState] = useState<DDaySetting | null>(null)
+  const [ddayOpen, setDdayOpen] = useState(false)
+  const [ddayTitle, setDdayTitle] = useState('')
+  const [ddayDate, setDdayDate] = useState('')
+  const [ddaySaving, setDdaySaving] = useState(false)
+  const isAdmin = profile?.role === 'admin'
 
   // 국어만 수강하는 학생: 홈은 보여주되 '학습' 바로가기(지문·단어 등)는 숨기고
   // 과제 리스트를 메인으로 둔다.
@@ -210,6 +240,51 @@ export function Dashboard() {
       alive = false
     }
   }, [profile])
+
+  useEffect(() => {
+    let alive = true
+    getDDay()
+      .then((d) => {
+        if (alive) setDdayState(d)
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  function openDdayEdit() {
+    setDdayTitle(dday?.title ?? '')
+    setDdayDate(dday?.dateISO ?? '')
+    setDdayOpen(true)
+  }
+  async function saveDday() {
+    if (!ddayTitle.trim() || !ddayDate) return
+    setDdaySaving(true)
+    try {
+      const next = { title: ddayTitle.trim(), dateISO: ddayDate }
+      await setDDay(next)
+      setDdayState(next)
+      setDdayOpen(false)
+    } catch {
+      // ignore
+    } finally {
+      setDdaySaving(false)
+    }
+  }
+  async function removeDday() {
+    if (!window.confirm('D-day를 삭제할까요?')) return
+    setDdaySaving(true)
+    try {
+      await clearDDay()
+      setDdayState(null)
+      setDdayOpen(false)
+    } catch {
+      // ignore
+    } finally {
+      setDdaySaving(false)
+    }
+  }
 
   const openRaw = useMemo(
     () => assignments.filter((a) => !isAssignmentDone(a, attempts)),
@@ -315,6 +390,53 @@ export function Dashboard() {
           </p>
         )}
       </section>
+
+      {/* D-day 카드 (관리자 설정) */}
+      {dday
+        ? (() => {
+            const n = daysUntil(dday.dateISO)
+            const inner = (
+              <>
+                <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-600 shrink-0">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2" />
+                    <path d="M16 2v4M8 2v4M3 10h18" />
+                  </svg>
+                </span>
+                <div className="min-w-0 flex-1 text-left">
+                  <p className="text-[15px] font-bold text-slate-900 truncate">
+                    {dday.title}
+                  </p>
+                  <p className="text-xs text-slate-400">{fmtDDayDate(dday.dateISO)}</p>
+                </div>
+                <span className="shrink-0 text-xl font-extrabold text-slate-900 tabular-nums">
+                  {n > 0 ? `${n}일` : n === 0 ? 'D-DAY' : '종료'}
+                </span>
+              </>
+            )
+            return isAdmin ? (
+              <button
+                type="button"
+                onClick={openDdayEdit}
+                className="w-full flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4 hover:border-slate-300 transition"
+              >
+                {inner}
+              </button>
+            ) : (
+              <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                {inner}
+              </div>
+            )
+          })()
+        : isAdmin && (
+            <button
+              type="button"
+              onClick={openDdayEdit}
+              className="w-full rounded-2xl border border-dashed border-slate-300 px-4 py-3.5 text-sm font-medium text-slate-500 hover:bg-slate-50"
+            >
+              + D-day 설정
+            </button>
+          )}
 
       {topAnnouncement && (
         <Link
@@ -542,6 +664,72 @@ export function Dashboard() {
             ))}
           </div>
         </section>
+      )}
+
+      {/* D-day 설정 모달 (관리자) */}
+      {ddayOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm"
+          onClick={() => !ddaySaving && setDdayOpen(false)}
+        >
+          <div
+            className="w-full sm:max-w-sm bg-white rounded-t-2xl sm:rounded-2xl shadow-xl p-5 space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-slate-900">D-day 설정</h3>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-slate-600">목표 이름</span>
+              <input
+                type="text"
+                value={ddayTitle}
+                onChange={(e) => setDdayTitle(e.target.value)}
+                placeholder="예: 2027 대수능"
+                className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-slate-600">목표일</span>
+              <input
+                type="date"
+                value={ddayDate}
+                onChange={(e) => setDdayDate(e.target.value)}
+                className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </label>
+            <div className="flex items-center justify-between gap-2 pt-1">
+              {dday ? (
+                <button
+                  type="button"
+                  onClick={removeDday}
+                  disabled={ddaySaving}
+                  className="text-xs text-slate-400 hover:text-red-600 px-1 disabled:opacity-50"
+                >
+                  삭제
+                </button>
+              ) : (
+                <span />
+              )}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDdayOpen(false)}
+                  disabled={ddaySaving}
+                  className="text-sm text-slate-500 hover:text-slate-900 px-2"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={saveDday}
+                  disabled={ddaySaving || !ddayTitle.trim() || !ddayDate}
+                  className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700 disabled:opacity-50"
+                >
+                  {ddaySaving ? '저장 중…' : '저장'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

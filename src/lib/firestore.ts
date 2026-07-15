@@ -25,6 +25,7 @@ import type {
   CategoryConfig,
   ClassSession,
   ClassSessionStatus,
+  DDaySetting,
   KoreanMock,
   KoreanMockQuestion,
   KoreanMockElective,
@@ -475,6 +476,18 @@ export async function createWordbookAttempt(input: {
 
 /* ========== KoreanMock CRUD ========== */
 
+// ───── 홈 D-day (관리자 설정, 전체 공통) ─────
+export async function getDDay(): Promise<DDaySetting | null> {
+  const snap = await getDoc(doc(db, 'settings', 'dday'))
+  return snap.exists() ? (snap.data() as DDaySetting) : null
+}
+export async function setDDay(s: DDaySetting): Promise<void> {
+  await setDoc(doc(db, 'settings', 'dday'), { title: s.title, dateISO: s.dateISO })
+}
+export async function clearDDay(): Promise<void> {
+  await deleteDoc(doc(db, 'settings', 'dday'))
+}
+
 export async function listKoreanMocks(): Promise<KoreanMock[]> {
   const snap = await getDocs(
     query(collection(db, 'koreanMocks'), orderBy('createdAt', 'desc')),
@@ -668,6 +681,19 @@ export async function regradeKoreanMockAttempts(mock: KoreanMock): Promise<numbe
     await batch.commit()
   }
   return pending.length
+}
+
+/** 응시 기록의 학생 답안을 수정하고 정답/점수 재계산. */
+export async function updateKoreanMockAttemptAnswers(
+  attemptId: string,
+  results: KoreanMockResult[],
+): Promise<void> {
+  const correct = results.filter((r) => r.correct).length
+  await updateDoc(doc(db, 'attempts', attemptId), {
+    koreanMockResults: results,
+    correct,
+    total: results.length,
+  })
 }
 
 /* ========== End KoreanMock CRUD ========== */

@@ -1,12 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { getAttempt, getKoreanMock } from '../lib/firestore'
+import { useAuth } from '../contexts/useAuth'
+import {
+  getAttempt,
+  getKoreanMock,
+  updateKoreanMockAttemptAnswers,
+} from '../lib/firestore'
 import {
   gradeFromScore,
   MOCK_SUBJECT_LABEL,
   questionPoints,
   type Attempt,
   type KoreanMock,
+  type KoreanMockResult,
   type MockSubject,
 } from '../lib/types'
 
@@ -61,11 +67,15 @@ function fmtAttemptDate(ts: Attempt['createdAt']): string {
 
 export function KoreanMockResult() {
   const { id, attemptId } = useParams<{ id: string; attemptId: string }>()
+  const { profile } = useAuth()
   const [attempt, setAttempt] = useState<Attempt | null>(null)
   const [mock, setMock] = useState<KoreanMock | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showCutoffs, setShowCutoffs] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [editResults, setEditResults] = useState<KoreanMockResult[] | null>(null)
+  const [savingEdit, setSavingEdit] = useState(false)
 
   useEffect(() => {
     if (!attemptId) return
@@ -98,8 +108,45 @@ export function KoreanMockResult() {
   if (error) return <p className="text-red-600 text-sm">{error}</p>
   if (!attempt || !attempt.koreanMockResults) return null
 
-  const results = attempt.koreanMockResults
+  const results =
+    editing && editResults ? editResults : attempt.koreanMockResults
+  const canEdit = profile?.role === 'admin' || attempt.studentUid === profile?.id
   const subj: MockSubject = attempt.mockSubject ?? mock?.subject ?? 'korean'
+
+  function startEditAnswers() {
+    setEditResults(attempt!.koreanMockResults!.map((r) => ({ ...r })))
+    setEditing(true)
+  }
+  function cycleAnswer(idx: number) {
+    setEditResults((prev) => {
+      if (!prev) return prev
+      const next = [...prev]
+      const r = next[idx]
+      const ua = r.userAnswer >= 5 ? 0 : r.userAnswer + 1 // 1→2→3→4→5→0(미응답)→1
+      next[idx] = {
+        ...r,
+        userAnswer: ua,
+        correct: ua > 0 && ua === r.correctAnswer,
+      }
+      return next
+    })
+  }
+  async function saveEditAnswers() {
+    if (!attemptId || !editResults) return
+    setSavingEdit(true)
+    try {
+      await updateKoreanMockAttemptAnswers(attemptId, editResults)
+      const correct = editResults.filter((r) => r.correct).length
+      setAttempt((a) =>
+        a ? { ...a, koreanMockResults: editResults, correct, total: editResults.length } : a,
+      )
+      setEditing(false)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '저장 실패')
+    } finally {
+      setSavingEdit(false)
+    }
+  }
   const pointsOf = (n: number) => pointsByNumber.get(n) ?? 2
   const totalPoints = results.reduce((s, r) => s + pointsOf(r.number), 0)
   const score = results.reduce((s, r) => s + (r.correct ? pointsOf(r.number) : 0), 0)
@@ -241,9 +288,42 @@ export function KoreanMockResult() {
 
       {/* 정오표 */}
       <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-100">
+        <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
           <h3 className="text-sm font-bold text-slate-900">정오표</h3>
+          {canEdit &&
+            (editing ? (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditing(false)}
+                  className="text-xs text-slate-400 hover:text-slate-700"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={saveEditAnswers}
+                  disabled={savingEdit}
+                  className="rounded-md bg-brand-600 text-white text-xs font-semibold px-3 py-1 hover:bg-brand-700 disabled:opacity-50"
+                >
+                  {savingEdit ? '저장 중…' : '저장'}
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={startEditAnswers}
+                className="text-xs font-medium text-brand-700 hover:underline"
+              >
+                답 수정
+              </button>
+            ))}
         </div>
+        {editing && (
+          <p className="px-4 pt-2 text-[11px] text-slate-400">
+            학생답을 탭하면 1→2→3→4→5→미응답 순으로 바뀝니다.
+          </p>
+        )}
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50 text-[11px] text-slate-400">
             <tr>
@@ -271,7 +351,21 @@ export function KoreanMockResult() {
                     </span>
                   </td>
                   <td className="px-2 py-2.5 text-center">
-                    {unanswered ? (
+                    {editing ? (
+                      <button
+                        type="button"
+                        onClick={() => cycleAnswer(i)}
+                        className={`inline-flex w-7 h-7 items-center justify-center rounded-full text-xs font-semibold border-2 border-dashed ${
+                          unanswered
+                            ? 'text-slate-300 border-slate-300'
+                            : r.correct
+                              ? 'bg-brand-100 text-brand-700 border-brand-300'
+                              : 'bg-red-100 text-red-600 border-red-300'
+                        }`}
+                      >
+                        {unanswered ? '—' : r.userAnswer}
+                      </button>
+                    ) : unanswered ? (
                       <span className="text-slate-300 text-xs">—</span>
                     ) : (
                       <span

@@ -688,6 +688,14 @@ export interface UserNotification {
   createdAt: Timestamp | null
 }
 
+/** 홈 화면 D-day 카드 (관리자 설정, 전체 공통). */
+export interface DDaySetting {
+  /** 목표 이름 (예: 2027 대수능). */
+  title: string
+  /** 목표일 YYYY-MM-DD. */
+  dateISO: string
+}
+
 /** 학생별 개별 수업 일정 (관리형 캘린더). */
 export type ClassSessionStatus = 'scheduled' | 'done' | 'canceled' | 'makeup'
 
