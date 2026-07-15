@@ -65,6 +65,7 @@ export function KoreanMockResult() {
   const [mock, setMock] = useState<KoreanMock | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showCutoffs, setShowCutoffs] = useState(false)
 
   useEffect(() => {
     if (!attemptId) return
@@ -114,6 +115,18 @@ export function KoreanMockResult() {
   })()
   const grade = gradeFromScore(score, activeCutoffs)
 
+  // 등급컷 상세 행: 정의된 등급 + 마지막 등급 이하 행.
+  const cutoffRows = (() => {
+    if (!activeCutoffs || activeCutoffs.length === 0)
+      return [] as { grade: number; label: string; score: number | null }[]
+    const sorted = [...activeCutoffs].sort((a, b) => a.grade - b.grade)
+    const maxG = Math.max(...sorted.map((c) => c.grade))
+    const rows: { grade: number; label: string; score: number | null }[] =
+      sorted.map((c) => ({ grade: c.grade, label: `${c.grade}등급`, score: c.minScore }))
+    rows.push({ grade: maxG + 1, label: `${maxG + 1}등급 이하`, score: null })
+    return rows
+  })()
+
   return (
     <div className="space-y-4 max-w-lg mx-auto">
       <header className="text-center">
@@ -136,17 +149,22 @@ export function KoreanMockResult() {
         </div>
       </div>
 
-      {/* 등급 카드 (등급컷 있을 때) */}
+      {/* 등급 카드 (등급컷 있을 때) — 탭하면 등급컷 상세 */}
       {grade != null && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+        <button
+          type="button"
+          onClick={() => setShowCutoffs(true)}
+          className="w-full text-left rounded-2xl border border-slate-200 bg-white p-5 hover:border-slate-300 transition"
+        >
           <div className="flex items-center gap-2.5">
             <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-amber-100 text-amber-700">
               🏆
             </span>
-            <div>
+            <div className="flex-1">
               <p className="text-sm font-bold text-slate-900">등급</p>
               <p className="text-xs text-slate-400">이번 시험에서 나의 위치는?</p>
             </div>
+            <span className="text-slate-300 text-lg">›</span>
           </div>
           <p className="mt-3 text-4xl font-extrabold text-amber-600 tracking-tight">
             {grade}등급
@@ -158,9 +176,9 @@ export function KoreanMockResult() {
             />
           </div>
           <p className="mt-1 text-[11px] text-slate-400">
-            원점수 {score}점 / {totalPoints}점
+            원점수 {score}점 / {totalPoints}점 · 등급컷 보기
           </p>
-        </div>
+        </button>
       )}
 
       {/* 출제자 한마디 */}
@@ -288,6 +306,78 @@ export function KoreanMockResult() {
           목록으로
         </Link>
       </div>
+
+      {/* 등급컷 상세 오버레이 */}
+      {showCutoffs && cutoffRows.length > 0 && (
+        <div className="fixed inset-0 z-50 bg-slate-50 overflow-y-auto safe-top safe-bottom">
+          <div className="max-w-lg mx-auto px-5 py-5">
+            <header className="flex items-center gap-2 mb-4">
+              <button
+                type="button"
+                onClick={() => setShowCutoffs(false)}
+                className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-slate-100 text-slate-600"
+                aria-label="닫기"
+              >
+                ‹
+              </button>
+              <div className="flex-1 text-center pr-9">
+                <h2 className="text-base font-bold text-slate-900">등급컷</h2>
+                <p className="text-xs text-slate-400 truncate">{attempt.refTitle}</p>
+              </div>
+            </header>
+
+            <div className="rounded-2xl bg-white border border-slate-200 p-5">
+              {attempt.mockElectiveName && (
+                <span className="inline-block rounded-full bg-violet-500 text-white text-xs font-semibold px-3 py-1 mb-2">
+                  {attempt.mockElectiveName}
+                </span>
+              )}
+              <h3 className="text-xl font-bold text-slate-900">추정 등급컷</h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                AI가 추정한 등급컷입니다. 실제와 다를 수 있어요.
+              </p>
+              <div className="mt-4 space-y-1">
+                {cutoffRows.map((r) => {
+                  const isMe = grade === r.grade
+                  return (
+                    <div
+                      key={r.grade}
+                      className={`flex items-center gap-3 px-4 py-3.5 rounded-xl ${
+                        isMe ? 'bg-gradient-to-r from-amber-300 to-amber-500 shadow-sm' : ''
+                      }`}
+                    >
+                      <span
+                        className={`shrink-0 text-sm font-bold ${
+                          isMe ? 'text-white' : 'text-slate-500'
+                        }`}
+                      >
+                        {r.label}
+                      </span>
+                      <span
+                        className={`flex-1 border-b border-dotted ${
+                          isMe ? 'border-white/50' : 'border-slate-300'
+                        }`}
+                      />
+                      <span
+                        className={`shrink-0 text-lg font-bold tabular-nums ${
+                          isMe ? 'text-white' : 'text-slate-900'
+                        }`}
+                      >
+                        {r.score != null ? `${r.score} 점` : '- 점'}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+              <p className="mt-4 text-center text-sm text-slate-500">
+                내 원점수{' '}
+                <span className="font-bold text-slate-900">{score}점</span> ·{' '}
+                <span className="font-bold text-amber-600">{grade}등급</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
