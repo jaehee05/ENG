@@ -8,6 +8,7 @@ import {
   getKoreanMock,
   listAttemptsForUser,
   listKoreanMockAttempts,
+  regradeKoreanMockAttempts,
   updateKoreanMock,
 } from '../lib/firestore'
 import {
@@ -166,7 +167,7 @@ export function KoreanMockDetail() {
         gradeCutoffs: eCutoffs ?? [],
       }
       await updateKoreanMock(mock.id, patch)
-      setMock({
+      const updatedMock = {
         ...mock,
         title: eTitle.trim(),
         subject: eSubject,
@@ -174,7 +175,15 @@ export function KoreanMockDetail() {
         electives: eElectives.length ? eElectives : undefined,
         examinerComment: eComment.trim() || undefined,
         gradeCutoffs: eCutoffs && eCutoffs.length ? eCutoffs : undefined,
-      })
+      }
+      setMock(updatedMock)
+      // 정답이 바뀌었을 수 있으니 기존 학생 응시 기록을 새 정답으로 재채점.
+      try {
+        await regradeKoreanMockAttempts(updatedMock)
+        if (isAdmin) setAllAttempts(await listKoreanMockAttempts(mock.id))
+      } catch {
+        // 재채점 실패해도 편집 저장은 유지
+      }
       setEditing(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : '저장 실패')

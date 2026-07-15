@@ -619,6 +619,57 @@ export async function listKoreanMockAttempts(refId: string): Promise<Attempt[]> 
     .filter((a) => a.type === 'korean_mock')
 }
 
+/**
+ * 모의고사 정답을 바꾼 뒤, 이미 응시한 학생들의 기록을 새 정답으로 재채점.
+ * 각 attempt.koreanMockResults[].correctAnswer/correct 와 correct 카운트를 갱신.
+ * 선택과목 문항은 그 응시의 선택과목(mockElectiveName) 정답으로 채점.
+ * 변경된 응시 기록 수를 반환.
+ */
+export async function regradeKoreanMockAttempts(mock: KoreanMock): Promise<number> {
+  const attempts = await listKoreanMockAttempts(mock.id)
+  const commonMap = new Map(mock.questions.map((q) => [q.number, q.answer]))
+  const electiveMaps = new Map<string, Map<number, number>>()
+  for (const el of mock.electives ?? []) {
+    electiveMaps.set(el.name, new Map(el.questions.map((q) => [q.number, q.answer])))
+  }
+
+  const pending: {
+    id: string
+    results: KoreanMockResult[]
+    correct: number
+  }[] = []
+  for (const a of attempts) {
+    if (!a.koreanMockResults) continue
+    const elMap = a.mockElectiveName ? electiveMaps.get(a.mockElectiveName) : undefined
+    let changed = false
+    const newResults = a.koreanMockResults.map((r) => {
+      // 공통 문항은 공통 정답, 선택 문항은 그 선택과목 정답. 못 찾으면 기존 유지.
+      const newAnswer = commonMap.get(r.number) ?? elMap?.get(r.number) ?? r.correctAnswer
+      const correct = r.userAnswer > 0 && r.userAnswer === newAnswer
+      if (newAnswer !== r.correctAnswer || correct !== r.correct) changed = true
+      return { ...r, correctAnswer: newAnswer, correct }
+    })
+    const correct = newResults.filter((r) => r.correct).length
+    if (changed || correct !== a.correct) {
+      pending.push({ id: a.id, results: newResults, correct })
+    }
+  }
+
+  // Firestore 배치 한도(500) 대비 청크로 커밋.
+  for (let i = 0; i < pending.length; i += 400) {
+    const batch = writeBatch(db)
+    for (const p of pending.slice(i, i + 400)) {
+      batch.update(doc(db, 'attempts', p.id), {
+        koreanMockResults: p.results,
+        correct: p.correct,
+        total: p.results.length,
+      })
+    }
+    await batch.commit()
+  }
+  return pending.length
+}
+
 /* ========== End KoreanMock CRUD ========== */
 
 export async function createReadingAttempt(input: {

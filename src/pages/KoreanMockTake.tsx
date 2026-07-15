@@ -54,7 +54,7 @@ function BubbleRow({
             key={n}
             type="button"
             onClick={() => onPick(n)}
-            className={`w-[16px] h-[22px] rounded-[50%] text-[9px] font-semibold border transition ${
+            className={`w-[16px] h-[22px] rounded-full text-[9px] font-semibold border transition ${
               sel === n
                 ? 'bg-slate-900 text-white border-slate-900'
                 : 'bg-white text-slate-400 border-slate-300 active:bg-slate-100'
