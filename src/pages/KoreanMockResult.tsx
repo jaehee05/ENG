@@ -114,16 +114,23 @@ export function KoreanMockResult() {
     return mock?.gradeCutoffs
   })()
   const grade = gradeFromScore(score, activeCutoffs)
+  // 6등급부터는 "6등급 이하"로 표기.
+  const gradeLabel = (g: number) => (g >= 6 ? '6등급 이하' : `${g}등급`)
 
-  // 등급컷 상세 행: 정의된 등급 + 마지막 등급 이하 행.
+  // 등급컷 상세 행: 1~5등급 + 6등급 이하.
   const cutoffRows = (() => {
     if (!activeCutoffs || activeCutoffs.length === 0)
-      return [] as { grade: number; label: string; score: number | null }[]
-    const sorted = [...activeCutoffs].sort((a, b) => a.grade - b.grade)
-    const maxG = Math.max(...sorted.map((c) => c.grade))
-    const rows: { grade: number; label: string; score: number | null }[] =
-      sorted.map((c) => ({ grade: c.grade, label: `${c.grade}등급`, score: c.minScore }))
-    rows.push({ grade: maxG + 1, label: `${maxG + 1}등급 이하`, score: null })
+      return [] as { grade: number; label: string; score: number | null; below: boolean }[]
+    const under = [...activeCutoffs]
+      .filter((c) => c.grade <= 5)
+      .sort((a, b) => a.grade - b.grade)
+    const rows = under.map((c) => ({
+      grade: c.grade,
+      label: `${c.grade}등급`,
+      score: c.minScore as number | null,
+      below: false,
+    }))
+    rows.push({ grade: 6, label: '6등급 이하', score: null, below: true })
     return rows
   })()
 
@@ -167,7 +174,7 @@ export function KoreanMockResult() {
             <span className="text-slate-300 text-lg">›</span>
           </div>
           <p className="mt-3 text-4xl font-extrabold text-amber-600 tracking-tight">
-            {grade}등급
+            {gradeLabel(grade)}
           </p>
           <div className="mt-3 h-2 w-full rounded-full bg-slate-100 overflow-hidden">
             <div
@@ -308,7 +315,7 @@ export function KoreanMockResult() {
       </div>
 
       {/* 등급컷 상세 오버레이 */}
-      {showCutoffs && cutoffRows.length > 0 && (
+      {showCutoffs && grade != null && cutoffRows.length > 0 && (
         <div className="fixed inset-0 z-50 bg-slate-50 overflow-y-auto safe-top safe-bottom">
           <div className="max-w-lg mx-auto px-5 py-5">
             <header className="flex items-center gap-2 mb-4">
@@ -333,12 +340,9 @@ export function KoreanMockResult() {
                 </span>
               )}
               <h3 className="text-xl font-bold text-slate-900">추정 등급컷</h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                AI가 추정한 등급컷입니다. 실제와 다를 수 있어요.
-              </p>
               <div className="mt-4 space-y-1">
                 {cutoffRows.map((r) => {
-                  const isMe = grade === r.grade
+                  const isMe = r.below ? grade >= 6 : grade === r.grade
                   return (
                     <div
                       key={r.grade}
@@ -372,7 +376,7 @@ export function KoreanMockResult() {
               <p className="mt-4 text-center text-sm text-slate-500">
                 내 원점수{' '}
                 <span className="font-bold text-slate-900">{score}점</span> ·{' '}
-                <span className="font-bold text-amber-600">{grade}등급</span>
+                <span className="font-bold text-amber-600">{gradeLabel(grade)}</span>
               </p>
             </div>
           </div>

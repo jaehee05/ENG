@@ -1,6 +1,7 @@
 import type { MockGradeCut } from '../lib/types'
 
-const GRADES = [1, 2, 3, 4, 5, 6, 7, 8]
+// 1~5등급 컷만 입력. 6등급부터는 "6등급 이하"로 처리.
+const GRADES = [1, 2, 3, 4, 5]
 
 /**
  * 등급컷 편집기. 1~8등급 각각 원점수(minScore)를 직접 입력/수정.

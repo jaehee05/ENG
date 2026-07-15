@@ -7,18 +7,18 @@ export const config = {
 
 const SYSTEM_PROMPT = `당신은 한국 수능/평가원 모의고사 등급컷 추정 전문가입니다.
 주어진 모의고사 정보(과목, 총 문항 수, 총점, 실전 모의고사 여부)와 — 제공된 경우 — 시험지 본문을 바탕으로,
-여태까지의 평가원 모의고사·수능의 난이도와 등급컷 경향을 고려해 1~8등급의 원점수 등급컷을 추정하세요.
+여태까지의 평가원 모의고사·수능의 난이도와 등급컷 경향을 고려해 1~5등급의 원점수 등급컷을 추정하세요.
 시험지 본문이 제공되면 지문의 길이·난도, 문항의 까다로움을 실제로 판단해 등급컷에 반영하세요(어려우면 등급컷을 낮게).
 
 원칙:
 - minScore는 "이 원점수 이상이면 해당 등급"인 원점수(정수). 총점을 넘지 않게.
-- 1등급이 가장 높고 8등급이 가장 낮으며, 등급이 오를수록 minScore가 커집니다(단조 감소: 1등급 minScore > 2등급 > ...).
-- 국어/수학(상대평가): 대략 1등급 상위4%, 2등급 11%, 3등급 23%, 4등급 40%, 5등급 60%, 6등급 77%, 7등급 89%, 8등급 96% 누적 비율에 해당하는 일반적 평가원 등급컷 경향을 총점에 맞춰 환산.
-- 영어(절대평가): 1등급 90%, 2등급 80%, 3등급 70%, 4등급 60%, 5등급 50%, 6등급 40%, 7등급 30%, 8등급 20% (총점 기준 환산).
+- 1등급이 가장 높고 5등급이 가장 낮으며, 등급이 오를수록 minScore가 커집니다(단조 감소: 1등급 minScore > 2등급 > ...).
+- 국어/수학(상대평가): 대략 1등급 상위4%, 2등급 11%, 3등급 23%, 4등급 40%, 5등급 60% 누적 비율에 해당하는 일반적 평가원 등급컷 경향을 총점에 맞춰 환산.
+- 영어(절대평가): 1등급 90%, 2등급 80%, 3등급 70%, 4등급 60%, 5등급 50% (총점 기준 환산).
 - 실전(사설) 모의고사는 평가원보다 다소 어려운 경향이 있어 국어/수학 등급컷을 소폭 낮게 잡아도 됩니다.
-- 9등급은 8등급 미만이므로 컷을 출력하지 않습니다.
+- 6등급 이하는 컷을 출력하지 않습니다(1~5등급만).
 
-submit_cutoffs 도구로 grade(1~8)와 minScore(정수) 배열을 제출하세요.`
+submit_cutoffs 도구로 grade(1~5)와 minScore(정수) 배열을 제출하세요.`
 
 interface Cut {
   grade: number
@@ -34,7 +34,7 @@ function normalize(input: unknown, total: number): Cut[] {
     const g = Number((r as { grade?: unknown }).grade)
     const s = Number((r as { minScore?: unknown }).minScore)
     if (!Number.isFinite(g) || !Number.isFinite(s)) continue
-    if (g < 1 || g > 8) continue
+    if (g < 1 || g > 5) continue
     out.push({ grade: Math.round(g), minScore: Math.max(0, Math.min(total, Math.round(s))) })
   }
   // 등급 오름차순 + minScore 단조 감소 보정
@@ -98,7 +98,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       tools: [
         {
           name: 'submit_cutoffs',
-          description: '1~8등급 원점수 등급컷을 제출합니다.',
+          description: '1~5등급 원점수 등급컷을 제출합니다.',
           input_schema: {
             type: 'object',
             properties: {
