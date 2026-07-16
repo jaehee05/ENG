@@ -47,6 +47,7 @@ function fromSnap(snap: QueryDocumentSnapshot | DocumentSnapshot): UserAccount {
     phone: d.phone,
     parentPhone: d.parentPhone,
     subjects,
+    readingAccess: d.readingAccess === true ? true : undefined,
     colorKey: typeof d.colorKey === 'string' ? d.colorKey : undefined,
     preregistered: d.preregistered === true ? true : undefined,
     createdAt: (d.createdAt as Timestamp | undefined) ?? null,
