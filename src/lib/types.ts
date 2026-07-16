@@ -98,8 +98,16 @@ export interface VocabSeries {
   words?: WordEntry[]
   /** Default words per DAY when generating next test. */
   perDay?: number
-  /** How many words have already been used in DAY tests (cursor). */
+  /** How many words have already been used in DAY tests (cursor). 레거시 공용 커서. */
   usedCount?: number
+  /**
+   * 학생별 DAY 진행도. 같은 교재(공용 단어은행)로 학생마다 독립적으로
+   * DAY 시험지를 생성한다. 키 = studentUid.
+   */
+  studentProgress?: Record<
+    string,
+    { usedCount: number; lastDayNumber: number }
+  >
   createdBy: string
   createdByName: string
   createdAt: Timestamp | null

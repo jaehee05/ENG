@@ -8,8 +8,10 @@ import {
   renameVocabSeriesSheets,
   updateVocabSeries,
 } from '../lib/firestore'
+import { listAccounts } from '../lib/account'
 import {
   parseWordList,
+  type UserAccount,
   type VocabSense,
   type VocabSeries,
   type WordEntry,
@@ -29,6 +31,8 @@ export function CorpusDetail() {
   const [error, setError] = useState<string | null>(null)
   const [perDayRaw, setPerDayRaw] = useState('30')
   const [maxAttemptsRaw, setMaxAttemptsRaw] = useState('')
+  const [students, setStudents] = useState<UserAccount[]>([])
+  const [genUid, setGenUid] = useState('')
   const [appendText, setAppendText] = useState('')
   const [generating, setGenerating] = useState(false)
   const [appending, setAppending] = useState(false)
@@ -61,6 +65,18 @@ export function CorpusDetail() {
       .finally(() => setLoading(false))
   }, [id])
 
+  useEffect(() => {
+    listAccounts()
+      .then((accs) =>
+        setStudents(
+          accs
+            .filter((a) => a.role === 'student' && a.status === 'active')
+            .sort((a, b) => a.displayName.localeCompare(b.displayName, 'ko')),
+        ),
+      )
+      .catch(() => {})
+  }, [])
+
   const appendIsTextbook = useMemo(
     () => looksLikeTextbookVocab(appendText),
     [appendText],
@@ -71,11 +87,22 @@ export function CorpusDetail() {
   }, [appendText, appendIsTextbook])
 
   const total = series?.words?.length ?? 0
-  const used = series?.usedCount ?? 0
+  // 선택 학생의 진행도 기준 (학생마다 독립적으로 DAY 생성).
+  const genProg = (genUid && series?.studentProgress?.[genUid]) || {
+    usedCount: 0,
+    lastDayNumber: 0,
+  }
+  const used = genProg.usedCount
   const remaining = Math.max(0, total - used)
+  const nextDay = genProg.lastDayNumber + 1
 
   async function handleGenerate() {
     if (!series || !profile) return
+    if (!genUid) {
+      setNotice('시험지를 만들 학생을 선택하세요.')
+      return
+    }
+    const student = students.find((s) => s.id === genUid)
     const perDay = Number.parseInt(perDayRaw, 10)
     if (!Number.isFinite(perDay) || perDay <= 0) {
       setNotice('DAY당 단어 수는 양의 정수여야 합니다.')
@@ -83,7 +110,7 @@ export function CorpusDetail() {
     }
     const allWords = series.words ?? []
     if (remaining <= 0) {
-      setNotice('사용할 단어가 더 이상 없습니다. 단어를 추가하세요.')
+      setNotice('이 학생은 교재 단어를 모두 사용했습니다. 단어를 추가하세요.')
       return
     }
     let maxAttempts: number | undefined
@@ -95,23 +122,29 @@ export function CorpusDetail() {
     setNotice(null)
     try {
       const slice = allWords.slice(used, Math.min(used + perDay, allWords.length))
-      const nextDay = series.lastDayNumber + 1
       await createVocabSet({
         title: `${series.title} DAY ${nextDay}`,
         words: slice,
         maxAttempts,
+        studentUid: genUid,
+        studentName: student?.displayName ?? '',
         createdBy: profile.id,
         createdByName: profile.displayName,
       })
+      const nextProgress = {
+        ...(series.studentProgress ?? {}),
+        [genUid]: { usedCount: used + slice.length, lastDayNumber: nextDay },
+      }
       await updateVocabSeries(series.id, {
-        usedCount: used + slice.length,
-        lastDayNumber: nextDay,
+        studentProgress: nextProgress,
         perDay,
         maxAttempts,
       })
       const refreshed = await getVocabSeries(series.id)
       if (refreshed) setSeries(refreshed)
-      setNotice(`"${series.title} DAY ${nextDay}" 시험지 ${slice.length}단어 생성 완료.`)
+      setNotice(
+        `${student?.displayName} · "${series.title} DAY ${nextDay}" ${slice.length}단어 생성 완료.`,
+      )
     } catch (err) {
       setNotice(err instanceof Error ? err.message : '생성 실패')
     } finally {
@@ -413,8 +446,7 @@ export function CorpusDetail() {
             </div>
           )}
           <p className="text-sm text-slate-500 mt-1">
-            전체 {total}단어 · 사용 {used} · 남은 {remaining} · 현재 DAY{' '}
-            {series.lastDayNumber}까지 생성
+            교재 전체 {total}단어 · 학생마다 DAY 시험지를 따로 생성
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -444,8 +476,30 @@ export function CorpusDetail() {
 
       <section className="rounded-lg border border-brand-200 bg-brand-50/40 p-4 space-y-3">
         <h2 className="text-sm font-semibold text-brand-700">
-          다음 DAY 시험지 만들기
+          학생 DAY 시험지 만들기
         </h2>
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1">
+            학생 <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={genUid}
+            onChange={(e) => setGenUid(e.target.value)}
+            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          >
+            <option value="">— 학생 선택 —</option>
+            {students.map((s) => {
+              const p = series.studentProgress?.[s.id]
+              return (
+                <option key={s.id} value={s.id}>
+                  {s.displayName}
+                  {s.school ? ` (${s.school})` : ''}
+                  {p ? ` · DAY ${p.lastDayNumber}까지` : ''}
+                </option>
+              )
+            })}
+          </select>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">
@@ -474,21 +528,28 @@ export function CorpusDetail() {
             />
           </div>
         </div>
-        <p className="text-xs text-slate-600">
-          다음 시험지 제목: <strong>{series.title} DAY {series.lastDayNumber + 1}</strong>
-          {remaining < Number.parseInt(perDayRaw || '0', 10) && remaining > 0 && (
-            <span className="ml-2 text-amber-700">
-              (남은 단어 {remaining}개만 사용)
-            </span>
-          )}
-        </p>
+        {genUid && (
+          <p className="text-xs text-slate-600">
+            이 학생: 사용 {used} · 남은 {remaining} · 다음 제목{' '}
+            <strong>{series.title} DAY {nextDay}</strong>
+            {remaining < Number.parseInt(perDayRaw || '0', 10) && remaining > 0 && (
+              <span className="ml-2 text-amber-700">
+                (남은 {remaining}개만 사용)
+              </span>
+            )}
+          </p>
+        )}
         <button
           type="button"
           onClick={handleGenerate}
-          disabled={generating || remaining <= 0}
+          disabled={generating || !genUid || remaining <= 0}
           className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700 disabled:opacity-50"
         >
-          {generating ? '생성 중...' : `DAY ${series.lastDayNumber + 1} 시험지 생성`}
+          {generating
+            ? '생성 중...'
+            : genUid
+              ? `DAY ${nextDay} 시험지 생성`
+              : '학생을 선택하세요'}
         </button>
       </section>
 

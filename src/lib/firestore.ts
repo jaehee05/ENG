@@ -189,7 +189,13 @@ export async function updateVocabSeries(
   patch: Partial<
     Pick<
       VocabSeries,
-      'title' | 'maxAttempts' | 'words' | 'perDay' | 'usedCount' | 'lastDayNumber'
+      | 'title'
+      | 'maxAttempts'
+      | 'words'
+      | 'perDay'
+      | 'usedCount'
+      | 'lastDayNumber'
+      | 'studentProgress'
     >
   >,
 ): Promise<void> {
