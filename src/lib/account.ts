@@ -277,6 +277,11 @@ export async function setAccountStatus(id: string, status: UserStatus): Promise<
   await updateDoc(doc(db, 'users', id), { status })
 }
 
+/** 지문 문제풀이 접근 권한 설정. */
+export async function setReadingAccess(id: string, allowed: boolean): Promise<void> {
+  await updateDoc(doc(db, 'users', id), { readingAccess: allowed })
+}
+
 export async function setAccountPassword(id: string, password: string): Promise<void> {
   validatePassword(password)
   await updateDoc(doc(db, 'users', id), { password })

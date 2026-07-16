@@ -189,10 +189,15 @@ export function Layout() {
     '/wordbook',
     '/history',
   ])
-  const filterForSubjects = (items: NavItem[]) =>
-    subj.english || isAdmin
-      ? items
-      : items.filter((i) => !englishOnlyPaths.has(i.to))
+  // 지문 문제풀이는 관리자가 지정한 학생에게만 노출.
+  const canReading = isAdmin || profile?.readingAccess === true
+  const filterForSubjects = (items: NavItem[]) => {
+    const bySubject =
+      subj.english || isAdmin
+        ? items
+        : items.filter((i) => !englishOnlyPaths.has(i.to))
+    return canReading ? bySubject : bySubject.filter((i) => i.to !== '/reading')
+  }
 
   const mockNavItem: NavItem = {
     to: '/korean-mocks',

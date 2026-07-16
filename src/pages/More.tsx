@@ -93,6 +93,7 @@ export function More() {
   const subj = profile ? accountSubjects(profile) : { korean: true, english: true }
   const showEnglish = subj.english || isAdmin
   const showMock = isAdmin || subj.korean
+  const canReading = isAdmin || profile?.readingAccess === true
 
   const [noti, toggleNoti] = useLocalToggle('pref_noti', true)
   const [marketing, toggleMarketing] = useLocalToggle('pref_marketing', true)
@@ -156,7 +157,9 @@ export function More() {
 
       {/* 학습 콘텐츠 (하단탭에서 빠진 항목들) */}
       <Card>
-        {showEnglish && <LinkRow to="/reading" label="지문 문제풀이" />}
+        {showEnglish && canReading && (
+          <LinkRow to="/reading" label="지문 문제풀이" />
+        )}
         {showEnglish && <LinkRow to="/vocab" label="단어 시험지" />}
         {showEnglish && <LinkRow to="/wordbook" label="내 단어장" />}
         {showMock && <LinkRow to="/korean-mocks" label="모의고사" />}

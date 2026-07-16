@@ -8,7 +8,7 @@ import {
   listReadings,
   setReadingOrder,
 } from '../lib/firestore'
-import { inferQuestionNumbers, type Reading } from '../lib/types'
+import { canAccessReading, inferQuestionNumbers, type Reading } from '../lib/types'
 import { parseExplanations, translatePassage } from '../lib/api'
 import {
   updateReadingPassageKo,
@@ -339,6 +339,16 @@ export function ReadingList({ manage = false }: { manage?: boolean }) {
       note: `완료: 성공 ${done} · 실패 ${failed}`,
     })
     setBulkTranslating(false)
+  }
+
+  // 지문 문제풀이는 관리자가 지정한 학생에게만.
+  if (profile && !canAccessReading(profile)) {
+    return (
+      <div className="max-w-lg mx-auto py-16 text-center">
+        <p className="text-slate-500 text-sm">지문 문제풀이 이용 권한이 없어요.</p>
+        <p className="text-xs text-slate-400 mt-1">담당 선생님께 문의해 주세요.</p>
+      </div>
+    )
   }
 
   return (

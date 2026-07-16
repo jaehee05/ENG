@@ -647,7 +647,9 @@ export function Dashboard() {
             학습
           </h2>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-            {shortcuts.map((c) => (
+            {shortcuts
+              .filter((c) => c.to !== '/reading' || isAdmin || profile?.readingAccess === true)
+              .map((c) => (
               <Link
                 key={c.to}
                 to={c.to}

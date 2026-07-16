@@ -15,6 +15,8 @@ export interface UserAccount {
   parentPhone?: string
   /** 학생 수강 과목. 없거나 빈 배열이면 둘 다(호환). */
   subjects?: MockSubject[]
+  /** true 인 학생에게만 지문 문제풀이 노출. 관리자가 지정. 미설정=미노출. */
+  readingAccess?: boolean
   /** 관리자가 지정한 캘린더 색상 키 (sky/emerald/amber/violet/rose/teal/indigo/orange). 없으면 uid 해시. */
   colorKey?: string
   /** true 면 관리자가 미리 등록한 placeholder. 학생이 회원가입하면 자동으로 활성화되고 이 플래그가 해제됨. */
@@ -25,6 +27,13 @@ export interface UserAccount {
 }
 
 /** 계정에서 유효 과목 집합을 뽑는다. 미설정/빈 값은 둘 다로 간주. */
+/** 지문 문제풀이 접근 가능 여부. 관리자는 항상, 학생은 지정된 경우만. */
+export function canAccessReading(
+  a: Pick<UserAccount, 'role' | 'readingAccess'>,
+): boolean {
+  return a.role === 'admin' || a.readingAccess === true
+}
+
 export function accountSubjects(a: Pick<UserAccount, 'subjects'>): {
   korean: boolean
   english: boolean

@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/useAuth'
 import { ScheduleManager } from '../components/ScheduleManager'
 import {
   getAccount,
+  setReadingAccess,
   updateAccountColorKey,
   updateAccountSubjects,
 } from '../lib/account'
@@ -507,6 +508,23 @@ export function AdminStudentDetail() {
           account={account}
           onSaved={(next) => setAccount({ ...account, colorKey: next })}
         />
+        <label className="mt-3 inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={!!account.readingAccess}
+            onChange={async (e) => {
+              const next = e.target.checked
+              setAccount({ ...account, readingAccess: next })
+              try {
+                await setReadingAccess(account.id, next)
+              } catch {
+                setAccount({ ...account, readingAccess: !next })
+              }
+            }}
+            className="h-4 w-4 accent-brand-600"
+          />
+          지문 문제풀이 접근 허용
+        </label>
       </header>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
