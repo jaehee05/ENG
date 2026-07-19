@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ClipboardEvent } from 'react'
+import { useEffect, useRef, useState, type ClipboardEvent } from 'react'
 
 const HILITE_COLORS = [
   { name: '노랑', color: '#fff3a0' },
@@ -20,11 +20,6 @@ function cleanPastedHtml(html: string): string {
   return frag
 }
 
-/**
- * 간단한 리치텍스트 에디터 (contentEditable + execCommand).
- * 볼드/밑줄/형광펜(여러 색)/들여쓰기. HWPX 등에서 붙여넣기 시 서식 유지.
- * 출력은 HTML 문자열.
- */
 export function RichTextEditor({
   value,
   onChange,
@@ -35,6 +30,9 @@ export function RichTextEditor({
   placeholder?: string
 }) {
   const ref = useRef<HTMLDivElement>(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const [selImg, setSelImg] = useState<HTMLImageElement | null>(null)
+  const [handle, setHandle] = useState<{ left: number; top: number } | null>(null)
 
   useEffect(() => {
     if (ref.current && ref.current.innerHTML !== value) {
@@ -58,6 +56,73 @@ export function RichTextEditor({
     emit()
   }
 
+  // ── 들여쓰기: 커서가 있는 블록의 margin-left 직접 조절 ──
+  function blockOfSelection(): HTMLElement | null {
+    const sel = window.getSelection()
+    const editor = ref.current
+    if (!sel || sel.rangeCount === 0 || !editor) return null
+    const node = sel.getRangeAt(0).startContainer
+    let el: HTMLElement | null =
+      node.nodeType === Node.TEXT_NODE ? node.parentElement : (node as HTMLElement)
+    while (el && el !== editor && el.parentElement !== editor) el = el.parentElement
+    return el && el !== editor ? el : null
+  }
+  function indent(delta: number) {
+    const block = blockOfSelection()
+    if (!block) {
+      document.execCommand(delta > 0 ? 'indent' : 'outdent')
+      emit()
+      return
+    }
+    const cur = parseInt(block.style.marginLeft || '0', 10) || 0
+    const next = Math.max(0, cur + delta * 24)
+    block.style.marginLeft = next ? `${next}px` : ''
+    emit()
+  }
+
+  // ── 이미지 리사이즈 핸들 위치 계산 ──
+  function updateHandle(img: HTMLImageElement | null) {
+    if (!img || !wrapRef.current) {
+      setHandle(null)
+      return
+    }
+    const ir = img.getBoundingClientRect()
+    const wr = wrapRef.current.getBoundingClientRect()
+    setHandle({ left: ir.right - wr.left, top: ir.bottom - wr.top })
+  }
+  function onEditorClick(e: React.MouseEvent) {
+    const t = e.target as HTMLElement
+    if (t.tagName === 'IMG') {
+      const img = t as HTMLImageElement
+      setSelImg(img)
+      updateHandle(img)
+    } else {
+      setSelImg(null)
+      setHandle(null)
+    }
+  }
+  function startResize(e: React.PointerEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!selImg) return
+    const image = selImg
+    const startX = e.clientX
+    const startW = image.getBoundingClientRect().width
+    function move(ev: PointerEvent) {
+      const w = Math.max(40, startW + (ev.clientX - startX))
+      image.style.width = `${Math.round(w)}px`
+      image.style.height = 'auto'
+      updateHandle(image)
+    }
+    function up() {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      emit()
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
+
   function onPaste(e: ClipboardEvent<HTMLDivElement>) {
     const html = e.clipboardData.getData('text/html')
     if (html) {
@@ -65,7 +130,6 @@ export function RichTextEditor({
       document.execCommand('insertHTML', false, cleanPastedHtml(html))
       emit()
     }
-    // html 이 없으면 기본(평문) 붙여넣기 그대로
   }
 
   const btn =
@@ -84,7 +148,6 @@ export function RichTextEditor({
           U
         </button>
         <span className="mx-0.5 h-5 w-px bg-slate-300" />
-        {/* 형광펜 색 */}
         {HILITE_COLORS.map((h) => (
           <button
             key={h.color}
@@ -104,10 +167,10 @@ export function RichTextEditor({
           형광✕
         </button>
         <span className="mx-0.5 h-5 w-px bg-slate-300" />
-        <button type="button" onClick={() => exec('outdent')} className={btn} title="내어쓰기">
+        <button type="button" onClick={() => indent(-1)} className={btn} title="내어쓰기">
           ⇤
         </button>
-        <button type="button" onClick={() => exec('indent')} className={btn} title="들여쓰기">
+        <button type="button" onClick={() => indent(1)} className={btn} title="들여쓰기">
           ⇥
         </button>
         <button
@@ -119,15 +182,27 @@ export function RichTextEditor({
           서식지우기
         </button>
       </div>
-      <div
-        ref={ref}
-        contentEditable
-        onInput={emit}
-        onPaste={onPaste}
-        data-placeholder={placeholder}
-        className="rte-content min-h-[8rem] max-h-[24rem] overflow-y-auto px-3 py-2.5 text-sm text-slate-800 leading-relaxed focus:outline-none"
-        suppressContentEditableWarning
-      />
+      <div ref={wrapRef} className="relative">
+        <div
+          ref={ref}
+          contentEditable
+          onInput={emit}
+          onPaste={onPaste}
+          onClick={onEditorClick}
+          onScroll={() => updateHandle(selImg)}
+          data-placeholder={placeholder}
+          className="rte-content min-h-[8rem] max-h-[24rem] overflow-y-auto px-3 py-2.5 text-sm text-slate-800 leading-relaxed focus:outline-none"
+          suppressContentEditableWarning
+        />
+        {handle && (
+          <div
+            onPointerDown={startResize}
+            style={{ left: handle.left - 8, top: handle.top - 8 }}
+            className="absolute z-10 h-4 w-4 rounded-sm border-2 border-white bg-brand-600 cursor-nwse-resize shadow"
+            title="드래그하여 크기 조절"
+          />
+        )}
+      </div>
     </div>
   )
 }

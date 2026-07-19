@@ -707,6 +707,18 @@ export interface UserNotification {
   createdAt: Timestamp | null
 }
 
+/** 해설 리치텍스트에서 미리 지정해두는 스타일 (한글 스타일처럼). 전역 공통. */
+export interface ExplStyle {
+  id: string
+  name: string
+  bold?: boolean
+  underline?: boolean
+  /** 글자색 hex. */
+  color?: string
+  /** 형광색 hex. */
+  highlight?: string
+}
+
 /** 홈 화면 D-day 카드 (관리자 설정, 전체 공통). */
 export interface DDaySetting {
   /** 목표 이름 (예: 2027 대수능). */
