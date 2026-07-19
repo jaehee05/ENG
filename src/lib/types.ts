@@ -350,6 +350,8 @@ export interface KoreanMockQuestion {
   answer: number
   /** 배점 (기본 2). */
   points?: number
+  /** 문항 해설 (HTML, 관리자 입력). 정오표에서 문항 탭 시 표시. */
+  explanation?: string
 }
 
 /** 선택과목 옵션 (수능형: 공통 + 택1). */

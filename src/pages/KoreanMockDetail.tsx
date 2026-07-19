@@ -19,6 +19,7 @@ import { MyAttemptsBox } from '../components/MyAttemptsBox'
 import { estimateMockCutoffs } from '../lib/api'
 import { MockCutoffEditor } from '../components/MockCutoffEditor'
 import { ExamFilePicker } from '../components/ExamFilePicker'
+import { RichTextEditor } from '../components/RichTextEditor'
 import {
   getMockSubject,
   MOCK_SUBJECT_LABEL,
@@ -553,6 +554,21 @@ function QuestionsEditor({
   function removeLast() {
     setQuestions(questions.slice(0, -1))
   }
+  const [explIdx, setExplIdx] = useState<number | null>(null)
+  const [explDraft, setExplDraft] = useState('')
+  function openExpl(i: number) {
+    setExplDraft(questions[i].explanation ?? '')
+    setExplIdx(i)
+  }
+  function saveExpl() {
+    if (explIdx == null) return
+    setQuestions(
+      questions.map((q, j) =>
+        j === explIdx ? { ...q, explanation: explDraft.trim() ? explDraft : undefined } : q,
+      ),
+    )
+    setExplIdx(null)
+  }
   return (
     <div className="space-y-1.5">
       <p className="text-xs font-medium text-slate-600">
@@ -592,9 +608,57 @@ function QuestionsEditor({
             >
               {questionPoints(q)}점
             </button>
+            <button
+              type="button"
+              onClick={() => openExpl(i)}
+              className={`shrink-0 rounded px-1.5 py-1 text-[10px] font-semibold border ${
+                q.explanation
+                  ? 'bg-brand-100 text-brand-700 border-brand-300'
+                  : 'bg-white text-slate-400 border-slate-300'
+              }`}
+              title="해설 입력"
+            >
+              해설{q.explanation ? '✓' : ''}
+            </button>
           </div>
         ))}
       </div>
+
+      {explIdx != null && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm"
+          onClick={() => setExplIdx(null)}
+        >
+          <div
+            className="w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-2xl shadow-xl p-4 space-y-3 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-sm font-bold text-slate-900">
+              {questions[explIdx]?.number}번 해설
+            </h3>
+            <RichTextEditor value={explDraft} onChange={setExplDraft} />
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setExplIdx(null)}
+                className="text-sm text-slate-500 hover:text-slate-900 px-2"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={saveExpl}
+                className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700"
+              >
+                적용
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-400">
+              적용 후 상단 "저장"을 눌러야 최종 반영됩니다.
+            </p>
+          </div>
+        </div>
+      )}
       <div className="flex items-center gap-2">
         <button
           type="button"

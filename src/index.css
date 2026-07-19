@@ -4,6 +4,18 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 리치텍스트 에디터/렌더 */
+.rte-content:empty::before {
+  content: attr(data-placeholder);
+  color: #94a3b8;
+  pointer-events: none;
+}
+.rte-content b, .rte-content strong, .rte-view b, .rte-view strong { font-weight: 700; }
+.rte-content u, .rte-view u { text-decoration: underline; }
+.rte-view { line-height: 1.7; }
+.rte-view blockquote { margin-left: 1.5rem; }
+.rte-view p { margin: 0 0 0.35rem; }
+
 html, body, #root {
   height: 100%;
   max-width: 100vw;

@@ -73,6 +73,7 @@ export function KoreanMockResult() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showCutoffs, setShowCutoffs] = useState(false)
+  const [explNumber, setExplNumber] = useState<number | null>(null)
   const [editing, setEditing] = useState(false)
   const [editResults, setEditResults] = useState<KoreanMockResult[] | null>(null)
   const [savingEdit, setSavingEdit] = useState(false)
@@ -148,6 +149,15 @@ export function KoreanMockResult() {
     }
   }
   const pointsOf = (n: number) => pointsByNumber.get(n) ?? 2
+  // 문항 번호 → 해설(HTML). 공통 + 응시한 선택과목 문항.
+  const explByNumber = new Map<number, string>()
+  if (mock) {
+    for (const q of mock.questions) if (q.explanation) explByNumber.set(q.number, q.explanation)
+    const el = attempt.mockElectiveName
+      ? mock.electives?.find((e) => e.name === attempt.mockElectiveName)
+      : undefined
+    for (const q of el?.questions ?? []) if (q.explanation) explByNumber.set(q.number, q.explanation)
+  }
   const totalPoints = results.reduce((s, r) => s + pointsOf(r.number), 0)
   const score = results.reduce((s, r) => s + (r.correct ? pointsOf(r.number) : 0), 0)
   const correctCount = results.filter((r) => r.correct).length
@@ -338,7 +348,13 @@ export function KoreanMockResult() {
             {results.map((r, i) => {
               const unanswered = r.userAnswer === 0
               return (
-                <tr key={i} className={r.correct ? '' : 'bg-red-50/40'}>
+                <tr
+                  key={i}
+                  onClick={editing ? undefined : () => setExplNumber(r.number)}
+                  className={`${r.correct ? '' : 'bg-red-50/40'} ${
+                    editing ? '' : 'cursor-pointer hover:bg-slate-50'
+                  }`}
+                >
                   <td className="px-3 py-2.5 font-semibold text-slate-800">
                     {r.number}번
                   </td>
@@ -476,6 +492,70 @@ export function KoreanMockResult() {
           </div>
         </div>
       )}
+
+      {/* 문항 해설 모달 */}
+      {explNumber != null &&
+        (() => {
+          const r = results.find((x) => x.number === explNumber)
+          const html = explByNumber.get(explNumber)
+          return (
+            <div
+              className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm"
+              onClick={() => setExplNumber(null)}
+            >
+              <div
+                className="w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[85vh] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="sticky top-0 bg-white border-b border-slate-100 px-5 py-3 flex items-center justify-between">
+                  <h3 className="text-base font-bold text-slate-900">
+                    {explNumber}번 해설
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setExplNumber(null)}
+                    className="text-slate-400 hover:text-slate-900 text-lg leading-none px-1"
+                    aria-label="닫기"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="p-5 space-y-3">
+                  {r && (
+                    <div className="flex items-center gap-4 text-sm">
+                      <span className="text-slate-500">
+                        정답{' '}
+                        <span className="font-bold text-slate-900">
+                          {r.correctAnswer}
+                        </span>
+                      </span>
+                      <span className="text-slate-500">
+                        내 답{' '}
+                        <span
+                          className={`font-bold ${
+                            r.correct ? 'text-brand-700' : 'text-red-600'
+                          }`}
+                        >
+                          {r.userAnswer === 0 ? '미응답' : r.userAnswer}
+                        </span>
+                      </span>
+                    </div>
+                  )}
+                  {html ? (
+                    <div
+                      className="rte-view text-sm text-slate-800"
+                      dangerouslySetInnerHTML={{ __html: html }}
+                    />
+                  ) : (
+                    <p className="text-sm text-slate-400 py-6 text-center">
+                      아직 해설이 없어요.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        })()}
     </div>
   )
 }
