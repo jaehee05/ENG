@@ -230,10 +230,17 @@ export function KoreanMockDetail() {
   async function applyExpl(html: string | undefined) {
     if (!mock || !explTarget) return
     setExplSaving(true)
+    // Firestore는 undefined 필드를 거부하므로, 삭제 시 키 자체를 제거
+    const withExpl = (q: KoreanMockQuestion): KoreanMockQuestion => {
+      if (html) return { ...q, explanation: html }
+      const rest = { ...q }
+      delete rest.explanation
+      return rest
+    }
     try {
       if (explTarget.group === 'common') {
         const nq = mock.questions.map((q, i) =>
-          i === explTarget.qIdx ? { ...q, explanation: html } : q,
+          i === explTarget.qIdx ? withExpl(q) : q,
         )
         await updateKoreanMock(mock.id, { questions: nq })
         setMock({ ...mock, questions: nq })
@@ -244,7 +251,7 @@ export function KoreanMockDetail() {
             ? {
                 ...el,
                 questions: el.questions.map((q, j) =>
-                  j === explTarget.qIdx ? { ...q, explanation: html } : q,
+                  j === explTarget.qIdx ? withExpl(q) : q,
                 ),
               }
             : el,
