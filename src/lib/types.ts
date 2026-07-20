@@ -717,6 +717,12 @@ export interface ExplStyle {
   color?: string
   /** 형광색 hex. */
   highlight?: string
+  /** 왼쪽 여백 (pt). */
+  marginLeft?: number
+  /** 오른쪽 여백 (pt). */
+  marginRight?: number
+  /** 첫 줄 들여쓰기 (pt). 양수=들여쓰기, 음수=내어쓰기. */
+  firstLine?: number
 }
 
 /** 홈 화면 D-day 카드 (관리자 설정, 전체 공통). */

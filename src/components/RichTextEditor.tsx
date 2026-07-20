@@ -145,24 +145,76 @@ export function RichTextEditor({
     window.addEventListener('pointerup', up)
   }
 
+  // ── 선택 영역과 교차하는 블록(문단) 목록 ──
+  function blocksInSelection(): HTMLElement[] {
+    const sel = window.getSelection()
+    const editor = ref.current
+    if (!sel || sel.rangeCount === 0 || !editor) return []
+    const range = sel.getRangeAt(0)
+    const blocks: HTMLElement[] = []
+    editor.childNodes.forEach((n) => {
+      if (n.nodeType === Node.ELEMENT_NODE && range.intersectsNode(n)) {
+        blocks.push(n as HTMLElement)
+      }
+    })
+    if (blocks.length === 0) {
+      const b = blockOfSelection()
+      if (b) blocks.push(b)
+    }
+    return blocks
+  }
+  function applyParaStyle(b: HTMLElement, s: ExplStyle) {
+    if (s.marginLeft != null) b.style.marginLeft = s.marginLeft ? `${s.marginLeft}pt` : ''
+    if (s.marginRight != null) b.style.marginRight = s.marginRight ? `${s.marginRight}pt` : ''
+    if (s.firstLine != null) {
+      if (s.firstLine >= 0) {
+        b.style.textIndent = s.firstLine ? `${s.firstLine}pt` : ''
+        b.style.paddingLeft = ''
+      } else {
+        // 내어쓰기: 첫 줄은 왼쪽에 붙고 이후 줄이 들여쓰짐
+        b.style.textIndent = `${s.firstLine}pt`
+        b.style.paddingLeft = `${-s.firstLine}pt`
+      }
+    }
+  }
+
   // ── 미리 지정한 스타일을 선택 영역에 적용 ──
   function applyStyle(s: ExplStyle) {
     ref.current?.focus()
     const sel = window.getSelection()
-    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return
-    const range = sel.getRangeAt(0)
-    const span = document.createElement('span')
-    if (s.bold) span.style.fontWeight = '700'
-    if (s.underline) span.style.textDecoration = 'underline'
-    if (s.color) span.style.color = s.color
-    if (s.highlight) span.style.backgroundColor = s.highlight
-    try {
-      span.appendChild(range.extractContents())
-      range.insertNode(span)
-      sel.removeAllRanges()
-    } catch {
-      // ignore
+    if (!sel || sel.rangeCount === 0) return
+    const hasChar = s.bold || s.underline || !!s.color || !!s.highlight
+    const hasPara = s.marginLeft != null || s.marginRight != null || s.firstLine != null
+
+    // 문단 서식 대상 블록을 문자 서식 적용 전에 미리 확보
+    let blocks = hasPara ? blocksInSelection() : []
+
+    // 문자 서식: 선택 영역을 span으로 감싸기
+    if (hasChar && !sel.isCollapsed) {
+      const range = sel.getRangeAt(0)
+      const span = document.createElement('span')
+      if (s.bold) span.style.fontWeight = '700'
+      if (s.underline) span.style.textDecoration = 'underline'
+      if (s.color) span.style.color = s.color
+      if (s.highlight) span.style.backgroundColor = s.highlight
+      try {
+        span.appendChild(range.extractContents())
+        range.insertNode(span)
+      } catch {
+        // ignore
+      }
     }
+
+    // 문단 서식: 블록에 여백/들여쓰기 적용
+    if (hasPara) {
+      if (blocks.length === 0) {
+        document.execCommand('formatBlock', false, 'div')
+        blocks = blocksInSelection()
+      }
+      blocks.forEach((b) => applyParaStyle(b, s))
+    }
+
+    sel.removeAllRanges()
     emit()
   }
 
@@ -178,6 +230,9 @@ export function RichTextEditor({
       ...(draft.underline ? { underline: true } : {}),
       ...(draft.color ? { color: draft.color } : {}),
       ...(draft.highlight ? { highlight: draft.highlight } : {}),
+      ...(draft.marginLeft ? { marginLeft: draft.marginLeft } : {}),
+      ...(draft.marginRight ? { marginRight: draft.marginRight } : {}),
+      ...(draft.firstLine ? { firstLine: draft.firstLine } : {}),
     }
     const exists = list.some((s) => s.id === clean.id)
     onStylesChange(exists ? list.map((s) => (s.id === clean.id ? clean : s)) : [...list, clean])
@@ -399,6 +454,80 @@ export function RichTextEditor({
                     title={h.name}
                   />
                 ))}
+              </div>
+              <div className="border-t border-slate-100 pt-2 space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-slate-400 w-16 shrink-0">왼쪽 여백</span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={draft.marginLeft ?? ''}
+                    onChange={(e) =>
+                      setDraft({
+                        ...draft,
+                        marginLeft: e.target.value === '' ? undefined : Number(e.target.value),
+                      })
+                    }
+                    placeholder="0"
+                    className="w-16 rounded-md border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-brand-400"
+                  />
+                  <span className="text-[11px] text-slate-400">pt</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-slate-400 w-16 shrink-0">오른쪽 여백</span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={draft.marginRight ?? ''}
+                    onChange={(e) =>
+                      setDraft({
+                        ...draft,
+                        marginRight: e.target.value === '' ? undefined : Number(e.target.value),
+                      })
+                    }
+                    placeholder="0"
+                    className="w-16 rounded-md border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-brand-400"
+                  />
+                  <span className="text-[11px] text-slate-400">pt</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-slate-400 w-16 shrink-0">첫 줄</span>
+                  <select
+                    value={
+                      !draft.firstLine ? 'none' : draft.firstLine > 0 ? 'indent' : 'hanging'
+                    }
+                    onChange={(e) => {
+                      const mode = e.target.value
+                      const mag = Math.abs(draft.firstLine ?? 0) || 10
+                      setDraft({
+                        ...draft,
+                        firstLine:
+                          mode === 'none' ? undefined : mode === 'indent' ? mag : -mag,
+                      })
+                    }}
+                    className="rounded-md border border-slate-300 px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-brand-400"
+                  >
+                    <option value="none">없음</option>
+                    <option value="indent">들여쓰기</option>
+                    <option value="hanging">내어쓰기</option>
+                  </select>
+                  {draft.firstLine != null && draft.firstLine !== 0 && (
+                    <>
+                      <input
+                        type="number"
+                        min={0}
+                        value={Math.abs(draft.firstLine)}
+                        onChange={(e) => {
+                          const mag = e.target.value === '' ? 0 : Number(e.target.value)
+                          const sign = (draft.firstLine ?? 0) < 0 ? -1 : 1
+                          setDraft({ ...draft, firstLine: mag ? sign * mag : undefined })
+                        }}
+                        className="w-16 rounded-md border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-brand-400"
+                      />
+                      <span className="text-[11px] text-slate-400">pt</span>
+                    </>
+                  )}
+                </div>
               </div>
               <div className="flex items-center justify-end gap-2 pt-0.5">
                 <button
