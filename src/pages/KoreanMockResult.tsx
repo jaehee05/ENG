@@ -347,12 +347,14 @@ export function KoreanMockResult() {
           <tbody className="divide-y divide-slate-100">
             {results.map((r, i) => {
               const unanswered = r.userAnswer === 0
+              const hasExpl = explByNumber.has(r.number)
+              const tappable = !editing && hasExpl
               return (
                 <tr
                   key={i}
-                  onClick={editing ? undefined : () => setExplNumber(r.number)}
+                  onClick={tappable ? () => setExplNumber(r.number) : undefined}
                   className={`${r.correct ? '' : 'bg-red-50/40'} ${
-                    editing ? '' : 'cursor-pointer hover:bg-slate-50'
+                    tappable ? 'cursor-pointer hover:bg-slate-50' : ''
                   }`}
                 >
                   <td className="px-3 py-2.5 font-semibold text-slate-800">

@@ -26,6 +26,7 @@ import type {
   ClassSession,
   ClassSessionStatus,
   DDaySetting,
+  ExplStyle,
   KoreanMock,
   KoreanMockQuestion,
   KoreanMockElective,
@@ -492,6 +493,16 @@ export async function setDDay(s: DDaySetting): Promise<void> {
 }
 export async function clearDDay(): Promise<void> {
   await deleteDoc(doc(db, 'settings', 'dday'))
+}
+
+// ───── 해설 미리 지정 스타일 (관리자 설정, 전체 공통) ─────
+export async function getExplStyles(): Promise<ExplStyle[]> {
+  const snap = await getDoc(doc(db, 'settings', 'explStyles'))
+  const list = snap.exists() ? (snap.data() as { list?: ExplStyle[] }).list : null
+  return Array.isArray(list) ? list : []
+}
+export async function setExplStyles(list: ExplStyle[]): Promise<void> {
+  await setDoc(doc(db, 'settings', 'explStyles'), { list })
 }
 
 export async function listKoreanMocks(): Promise<KoreanMock[]> {

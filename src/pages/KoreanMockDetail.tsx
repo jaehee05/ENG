@@ -5,10 +5,12 @@ import {
   deleteAttempt,
   deleteKoreanMock,
   formatDate,
+  getExplStyles,
   getKoreanMock,
   listAttemptsForUser,
   listKoreanMockAttempts,
   regradeKoreanMockAttempts,
+  setExplStyles,
   updateKoreanMock,
 } from '../lib/firestore'
 import {
@@ -25,6 +27,7 @@ import {
   MOCK_SUBJECT_LABEL,
   questionPoints,
   type Attempt,
+  type ExplStyle,
   type KoreanMock,
   type KoreanMockElective,
   type KoreanMockQuestion,
@@ -60,6 +63,14 @@ export function KoreanMockDetail() {
   const [eComment, setEComment] = useState('')
   const [eCutoffs, setECutoffs] = useState<MockGradeCut[] | null>(null)
   const [examText, setExamText] = useState('')
+  // 문항 해설 편집 (정답 편집과 분리 — 오클릭 방지, 즉시 저장)
+  const [explTarget, setExplTarget] = useState<{
+    group: 'common' | number
+    qIdx: number
+  } | null>(null)
+  const [explDraft, setExplDraft] = useState('')
+  const [explSaving, setExplSaving] = useState(false)
+  const [explStyles, setExplStylesState] = useState<ExplStyle[]>([])
   const [cutoffBusy, setCutoffBusy] = useState(false)
   const [cutoffError, setCutoffError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -93,6 +104,20 @@ export function KoreanMockDetail() {
     if (!isAdmin || !id) return
     listKoreanMockAttempts(id).then(setAllAttempts).catch(() => {})
   }, [isAdmin, id])
+
+  useEffect(() => {
+    if (!isAdmin) return
+    getExplStyles().then(setExplStylesState).catch(() => {})
+  }, [isAdmin])
+
+  async function saveExplStyles(list: ExplStyle[]) {
+    setExplStylesState(list)
+    try {
+      await setExplStyles(list)
+    } catch {
+      // 실패 시 다음 열람 때 서버 값으로 복원됨
+    }
+  }
 
   const grouped = useMemo(() => {
     // 학생별로 최신 응시만 표시
@@ -190,6 +215,48 @@ export function KoreanMockDetail() {
       setError(err instanceof Error ? err.message : '저장 실패')
     } finally {
       setSaving(false)
+    }
+  }
+
+  function openExpl(group: 'common' | number, qIdx: number) {
+    if (!mock) return
+    const q =
+      group === 'common'
+        ? mock.questions[qIdx]
+        : mock.electives?.[group]?.questions[qIdx]
+    setExplDraft(q?.explanation ?? '')
+    setExplTarget({ group, qIdx })
+  }
+  async function applyExpl(html: string | undefined) {
+    if (!mock || !explTarget) return
+    setExplSaving(true)
+    try {
+      if (explTarget.group === 'common') {
+        const nq = mock.questions.map((q, i) =>
+          i === explTarget.qIdx ? { ...q, explanation: html } : q,
+        )
+        await updateKoreanMock(mock.id, { questions: nq })
+        setMock({ ...mock, questions: nq })
+      } else {
+        const ei = explTarget.group
+        const ne = (mock.electives ?? []).map((el, i) =>
+          i === ei
+            ? {
+                ...el,
+                questions: el.questions.map((q, j) =>
+                  j === explTarget.qIdx ? { ...q, explanation: html } : q,
+                ),
+              }
+            : el,
+        )
+        await updateKoreanMock(mock.id, { electives: ne })
+        setMock({ ...mock, electives: ne })
+      }
+      setExplTarget(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '해설 저장 실패')
+    } finally {
+      setExplSaving(false)
     }
   }
 
@@ -398,6 +465,105 @@ export function KoreanMockDetail() {
         </section>
       )}
 
+      {/* 관리자: 문항 해설 (정답 편집과 분리) */}
+      {isAdmin && (
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">문항 해설</h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              문항 번호를 눌러 해설을 입력·수정·삭제하세요. 학생 결과 정오표에서
+              해당 문항을 누르면 표시됩니다.
+            </p>
+          </div>
+          {(
+            [
+              { label: '공통 과목', group: 'common' as const, qs: mock.questions },
+              ...(mock.electives ?? []).map((el, i) => ({
+                label: `선택 · ${el.name}`,
+                group: i as number,
+                qs: el.questions,
+              })),
+            ] as { label: string; group: 'common' | number; qs: KoreanMockQuestion[] }[]
+          ).map((sec) => (
+            <div key={String(sec.group)} className="space-y-1.5">
+              <p className="text-xs font-medium text-slate-600">{sec.label}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {sec.qs.map((q, j) => (
+                  <button
+                    key={j}
+                    type="button"
+                    onClick={() => openExpl(sec.group, j)}
+                    className={`rounded-md px-2 py-1.5 text-xs font-semibold border transition ${
+                      q.explanation
+                        ? 'bg-brand-100 text-brand-700 border-brand-300'
+                        : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    {q.number}
+                    {q.explanation ? ' ✓' : ''}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {/* 문항 해설 편집 모달 */}
+      {explTarget != null && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm"
+          onClick={() => !explSaving && setExplTarget(null)}
+        >
+          <div
+            className="w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-2xl shadow-xl p-4 space-y-3 max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-sm font-bold text-slate-900">
+              {(explTarget.group === 'common'
+                ? mock.questions[explTarget.qIdx]
+                : mock.electives?.[explTarget.group]?.questions[explTarget.qIdx]
+              )?.number}
+              번 해설
+            </h3>
+            <RichTextEditor
+              value={explDraft}
+              onChange={setExplDraft}
+              styles={explStyles}
+              onStylesChange={saveExplStyles}
+            />
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => applyExpl(undefined)}
+                disabled={explSaving}
+                className="text-xs text-slate-400 hover:text-red-600 px-1 disabled:opacity-50"
+              >
+                해설 삭제
+              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setExplTarget(null)}
+                  disabled={explSaving}
+                  className="text-sm text-slate-500 hover:text-slate-900 px-2"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyExpl(explDraft.trim() ? explDraft : undefined)}
+                  disabled={explSaving}
+                  className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700 disabled:opacity-50"
+                >
+                  {explSaving ? '저장 중…' : '저장'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 관리자: 해설 PDF */}
       {isAdmin && (
         <section className="space-y-3">
@@ -554,21 +720,6 @@ function QuestionsEditor({
   function removeLast() {
     setQuestions(questions.slice(0, -1))
   }
-  const [explIdx, setExplIdx] = useState<number | null>(null)
-  const [explDraft, setExplDraft] = useState('')
-  function openExpl(i: number) {
-    setExplDraft(questions[i].explanation ?? '')
-    setExplIdx(i)
-  }
-  function saveExpl() {
-    if (explIdx == null) return
-    setQuestions(
-      questions.map((q, j) =>
-        j === explIdx ? { ...q, explanation: explDraft.trim() ? explDraft : undefined } : q,
-      ),
-    )
-    setExplIdx(null)
-  }
   return (
     <div className="space-y-1.5">
       <p className="text-xs font-medium text-slate-600">
@@ -608,57 +759,9 @@ function QuestionsEditor({
             >
               {questionPoints(q)}점
             </button>
-            <button
-              type="button"
-              onClick={() => openExpl(i)}
-              className={`shrink-0 rounded px-1.5 py-1 text-[10px] font-semibold border ${
-                q.explanation
-                  ? 'bg-brand-100 text-brand-700 border-brand-300'
-                  : 'bg-white text-slate-400 border-slate-300'
-              }`}
-              title="해설 입력"
-            >
-              해설{q.explanation ? '✓' : ''}
-            </button>
           </div>
         ))}
       </div>
-
-      {explIdx != null && (
-        <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm"
-          onClick={() => setExplIdx(null)}
-        >
-          <div
-            className="w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-2xl shadow-xl p-4 space-y-3 max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-sm font-bold text-slate-900">
-              {questions[explIdx]?.number}번 해설
-            </h3>
-            <RichTextEditor value={explDraft} onChange={setExplDraft} />
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setExplIdx(null)}
-                className="text-sm text-slate-500 hover:text-slate-900 px-2"
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                onClick={saveExpl}
-                className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700"
-              >
-                적용
-              </button>
-            </div>
-            <p className="text-[11px] text-slate-400">
-              적용 후 상단 "저장"을 눌러야 최종 반영됩니다.
-            </p>
-          </div>
-        </div>
-      )}
       <div className="flex items-center gap-2">
         <button
           type="button"

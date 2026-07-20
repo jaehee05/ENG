@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ClipboardEvent } from 'react'
+import type { ExplStyle } from '../lib/types'
 
 const HILITE_COLORS = [
   { name: '노랑', color: '#fff3a0' },
@@ -8,6 +9,19 @@ const HILITE_COLORS = [
   { name: '주황', color: '#ffd9a8' },
   { name: '보라', color: '#e3d3ff' },
 ]
+
+const TEXT_COLORS = [
+  { name: '검정', color: '#1e293b' },
+  { name: '빨강', color: '#dc2626' },
+  { name: '파랑', color: '#2563eb' },
+  { name: '초록', color: '#16a34a' },
+  { name: '보라', color: '#7c3aed' },
+]
+
+function newStyleId(): string {
+  const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto
+  return c?.randomUUID ? c.randomUUID() : `s${Date.now()}${Math.floor(Math.random() * 1000)}`
+}
 
 /** 붙여넣은 HTML에서 프래그먼트만 뽑고 위험/불필요 태그 제거(서식은 유지). */
 function cleanPastedHtml(html: string): string {
@@ -24,15 +38,23 @@ export function RichTextEditor({
   value,
   onChange,
   placeholder = '해설을 입력하세요…',
+  styles,
+  onStylesChange,
 }: {
   value: string
   onChange: (html: string) => void
   placeholder?: string
+  /** 미리 지정한 스타일 목록. 있으면 적용 버튼이 표시됨. */
+  styles?: ExplStyle[]
+  /** 있으면 스타일 관리(추가/수정/삭제) UI가 표시됨. */
+  onStylesChange?: (list: ExplStyle[]) => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const [selImg, setSelImg] = useState<HTMLImageElement | null>(null)
   const [handle, setHandle] = useState<{ left: number; top: number } | null>(null)
+  const [mgr, setMgr] = useState(false)
+  const [draft, setDraft] = useState<ExplStyle | null>(null)
 
   useEffect(() => {
     if (ref.current && ref.current.innerHTML !== value) {
@@ -123,6 +145,50 @@ export function RichTextEditor({
     window.addEventListener('pointerup', up)
   }
 
+  // ── 미리 지정한 스타일을 선택 영역에 적용 ──
+  function applyStyle(s: ExplStyle) {
+    ref.current?.focus()
+    const sel = window.getSelection()
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return
+    const range = sel.getRangeAt(0)
+    const span = document.createElement('span')
+    if (s.bold) span.style.fontWeight = '700'
+    if (s.underline) span.style.textDecoration = 'underline'
+    if (s.color) span.style.color = s.color
+    if (s.highlight) span.style.backgroundColor = s.highlight
+    try {
+      span.appendChild(range.extractContents())
+      range.insertNode(span)
+      sel.removeAllRanges()
+    } catch {
+      // ignore
+    }
+    emit()
+  }
+
+  function saveDraft() {
+    if (!draft || !onStylesChange) return
+    const name = draft.name.trim()
+    if (!name) return
+    const list = styles ?? []
+    const clean: ExplStyle = {
+      id: draft.id,
+      name,
+      ...(draft.bold ? { bold: true } : {}),
+      ...(draft.underline ? { underline: true } : {}),
+      ...(draft.color ? { color: draft.color } : {}),
+      ...(draft.highlight ? { highlight: draft.highlight } : {}),
+    }
+    const exists = list.some((s) => s.id === clean.id)
+    onStylesChange(exists ? list.map((s) => (s.id === clean.id ? clean : s)) : [...list, clean])
+    setDraft(null)
+  }
+  function removeStyle(id: string) {
+    if (!onStylesChange) return
+    onStylesChange((styles ?? []).filter((s) => s.id !== id))
+    if (draft?.id === id) setDraft(null)
+  }
+
   function onPaste(e: ClipboardEvent<HTMLDivElement>) {
     const html = e.clipboardData.getData('text/html')
     if (html) {
@@ -182,6 +248,190 @@ export function RichTextEditor({
           서식지우기
         </button>
       </div>
+
+      {/* 미리 지정한 스타일 적용 + 관리 */}
+      {(styles?.length || onStylesChange) && (
+        <div
+          className="flex flex-wrap items-center gap-1 px-1.5 py-1.5 border-b border-slate-200 bg-white"
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          <span className="text-[11px] text-slate-400 mr-0.5">스타일</span>
+          {(styles ?? []).map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => applyStyle(s)}
+              title={`${s.name} 적용`}
+              className="h-7 px-2 inline-flex items-center rounded-md border border-slate-300 text-xs hover:bg-slate-100"
+              style={{
+                fontWeight: s.bold ? 700 : 400,
+                textDecoration: s.underline ? 'underline' : undefined,
+                color: s.color,
+                backgroundColor: s.highlight,
+              }}
+            >
+              {s.name}
+            </button>
+          ))}
+          {!(styles?.length) && onStylesChange && (
+            <span className="text-[11px] text-slate-400">지정된 스타일 없음</span>
+          )}
+          {onStylesChange && (
+            <button
+              type="button"
+              onClick={() => {
+                setMgr((v) => !v)
+                setDraft(null)
+              }}
+              className="h-7 px-2 inline-flex items-center rounded-md border border-dashed border-slate-300 text-xs text-slate-500 hover:bg-slate-100"
+              title="스타일 관리"
+            >
+              ⚙ 관리
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* 스타일 관리 패널 */}
+      {mgr && onStylesChange && (
+        <div className="border-b border-slate-200 bg-slate-50 px-2.5 py-2.5 space-y-2">
+          {(styles ?? []).length > 0 && (
+            <div className="space-y-1">
+              {(styles ?? []).map((s) => (
+                <div key={s.id} className="flex items-center justify-between gap-2 text-xs">
+                  <span
+                    className="truncate px-1.5 py-0.5 rounded"
+                    style={{
+                      fontWeight: s.bold ? 700 : 400,
+                      textDecoration: s.underline ? 'underline' : undefined,
+                      color: s.color,
+                      backgroundColor: s.highlight,
+                    }}
+                  >
+                    {s.name}
+                  </span>
+                  <span className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      className="text-slate-500 hover:text-slate-900"
+                      onClick={() => setDraft({ ...s })}
+                    >
+                      수정
+                    </button>
+                    <button
+                      type="button"
+                      className="text-slate-400 hover:text-red-600"
+                      onClick={() => removeStyle(s.id)}
+                    >
+                      삭제
+                    </button>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {draft ? (
+            <div className="rounded-lg border border-slate-200 bg-white p-2.5 space-y-2">
+              <input
+                value={draft.name}
+                onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                placeholder="스타일 이름 (예: 정답근거)"
+                className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-brand-400"
+              />
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setDraft({ ...draft, bold: !draft.bold })}
+                  className={`h-7 w-8 rounded-md border text-xs font-bold ${
+                    draft.bold ? 'bg-brand-100 border-brand-300 text-brand-700' : 'bg-white border-slate-300'
+                  }`}
+                >
+                  B
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDraft({ ...draft, underline: !draft.underline })}
+                  className={`h-7 w-8 rounded-md border text-xs underline ${
+                    draft.underline ? 'bg-brand-100 border-brand-300 text-brand-700' : 'bg-white border-slate-300'
+                  }`}
+                >
+                  U
+                </button>
+                <span className="mx-0.5 h-5 w-px bg-slate-300" />
+                <span className="text-[11px] text-slate-400">글자색</span>
+                <button
+                  type="button"
+                  onClick={() => setDraft({ ...draft, color: undefined })}
+                  className={`h-6 w-6 rounded border text-[10px] ${!draft.color ? 'ring-2 ring-brand-400' : ''}`}
+                  title="없음"
+                >
+                  ✕
+                </button>
+                {TEXT_COLORS.map((c) => (
+                  <button
+                    key={c.color}
+                    type="button"
+                    onClick={() => setDraft({ ...draft, color: c.color })}
+                    className={`h-6 w-6 rounded border border-slate-300 ${draft.color === c.color ? 'ring-2 ring-brand-400' : ''}`}
+                    style={{ backgroundColor: c.color }}
+                    title={c.name}
+                  />
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] text-slate-400">형광</span>
+                <button
+                  type="button"
+                  onClick={() => setDraft({ ...draft, highlight: undefined })}
+                  className={`h-6 w-6 rounded border text-[10px] ${!draft.highlight ? 'ring-2 ring-brand-400' : ''}`}
+                  title="없음"
+                >
+                  ✕
+                </button>
+                {HILITE_COLORS.map((h) => (
+                  <button
+                    key={h.color}
+                    type="button"
+                    onClick={() => setDraft({ ...draft, highlight: h.color })}
+                    className={`h-6 w-6 rounded border border-slate-300 ${draft.highlight === h.color ? 'ring-2 ring-brand-400' : ''}`}
+                    style={{ backgroundColor: h.color }}
+                    title={h.name}
+                  />
+                ))}
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-0.5">
+                <button
+                  type="button"
+                  onClick={() => setDraft(null)}
+                  className="text-xs text-slate-500 hover:text-slate-900 px-1"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={saveDraft}
+                  disabled={!draft.name.trim()}
+                  className="rounded-md bg-brand-600 text-white text-xs font-medium px-3 py-1.5 hover:bg-brand-700 disabled:opacity-50"
+                >
+                  저장
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() =>
+                setDraft({ id: newStyleId(), name: '', bold: false, underline: false })
+              }
+              className="w-full rounded-md border border-dashed border-slate-300 py-1.5 text-xs text-slate-500 hover:bg-white"
+            >
+              ＋ 새 스타일 추가
+            </button>
+          )}
+        </div>
+      )}
+
       <div ref={wrapRef} className="relative">
         <div
           ref={ref}
