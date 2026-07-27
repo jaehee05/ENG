@@ -18,6 +18,7 @@ import {
   type UserAccount,
 } from '../lib/types'
 import { colorForStudent } from '../lib/studentColor'
+import { useBackdropDismiss } from '../lib/useBackdropDismiss'
 import {
   EMPTY_SESSION_FORM,
   fromSession,
@@ -379,6 +380,14 @@ export function StudentSchedule() {
 
   const monthLabel = `${cursor.year}년 ${cursor.monthIndex + 1}월`
 
+  const addBackdrop = useBackdropDismiss({
+    onDismiss: () => setAddOpen(false),
+    dirty:
+      addStudentUid !== '' ||
+      JSON.stringify(addForm) !== JSON.stringify(EMPTY_SESSION_FORM),
+    disabled: addSaving,
+  })
+
   return (
     <div className="space-y-5">
       <header className="flex items-start justify-between gap-3 flex-wrap">
@@ -702,7 +711,7 @@ export function StudentSchedule() {
       {isAdmin && addOpen && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm"
-          onClick={() => !addSaving && setAddOpen(false)}
+          {...addBackdrop}
         >
           <div
             className="w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-2xl shadow-xl p-5 space-y-3 max-h-[90vh] overflow-y-auto"

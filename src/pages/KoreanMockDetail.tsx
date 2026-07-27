@@ -22,6 +22,7 @@ import { estimateMockCutoffs, extractGlossary, translatePassage } from '../lib/a
 import { MockCutoffEditor } from '../components/MockCutoffEditor'
 import { ExamFilePicker } from '../components/ExamFilePicker'
 import { RichTextEditor } from '../components/RichTextEditor'
+import { useBackdropDismiss } from '../lib/useBackdropDismiss'
 import {
   choiceMark,
   getMockSubject,
@@ -428,6 +429,29 @@ export function KoreanMockDetail() {
     }
   }
 
+  // 편집 모달 초안이 저장된 값과 다른지 — 배경을 스쳤을 때 확인을 띄우는 기준.
+  // (훅은 조건부 호출이 안 되므로 early return 위에서 계산한다)
+  const explTargetQuestion =
+    mock && explTarget
+      ? explTarget.group === 'common'
+        ? mock.questions[explTarget.qIdx]
+        : mock.electives?.[explTarget.group]?.questions[explTarget.qIdx]
+      : undefined
+  const explDirty = explTargetQuestion
+    ? explDraft.trim() !== (explTargetQuestion.explanation ?? '').trim() ||
+      explWrongDraft.trim() !== (explTargetQuestion.explanationWrong ?? '').trim() ||
+      passageDraft.trim() !== (explTargetQuestion.passage ?? '').trim() ||
+      passageKoDraft.trim() !== (explTargetQuestion.passageKo ?? '').trim() ||
+      JSON.stringify(glossDraft) !==
+        JSON.stringify(explTargetQuestion.glossary ?? [])
+    : false
+  const explBackdrop = useBackdropDismiss({
+    onDismiss: () => setExplTarget(null),
+    dirty: explDirty,
+    disabled: explSaving || aiBusy !== null,
+    confirmMessage: '입력 중인 해설/지문이 저장되지 않습니다. 닫을까요?',
+  })
+
   if (loading) return <p className="text-slate-500 text-sm">불러오는 중…</p>
   if (error) return <p className="text-red-600 text-sm">{error}</p>
   if (!mock) return null
@@ -617,7 +641,7 @@ export function KoreanMockDetail() {
       {explTarget != null && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm"
-          onClick={() => !explSaving && setExplTarget(null)}
+          {...explBackdrop}
         >
           <div
             className="w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-2xl shadow-xl p-4 space-y-3 max-h-[92vh] overflow-y-auto"

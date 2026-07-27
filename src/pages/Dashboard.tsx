@@ -14,6 +14,7 @@ import {
   setDDay,
 } from '../lib/firestore'
 import { accountSubjects, isAssignmentVisibleToStudent } from '../lib/types'
+import { useBackdropDismiss } from '../lib/useBackdropDismiss'
 import { computeStudentBalance, fmtDateLabel, todayISO } from '../lib/payments'
 import type {
   Announcement,
@@ -364,6 +365,14 @@ export function Dashboard() {
     return '좋은 저녁이에요'
   })()
 
+  const ddayBackdrop = useBackdropDismiss({
+    onDismiss: () => setDdayOpen(false),
+    dirty:
+      ddayTitle.trim() !== (dday?.title ?? '').trim() ||
+      ddayDate !== (dday?.dateISO ?? ''),
+    disabled: ddaySaving,
+  })
+
   return (
     <div className="space-y-8">
       <section>
@@ -673,7 +682,7 @@ export function Dashboard() {
       {ddayOpen && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm"
-          onClick={() => !ddaySaving && setDdayOpen(false)}
+          {...ddayBackdrop}
         >
           <div
             className="w-full sm:max-w-sm bg-white rounded-t-2xl sm:rounded-2xl shadow-xl p-5 space-y-3"
