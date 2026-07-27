@@ -195,7 +195,7 @@ export function ReadingDetail() {
   const choicesGlossary = r.choicesGlossary ?? []
 
   return (
-    <div className="space-y-6 max-w-3xl relative">
+    <div className="space-y-6 max-w-3xl mx-auto relative">
       {isAdmin && prevReading && (
         <Link
           to={`/reading/${prevReading.id}`}

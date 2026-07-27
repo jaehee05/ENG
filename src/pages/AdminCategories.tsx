@@ -153,7 +153,7 @@ export function AdminCategories() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 max-w-4xl mx-auto">
       <header>
         <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
           관리

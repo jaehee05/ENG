@@ -185,7 +185,7 @@ export function VocabDetail() {
   if (!set) return null
 
   return (
-    <div className="space-y-5 max-w-3xl">
+    <div className="space-y-5 max-w-3xl mx-auto">
       <header className="flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
