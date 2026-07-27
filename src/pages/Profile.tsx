@@ -21,7 +21,7 @@ export function Profile() {
     .join(' · ')
 
   return (
-    <div className="space-y-5 max-w-lg">
+    <div className="space-y-5 max-w-lg mx-auto">
       <header>
         <Link to="/more" className="text-xs text-slate-500 hover:text-slate-900">
           ← 더보기

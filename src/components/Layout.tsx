@@ -206,20 +206,20 @@ export function Layout() {
   }
   const koreanOnly = !isAdmin && subj.korean && !subj.english
 
-  // 데스크탑/iPad landscape: 모든 항목 표시
+  // 아이패드 세로(md, 768) 이상: 모든 항목 표시
   const desktopNav = isAdmin
     ? [...studentNav, ...studentExtraNav, ...adminExtraNav]
     : koreanOnly
       ? [...filterForSubjects(studentNav), mockNavItem]
       : filterForSubjects([...studentNav, ...studentExtraNav])
-  // 모바일 + iPad portrait 하단 탭바: 홈·과제·일정·더보기 4개 고정
+  // 아이폰(md 미만) 하단 탭바: 홈·과제·일정·더보기 4개 고정
   const mobileNav = bottomTabs
 
   return (
     <div className="h-dvh flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* 상단 미니멀 헤더 */}
       <header className="bg-white border-b border-slate-200 safe-top safe-x">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
+        <div className="max-w-6xl xl:max-w-7xl 2xl:max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-3">
           <Link
             to="/"
             className="text-[15px] font-semibold tracking-tight text-slate-900 flex items-center gap-1.5"
@@ -266,9 +266,18 @@ export function Layout() {
         </div>
         {menuOpen && (
           <div className="border-t border-slate-200 bg-white">
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3 text-sm flex-wrap">
+            <div className="max-w-6xl xl:max-w-7xl 2xl:max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-3 text-sm flex-wrap">
               <span className="text-slate-600">{profile?.displayName}</span>
               <div className="flex items-center gap-3 flex-wrap">
+                {/* /profile 은 하단 "더보기" 탭에만 있어 md 이상(더보기 탭 없음)에서
+                    닿을 수 없었다. 헤더 메뉴에 넣어 전 기기에서 접근 가능하게 한다. */}
+                <Link
+                  to="/profile"
+                  onClick={() => setMenuOpen(false)}
+                  className="text-slate-600 hover:text-slate-900 underline-offset-2 hover:underline"
+                >
+                  내 정보
+                </Link>
                 <Link
                   to="/history"
                   onClick={() => setMenuOpen(false)}
@@ -306,36 +315,40 @@ export function Layout() {
 
       {/* 본문 */}
       <main className="flex-1 overflow-y-auto overscroll-contain safe-x">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7 pb-6">
+        <div className="max-w-6xl xl:max-w-7xl 2xl:max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7 pb-6">
           <Outlet />
         </div>
       </main>
 
-      {/* 데스크탑 / iPad landscape: 하단 가로 네비. lg 이상에서만 (iPad portrait 768은 모바일 탭바) */}
-      <nav className="hidden lg:block sticky bottom-0 border-t border-slate-200 bg-white/95 backdrop-blur">
-        <div className="max-w-6xl mx-auto px-6 h-12 flex items-center justify-center gap-1">
-          {desktopNav.map((i) => (
-            <NavLink
-              key={i.to}
-              to={i.to}
-              end={i.end}
-              className={({ isActive }) =>
-                `inline-flex items-center gap-1.5 px-3 h-9 rounded-md text-sm font-medium transition ${
-                  isActive
-                    ? 'bg-slate-100 text-slate-900'
-                    : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
-                }`
-              }
-            >
-              <span className="w-4 h-4 inline-flex">{i.icon}</span>
-              {i.label}
-            </NavLink>
-          ))}
+      {/* 아이패드 세로(768) 이상: 하단 가로 네비 — 전체 메뉴 노출.
+          관리자는 항목이 10개까지 늘어나 768px에서 빠듯하므로, 넘치면 가로 스크롤되게 둔다.
+          (안쪽 flex에 mx-auto → 들어갈 땐 가운데 정렬, 넘칠 땐 왼쪽부터) */}
+      <nav className="hidden md:block sticky bottom-0 border-t border-slate-200 bg-white/95 backdrop-blur safe-bottom safe-x">
+        <div className="max-w-6xl xl:max-w-7xl 2xl:max-w-screen-2xl mx-auto px-4 lg:px-6 h-12 flex items-center overflow-x-auto">
+          <div className="flex items-center gap-0.5 lg:gap-1 mx-auto">
+            {desktopNav.map((i) => (
+              <NavLink
+                key={i.to}
+                to={i.to}
+                end={i.end}
+                className={({ isActive }) =>
+                  `inline-flex items-center gap-1.5 px-2 lg:px-3 h-9 rounded-md text-[13px] lg:text-sm font-medium whitespace-nowrap transition ${
+                    isActive
+                      ? 'bg-slate-100 text-slate-900'
+                      : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                  }`
+                }
+              >
+                <span className="w-4 h-4 inline-flex shrink-0">{i.icon}</span>
+                {i.label}
+              </NavLink>
+            ))}
+          </div>
         </div>
       </nav>
 
-      {/* 모바일 + iPad portrait 하단 탭바 */}
-      <nav className="lg:hidden border-t border-slate-200 bg-white safe-bottom safe-x">
+      {/* 아이폰(768 미만) 하단 탭바 */}
+      <nav className="md:hidden border-t border-slate-200 bg-white safe-bottom safe-x">
         <div
           className="grid px-1 max-w-md mx-auto"
           style={{

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import { ScheduleManager } from '../components/ScheduleManager'
+import { DESKTOP_QUERY, useMediaQuery } from '../lib/useMediaQuery'
 import {
   getAccount,
   setReadingAccess,
@@ -72,6 +73,13 @@ function avg(nums: number[]): number {
   return Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 10) / 10
 }
 
+/** 정답률 색. 80↑ 양호 · 50~79 주의 · 50↓ 위험 */
+function ratioClass(ratio: number): string {
+  if (ratio >= 80) return 'text-brand-700'
+  if (ratio >= 50) return 'text-amber-700'
+  return 'text-red-700'
+}
+
 const TYPE_LABEL: Record<Attempt['type'], string> = {
   vocab: '단어 시험지',
   reading: '지문 문제풀이',
@@ -88,9 +96,23 @@ const TYPE_CLASS: Record<Attempt['type'], string> = {
 
 type TypeFilter = 'all' | Attempt['type']
 
+/**
+ * 탭 구성. 자주 쓰는 순서대로 두고 첫 탭(과제)을 기본값으로 한다.
+ * — 이 화면에 들어오는 목적 대부분이 "과제 현황 확인"이라서다.
+ */
+type TabKey =
+  | 'assignments'
+  | 'attempts'
+  | 'metrics'
+  | 'schedule'
+  | 'wordbook'
+  | 'settings'
+
 export function AdminStudentDetail() {
   const { id } = useParams<{ id: string }>()
   const { profile } = useAuth()
+  const isDesktop = useMediaQuery(DESKTOP_QUERY)
+  const [tab, setTab] = useState<TabKey>('assignments')
   const [account, setAccount] = useState<UserAccount | null>(null)
   const [attempts, setAttempts] = useState<Attempt[]>([])
   const [wordbook, setWordbook] = useState<WordLookup[]>([])
@@ -112,6 +134,8 @@ export function AdminStudentDetail() {
   const [assignMinCorrect, setAssignMinCorrect] = useState('')
   const [assigning, setAssigning] = useState(false)
   const [assignError, setAssignError] = useState<string | null>(null)
+  // 과제 부여 폼은 기본 접힘. 목록(= 보러 온 것)이 먼저 보이도록.
+  const [assignFormOpen, setAssignFormOpen] = useState(false)
 
   async function reloadAssignments() {
     if (!id) return
@@ -199,6 +223,37 @@ export function AdminStudentDetail() {
       readingTotal: readings.length,
     }
   }, [attempts, vocabSets, readings])
+
+  /**
+   * 진행 중(미완료) — D-day 오름차순(지난 것 가장 위) → 마감 없음은 맨 뒤
+   * 완료 — 부여일 내림차순
+   * 탭 배지에서도 개수를 쓰므로 렌더 밖으로 끌어올렸다.
+   */
+  const groupedAssignments = useMemo(() => {
+    const enriched = assignments.map((a) => ({
+      a,
+      status: getAssignmentStatusView(a, attempts),
+      dday: getDDay(a.dueAt),
+    }))
+    const pending = enriched
+      .filter((x) => x.status.status !== 'done')
+      .sort((x, y) => {
+        const xv = x.dday.days
+        const yv = y.dday.days
+        if (xv == null && yv == null) return 0
+        if (xv == null) return 1
+        if (yv == null) return -1
+        return xv - yv
+      })
+    const done = enriched
+      .filter((x) => x.status.status === 'done')
+      .sort((x, y) => {
+        const xt = x.a.createdAt?.toMillis?.() ?? 0
+        const yt = y.a.createdAt?.toMillis?.() ?? 0
+        return yt - xt
+      })
+    return { pending, done }
+  }, [assignments, attempts])
 
   const [bundleMode, setBundleMode] = useState(false)
   const [bundleCategory, setBundleCategory] = useState('')
@@ -296,6 +351,7 @@ export function AdminStudentDetail() {
         setAssignNote('')
         await maybePushAssignment([title])
         await reloadAssignments()
+        setAssignFormOpen(false)
       } catch (err) {
         setAssignError(err instanceof Error ? err.message : '과제 부여에 실패했습니다.')
       } finally {
@@ -333,6 +389,7 @@ export function AdminStudentDetail() {
         setAssignNote('')
         await maybePushAssignment(group.list.map((r) => r.title))
         await reloadAssignments()
+        setAssignFormOpen(false)
       } catch (err) {
         setAssignError(err instanceof Error ? err.message : '과제 부여에 실패했습니다.')
       } finally {
@@ -384,6 +441,7 @@ export function AdminStudentDetail() {
       setAssignMinCorrect('')
       await maybePushAssignment([target.title])
       await reloadAssignments()
+      setAssignFormOpen(false)
     } catch (err) {
       setAssignError(err instanceof Error ? err.message : '과제 부여에 실패했습니다.')
     } finally {
@@ -444,157 +502,102 @@ export function AdminStudentDetail() {
   if (error) return <p className="text-red-600 text-sm">{error}</p>
   if (!account) return null
 
-  return (
-    <div className="space-y-5">
-      <header>
-        <Link
-          to="/admin/students"
-          className="text-xs text-slate-500 hover:text-slate-900"
-        >
-          ← 학생 관리
-        </Link>
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mt-2 mb-1">
-          학생 상세
-        </p>
-        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
-          {account.displayName}
-        </h1>
-        <p className="text-xs text-slate-500 mt-1">
-          {account.school || '학교 미입력'} · {account.email}
-        </p>
-        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5 text-[11px] text-slate-500">
-          <span>학생 {account.phone || '-'}</span>
-          <span>학부모 {account.parentPhone || '-'}</span>
-          <span>가입 {fmtDate(account.createdAt)}</span>
-        </div>
-        <div className="mt-3 flex flex-wrap items-center gap-1.5">
-          <Link
-            to={`/vocab/new?student=${account.id}`}
-            className="rounded-md bg-slate-900 text-white text-xs font-medium px-3 py-1.5 hover:bg-slate-800"
+  const { pending, done } = groupedAssignments
+  const tel = (account.phone || account.parentPhone || '').replace(/[^0-9+]/g, '')
+
+  const tabs: { key: TabKey; label: string; badge?: number }[] = [
+    { key: 'assignments', label: '과제', badge: pending.length },
+    { key: 'attempts', label: '시험 이력', badge: attempts.length },
+    { key: 'metrics', label: '학습 지표' },
+    { key: 'schedule', label: '일정' },
+    { key: 'wordbook', label: '단어장', badge: wordbook.length },
+    { key: 'settings', label: '설정' },
+  ]
+
+  // ── 기기에 따라 사이드바 또는 탭 안쪽으로 들어가는 조각들 ──────────────
+
+  const contactActions = (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <Link
+        to={`/vocab/new?student=${account.id}`}
+        className="rounded-md bg-slate-900 text-white text-xs font-medium px-3 py-2 touch:py-2.5 hover:bg-slate-800"
+      >
+        + 단어 시험지
+      </Link>
+      {tel && (
+        <>
+          <a
+            href={`tel:${tel}`}
+            title="전화"
+            className="rounded-md border border-brand-200 bg-brand-50 text-brand-700 text-xs font-medium px-3 py-2 touch:py-2.5 hover:bg-brand-100"
           >
-            + 이 학생 단어 시험지
-          </Link>
-          {(() => {
-            const tel = (account.phone || account.parentPhone || '').replace(
-              /[^0-9+]/g,
-              '',
-            )
-            if (!tel) return null
-            return (
-              <>
-                <a
-                  href={`tel:${tel}`}
-                  title="전화"
-                  className="rounded-md border border-brand-200 bg-brand-50 text-brand-700 text-xs font-medium px-3 py-1.5 hover:bg-brand-100"
-                >
-                  전화
-                </a>
-                <a
-                  href={`sms:${tel}`}
-                  title="문자"
-                  className="rounded-md border border-slate-200 text-slate-600 text-xs font-medium px-3 py-1.5 hover:bg-slate-50"
-                >
-                  문자
-                </a>
-              </>
-            )
-          })()}
-        </div>
-        <SubjectPicker
-          account={account}
-          onSaved={(next) => setAccount({ ...account, subjects: next })}
-        />
-        <ColorPicker
-          account={account}
-          onSaved={(next) => setAccount({ ...account, colorKey: next })}
-        />
-        <label className="mt-3 inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={!!account.readingAccess}
-            onChange={async (e) => {
-              const next = e.target.checked
-              setAccount({ ...account, readingAccess: next })
-              try {
-                await setReadingAccess(account.id, next)
-              } catch {
-                setAccount({ ...account, readingAccess: !next })
-              }
-            }}
-            className="h-4 w-4 accent-brand-600"
-          />
-          지문 문제풀이 접근 허용
-        </label>
-      </header>
+            전화
+          </a>
+          <a
+            href={`sms:${tel}`}
+            title="문자"
+            className="rounded-md border border-slate-200 text-slate-600 text-xs font-medium px-3 py-2 touch:py-2.5 hover:bg-slate-50"
+          >
+            문자
+          </a>
+        </>
+      )}
+    </div>
+  )
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-        <StatCard label="총 시험" value={`${stats.totalAttempts}`} />
-        <StatCard
-          label="평균"
-          value={stats.totalAttempts > 0 ? `${stats.avgRatio}%` : '—'}
-        />
-        <StatCard
-          label="단어장"
-          value={`${stats.wordbookSize}`}
-          sub={`조회 ${stats.wordbookTotalLookups}`}
-        />
-        <StatCard
-          label="최근"
-          value={stats.lastActivity ? fmtDate(stats.lastActivity) : '—'}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        <StatCard
-          label="단어 시험지 평균"
-          value={
-            attempts.some((a) => a.type === 'vocab' && a.total > 0)
-              ? `${stats.vocabAvg}%`
-              : '—'
-          }
-          sub={`${attempts.filter((a) => a.type === 'vocab').length}회 응시`}
-        />
-        <StatCard
-          label="지문 평균"
-          value={
-            attempts.some((a) => a.type === 'reading' && a.total > 0)
-              ? `${stats.readingAvg}%`
-              : '—'
-          }
-          sub={`${attempts.filter((a) => a.type === 'reading').length}회 응시`}
-        />
-      </div>
-
-      <section className="space-y-3">
-        <h2 className="text-base font-semibold text-slate-900">학습 진행도</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <ProgressCard
-            label="단어 시험지"
-            done={progress.vocabDone}
-            total={progress.vocabTotal}
-          />
-          <ProgressCard
-            label="지문 문제풀이"
-            done={progress.readingDone}
-            total={progress.readingTotal}
-          />
-        </div>
-      </section>
-
-      <WeeklyReportPreview
-        studentName={account.displayName}
-        assignments={assignments}
-        attempts={attempts}
+  const keyStats = (
+    <div className="grid grid-cols-2 gap-2">
+      <StatCard label="총 시험" value={`${stats.totalAttempts}`} />
+      <StatCard
+        label="평균"
+        value={stats.totalAttempts > 0 ? `${stats.avgRatio}%` : '—'}
       />
+      <StatCard
+        label="단어장"
+        value={`${stats.wordbookSize}`}
+        sub={`조회 ${stats.wordbookTotalLookups}`}
+      />
+      <StatCard
+        label="최근"
+        value={stats.lastActivity ? fmtDate(stats.lastActivity) : '—'}
+      />
+    </div>
+  )
 
-      <ScheduleManager studentUid={account.id} />
+  const progressCards = (
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-2">
+      <ProgressCard
+        label="단어 시험지"
+        done={progress.vocabDone}
+        total={progress.vocabTotal}
+      />
+      <ProgressCard
+        label="지문 문제풀이"
+        done={progress.readingDone}
+        total={progress.readingTotal}
+      />
+    </div>
+  )
 
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-slate-900">과제</h2>
-          <span className="text-xs text-slate-500">총 {assignments.length}건</span>
-        </div>
+  // ── 탭 내용 ────────────────────────────────────────────────────────
 
+  const assignmentsPanel = (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm text-slate-500">
+          진행 중 <b className="font-semibold text-slate-900">{pending.length}</b> ·
+          완료 <b className="font-semibold text-slate-900">{done.length}</b>
+        </p>
+        <button
+          type="button"
+          onClick={() => setAssignFormOpen((v) => !v)}
+          className="rounded-md bg-slate-900 text-white text-sm font-semibold px-4 py-2 touch:py-2.5 hover:bg-slate-800"
+        >
+          {assignFormOpen ? '닫기' : '+ 과제 부여'}
+        </button>
+      </div>
+
+      {assignFormOpen && (
         <form
           onSubmit={handleAssign}
           className="rounded-lg border border-brand-200 bg-brand-50/40 p-4 space-y-4"
@@ -622,7 +625,7 @@ export function AdminStudentDetail() {
                       setAssignCategory(defaultCategoryKey(opt.key))
                       if (opt.key !== 'reading') setBundleMode(false)
                     }}
-                    className={`rounded px-2 py-1.5 text-xs font-medium transition ${
+                    className={`rounded px-2 py-1.5 touch:py-2 text-xs font-medium transition ${
                       active
                         ? 'bg-slate-900 text-white'
                         : 'text-slate-600 hover:bg-slate-100'
@@ -711,8 +714,8 @@ export function AdminStudentDetail() {
             )}
           </div>
 
-          {/* 3. 마감일 + 분류 — 핵심 옵션 두 줄 */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* 3. 일정 + 분류 */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">
                 시작일 <span className="text-slate-400 font-normal">(선택 · 이 날부터 학생에게 노출)</span>
@@ -805,125 +808,142 @@ export function AdminStudentDetail() {
             <button
               type="submit"
               disabled={assigning}
-              className="rounded-md bg-slate-900 text-white text-sm font-semibold px-5 py-2 hover:bg-slate-800 disabled:opacity-50"
+              className="rounded-md bg-slate-900 text-white text-sm font-semibold px-5 py-2 touch:py-2.5 hover:bg-slate-800 disabled:opacity-50"
             >
               {assigning ? '부여 중…' : '과제 부여'}
             </button>
           </div>
         </form>
+      )}
 
-        {assignments.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
-            아직 부여한 과제가 없습니다.
-          </div>
-        ) : (
-          (() => {
-            // 진행 중(미완료) — D-day 오름차순(지난 것 가장 위) → 마감 없음은 맨 뒤
-            // 완료 — 부여일 내림차순
-            const enriched = assignments.map((a) => ({
-              a,
-              status: getAssignmentStatusView(a, attempts),
-              dday: getDDay(a.dueAt),
-            }))
-            const pending = enriched
-              .filter((x) => x.status.status !== 'done')
-              .sort((x, y) => {
-                const xv = x.dday.days
-                const yv = y.dday.days
-                if (xv == null && yv == null) return 0
-                if (xv == null) return 1
-                if (yv == null) return -1
-                return xv - yv
-              })
-            const done = enriched
-              .filter((x) => x.status.status === 'done')
-              .sort((x, y) => {
-                const xt = x.a.createdAt?.toMillis?.() ?? 0
-                const yt = y.a.createdAt?.toMillis?.() ?? 0
-                return yt - xt
-              })
-            return (
-              <div className="space-y-4">
-                {pending.length > 0 && (
-                  <div className="space-y-1.5">
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                      진행 중 ({pending.length})
-                    </p>
-                    <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
-                      {pending.map((x) => (
-                        <AssignmentRow
-                          key={x.a.id}
-                          a={x.a}
-                          status={x.status}
-                          dday={x.dday}
-                          categories={categories}
-                          onToggleDone={() => handleToggleAssignmentDone(x.a)}
-                          onDelete={() => handleDeleteAssignment(x.a)}
-                          onSave={(input) =>
-                            handleSaveAssignmentEdit(x.a, input)
-                          }
-                          fmtDate={fmtDate}
-                        />
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {done.length > 0 && (
-                  <details className="space-y-1.5" open={pending.length === 0}>
-                    <summary className="text-xs font-semibold text-slate-500 uppercase tracking-wider cursor-pointer hover:text-slate-700 select-none">
-                      완료 ({done.length})
-                    </summary>
-                    <ul className="mt-1.5 divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
-                      {done.map((x) => (
-                        <AssignmentRow
-                          key={x.a.id}
-                          a={x.a}
-                          status={x.status}
-                          dday={x.dday}
-                          categories={categories}
-                          onToggleDone={() => handleToggleAssignmentDone(x.a)}
-                          onDelete={() => handleDeleteAssignment(x.a)}
-                          onSave={(input) =>
-                            handleSaveAssignmentEdit(x.a, input)
-                          }
-                          fmtDate={fmtDate}
-                        />
-                      ))}
-                    </ul>
-                  </details>
-                )}
-              </div>
-            )
-          })()
-        )}
-      </section>
-
-      <section className="space-y-3">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <h2 className="text-base font-semibold text-slate-900">시험 이력</h2>
-          <div className="flex items-center gap-1 text-xs">
-            {(['all', 'vocab', 'reading', 'korean_mock', 'wordbook'] as const).map((k) => (
-              <button
-                key={k}
-                onClick={() => setTypeFilter(k)}
-                className={`px-3 py-1.5 rounded-full transition ${
-                  typeFilter === k
-                    ? 'bg-slate-900 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                {k === 'all' ? '전체' : TYPE_LABEL[k]}
-              </button>
-            ))}
-          </div>
+      {assignments.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
+          아직 부여한 과제가 없습니다.
         </div>
+      ) : (
+        <div className="space-y-4">
+          {pending.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                진행 중 ({pending.length})
+              </p>
+              <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
+                {pending.map((x) => (
+                  <AssignmentRow
+                    key={x.a.id}
+                    a={x.a}
+                    status={x.status}
+                    dday={x.dday}
+                    categories={categories}
+                    onToggleDone={() => handleToggleAssignmentDone(x.a)}
+                    onDelete={() => handleDeleteAssignment(x.a)}
+                    onSave={(input) => handleSaveAssignmentEdit(x.a, input)}
+                    fmtDate={fmtDate}
+                  />
+                ))}
+              </ul>
+            </div>
+          )}
+          {done.length > 0 && (
+            <details className="space-y-1.5" open={pending.length === 0}>
+              <summary className="text-xs font-semibold text-slate-500 uppercase tracking-wider cursor-pointer hover:text-slate-700 select-none py-1">
+                완료 ({done.length})
+              </summary>
+              <ul className="mt-1.5 divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
+                {done.map((x) => (
+                  <AssignmentRow
+                    key={x.a.id}
+                    a={x.a}
+                    status={x.status}
+                    dday={x.dday}
+                    categories={categories}
+                    onToggleDone={() => handleToggleAssignmentDone(x.a)}
+                    onDelete={() => handleDeleteAssignment(x.a)}
+                    onSave={(input) => handleSaveAssignmentEdit(x.a, input)}
+                    fmtDate={fmtDate}
+                  />
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
+    </div>
+  )
 
-        {filteredAttempts.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
-            기록이 없습니다.
-          </div>
-        ) : (
-          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+  const attemptsPanel = (
+    <div className="space-y-3">
+      <div className="flex items-center gap-1 text-xs overflow-x-auto pb-1">
+        {(['all', 'vocab', 'reading', 'korean_mock', 'wordbook'] as const).map((k) => (
+          <button
+            key={k}
+            onClick={() => setTypeFilter(k)}
+            className={`px-3 py-1.5 touch:py-2 rounded-full whitespace-nowrap transition ${
+              typeFilter === k
+                ? 'bg-slate-900 text-white'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            {k === 'all' ? '전체' : TYPE_LABEL[k]}
+          </button>
+        ))}
+      </div>
+
+      {filteredAttempts.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+          기록이 없습니다.
+        </div>
+      ) : (
+        <>
+          {/* 아이폰: 카드 목록. 6열 테이블을 가로로 밀어 보게 하지 않는다. */}
+          <ul className="md:hidden space-y-2">
+            {filteredAttempts.map((a) => {
+              const ratio = a.total > 0 ? Math.round((a.correct / a.total) * 100) : 0
+              return (
+                <li
+                  key={a.id}
+                  className="rounded-lg border border-slate-200 bg-white p-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <span
+                        className={`inline-block rounded px-2 py-0.5 text-[11px] font-medium ${TYPE_CLASS[a.type]}`}
+                      >
+                        {TYPE_LABEL[a.type]}
+                      </span>
+                      <Link
+                        to={attemptResultPath(a)}
+                        className="block mt-1 text-sm font-medium text-slate-900 hover:text-brand-700 break-words"
+                      >
+                        {a.refTitle}
+                      </Link>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        {fmtDate(a.createdAt)}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className={`text-lg font-semibold ${ratioClass(ratio)}`}>
+                        {ratio}%
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        {a.correct} / {a.total}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteAttempt(a)}
+                        className="text-[11px] text-slate-400 hover:text-red-600 mt-1 py-1"
+                      >
+                        삭제
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+
+          {/* 아이패드 이상: 테이블 */}
+          <div className="hidden md:block overflow-x-auto rounded-lg border border-slate-200 bg-white">
             <table className="min-w-full text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
                 <tr>
@@ -938,24 +958,18 @@ export function AdminStudentDetail() {
               <tbody className="divide-y divide-slate-100">
                 {filteredAttempts.map((a) => {
                   const ratio = a.total > 0 ? Math.round((a.correct / a.total) * 100) : 0
-                  const resultPath =
-                    a.type === 'vocab'
-                      ? `/vocab/${a.refId}/result/${a.id}`
-                      : a.type === 'reading'
-                        ? `/reading/${a.refId}/result/${a.id}`
-                        : a.type === 'korean_mock'
-                          ? `/korean-mocks/${a.refId}/result/${a.id}`
-                          : `/wordbook/result/${a.id}`
                   return (
                     <tr key={a.id}>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${TYPE_CLASS[a.type]}`}>
+                        <span
+                          className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${TYPE_CLASS[a.type]}`}
+                        >
                           {TYPE_LABEL[a.type]}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-slate-900">
                         <Link
-                          to={resultPath}
+                          to={attemptResultPath(a)}
                           className="text-slate-900 hover:text-brand-700 hover:underline"
                         >
                           {a.refTitle}
@@ -965,15 +979,7 @@ export function AdminStudentDetail() {
                         {a.correct} / {a.total}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <span
-                          className={`text-sm font-medium ${
-                            ratio >= 80
-                              ? 'text-brand-700'
-                              : ratio >= 50
-                                ? 'text-brand-700'
-                                : 'text-red-700'
-                          }`}
-                        >
+                        <span className={`text-sm font-medium ${ratioClass(ratio)}`}>
                           {ratio}%
                         </span>
                       </td>
@@ -998,44 +1004,240 @@ export function AdminStudentDetail() {
               </tbody>
             </table>
           </div>
-        )}
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-base font-semibold text-slate-900">
-          단어장 ({wordbook.length})
-        </h2>
-        {wordbook.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
-            모은 단어가 없습니다.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            {[...wordbook]
-              .sort((a, b) => (b.count ?? 0) - (a.count ?? 0))
-              .slice(0, 20)
-              .map((w) => (
-                <div
-                  key={w.en}
-                  className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm flex items-baseline justify-between gap-3"
-                >
-                  <div className="min-w-0">
-                    <p className="font-medium text-slate-900 truncate">{w.en}</p>
-                    <p className="text-slate-500 truncate text-xs">{w.ko}</p>
-                  </div>
-                  <span className="inline-block rounded-full bg-brand-50 text-brand-700 text-xs font-medium px-2 py-0.5 whitespace-nowrap">
-                    {w.count}회
-                  </span>
-                </div>
-              ))}
-          </div>
-        )}
-        {wordbook.length > 20 && (
-          <p className="text-xs text-slate-500">조회 횟수 상위 20개만 표시 (총 {wordbook.length}개)</p>
-        )}
-      </section>
+        </>
+      )}
     </div>
   )
+
+  const metricsPanel = (
+    <div className="space-y-4">
+      {/* 데스크탑에선 이 둘이 사이드바에 상시 노출되므로 탭에서 뺀다. */}
+      {!isDesktop && (
+        <>
+          {keyStats}
+          {progressCards}
+        </>
+      )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <StatCard
+          label="단어 시험지 평균"
+          value={
+            attempts.some((a) => a.type === 'vocab' && a.total > 0)
+              ? `${stats.vocabAvg}%`
+              : '—'
+          }
+          sub={`${attempts.filter((a) => a.type === 'vocab').length}회 응시`}
+        />
+        <StatCard
+          label="지문 평균"
+          value={
+            attempts.some((a) => a.type === 'reading' && a.total > 0)
+              ? `${stats.readingAvg}%`
+              : '—'
+          }
+          sub={`${attempts.filter((a) => a.type === 'reading').length}회 응시`}
+        />
+      </div>
+      <WeeklyReportPreview
+        studentName={account.displayName}
+        assignments={assignments}
+        attempts={attempts}
+      />
+    </div>
+  )
+
+  const wordbookPanel =
+    wordbook.length === 0 ? (
+      <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+        모은 단어가 없습니다.
+      </div>
+    ) : (
+      <div className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-2">
+          {[...wordbook]
+            .sort((a, b) => (b.count ?? 0) - (a.count ?? 0))
+            .slice(0, 20)
+            .map((w) => (
+              <div
+                key={w.en}
+                className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm flex items-baseline justify-between gap-3"
+              >
+                <div className="min-w-0">
+                  <p className="font-medium text-slate-900 truncate">{w.en}</p>
+                  <p className="text-slate-500 truncate text-xs">{w.ko}</p>
+                </div>
+                <span className="inline-block rounded-full bg-brand-50 text-brand-700 text-xs font-medium px-2 py-0.5 whitespace-nowrap">
+                  {w.count}회
+                </span>
+              </div>
+            ))}
+        </div>
+        {wordbook.length > 20 && (
+          <p className="text-xs text-slate-500">
+            조회 횟수 상위 20개만 표시 (총 {wordbook.length}개)
+          </p>
+        )}
+      </div>
+    )
+
+  const settingsPanel = (
+    <div className="max-w-2xl space-y-1 rounded-lg border border-slate-200 bg-white p-4">
+      <SubjectPicker
+        account={account}
+        onSaved={(next) => setAccount({ ...account, subjects: next })}
+      />
+      <ColorPicker
+        account={account}
+        onSaved={(next) => setAccount({ ...account, colorKey: next })}
+      />
+      <label className="mt-3 flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none py-1">
+        <input
+          type="checkbox"
+          checked={!!account.readingAccess}
+          onChange={async (e) => {
+            const next = e.target.checked
+            setAccount({ ...account, readingAccess: next })
+            try {
+              await setReadingAccess(account.id, next)
+            } catch {
+              setAccount({ ...account, readingAccess: !next })
+            }
+          }}
+          className="h-4 w-4 accent-brand-600"
+        />
+        지문 문제풀이 접근 허용
+      </label>
+    </div>
+  )
+
+  const panels: Record<TabKey, React.ReactNode> = {
+    assignments: assignmentsPanel,
+    attempts: attemptsPanel,
+    metrics: metricsPanel,
+    schedule: <ScheduleManager studentUid={account.id} />,
+    wordbook: wordbookPanel,
+    settings: settingsPanel,
+  }
+
+  return (
+    <div className="space-y-4">
+      <Link
+        to="/admin/students"
+        className="inline-block text-xs text-slate-500 hover:text-slate-900"
+      >
+        ← 학생 관리
+      </Link>
+
+      <div className="xl:flex xl:gap-6 xl:items-start">
+        {/* 맥북·대형 태블릿 가로: 좌측 고정 사이드바. 학생을 보는 내내 신원과 핵심 지표가 붙어 있는다. */}
+        <aside className="hidden xl:block w-72 2xl:w-80 shrink-0 xl:sticky xl:top-4 space-y-3">
+          <div>
+            <h1 className="text-xl font-semibold text-slate-900 tracking-tight">
+              {account.displayName}
+            </h1>
+            <p className="text-xs text-slate-500 mt-1">
+              {account.school || '학교 미입력'}
+            </p>
+            <p className="text-xs text-slate-500 break-all">{account.email}</p>
+            <div className="mt-2 space-y-0.5 text-[11px] text-slate-500">
+              <p>학생 {account.phone || '-'}</p>
+              <p>학부모 {account.parentPhone || '-'}</p>
+              <p>가입 {fmtDate(account.createdAt)}</p>
+            </div>
+          </div>
+          {contactActions}
+          {keyStats}
+          {progressCards}
+        </aside>
+
+        <div className="min-w-0 flex-1 space-y-4">
+          {/* 아이폰·아이패드: 압축 헤더 + 요약 한 줄 */}
+          <header className="xl:hidden space-y-2">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div className="min-w-0">
+                <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
+                  {account.displayName}
+                </h1>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {account.school || '학교 미입력'} · {account.email}
+                </p>
+              </div>
+              {contactActions}
+            </div>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-600">
+              <span>
+                총 <b className="font-semibold text-slate-900">{stats.totalAttempts}</b>회
+              </span>
+              <span className="text-slate-300">·</span>
+              <span>
+                평균{' '}
+                <b className="font-semibold text-slate-900">
+                  {stats.totalAttempts > 0 ? `${stats.avgRatio}%` : '—'}
+                </b>
+              </span>
+              <span className="text-slate-300">·</span>
+              <span>
+                진행 중 과제{' '}
+                <b className="font-semibold text-slate-900">{pending.length}</b>
+              </span>
+              {stats.lastActivity && (
+                <>
+                  <span className="text-slate-300">·</span>
+                  <span>최근 {fmtDate(stats.lastActivity)}</span>
+                </>
+              )}
+            </div>
+          </header>
+
+          {/* 탭 — 폰에서는 가로 스크롤 */}
+          <div className="border-b border-slate-200 overflow-x-auto">
+            <div className="flex min-w-max">
+              {tabs.map((t) => {
+                const active = tab === t.key
+                return (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => setTab(t.key)}
+                    className={`relative px-3 sm:px-4 h-11 touch:h-12 text-sm font-medium whitespace-nowrap transition ${
+                      active
+                        ? 'text-slate-900'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    {t.label}
+                    {t.badge != null && t.badge > 0 && (
+                      <span
+                        className={`ml-1.5 inline-block rounded-full px-1.5 py-0.5 text-[10px] font-semibold align-middle ${
+                          active
+                            ? 'bg-brand-100 text-brand-700'
+                            : 'bg-slate-100 text-slate-500'
+                        }`}
+                      >
+                        {t.badge}
+                      </span>
+                    )}
+                    {active && (
+                      <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-brand-600" />
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {panels[tab]}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function attemptResultPath(a: Attempt): string {
+  if (a.type === 'vocab') return `/vocab/${a.refId}/result/${a.id}`
+  if (a.type === 'reading') return `/reading/${a.refId}/result/${a.id}`
+  if (a.type === 'korean_mock') return `/korean-mocks/${a.refId}/result/${a.id}`
+  return `/wordbook/result/${a.id}`
 }
 
 const STATUS_TONE_CLASS: Record<AssignmentStatusView['tone'], string> = {
@@ -1150,7 +1352,7 @@ function AssignmentRow({
   }
 
   return (
-    <li className="px-4 py-3">
+    <li className="px-4 py-3 touch:py-3.5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -1161,7 +1363,7 @@ function AssignmentRow({
               type="button"
               onClick={onToggleDone}
               title="클릭으로 완료 ↔ 미완료 전환 (학생이 완료한 과제도 강제 변경 가능)"
-              className={`rounded-full px-2 py-0.5 text-[11px] font-medium border transition cursor-pointer hover:brightness-95 ${
+              className={`rounded-full px-2 py-0.5 touch:py-1 text-[11px] font-medium border transition cursor-pointer hover:brightness-95 ${
                 STATUS_TONE_CLASS[status.tone]
               }`}
             >
@@ -1198,14 +1400,14 @@ function AssignmentRow({
           <button
             type="button"
             onClick={() => (editing ? setEditing(false) : startEdit())}
-            className="text-xs text-slate-500 hover:text-slate-900 px-1"
+            className="text-xs text-slate-500 hover:text-slate-900 px-1 py-1"
           >
             {editing ? '닫기' : '수정'}
           </button>
           <button
             type="button"
             onClick={onDelete}
-            className="text-xs text-slate-400 hover:text-red-600 px-1"
+            className="text-xs text-slate-400 hover:text-red-600 px-1 py-1"
           >
             삭제
           </button>
@@ -1304,7 +1506,7 @@ function AssignmentRow({
             <button
               type="button"
               onClick={() => setEditing(false)}
-              className="rounded-md border border-slate-300 text-slate-700 text-xs font-medium px-3 py-1.5 hover:bg-slate-100"
+              className="rounded-md border border-slate-300 text-slate-700 text-xs font-medium px-3 py-1.5 touch:py-2 hover:bg-slate-100"
             >
               취소
             </button>
@@ -1312,7 +1514,7 @@ function AssignmentRow({
               type="button"
               onClick={handleSubmit}
               disabled={saving}
-              className="rounded-md bg-slate-900 text-white text-xs font-medium px-3 py-1.5 hover:bg-slate-800 disabled:opacity-50"
+              className="rounded-md bg-slate-900 text-white text-xs font-medium px-3 py-1.5 touch:py-2 hover:bg-slate-800 disabled:opacity-50"
             >
               {saving ? '저장 중…' : '저장'}
             </button>
@@ -1337,30 +1539,26 @@ function WeeklyReportPreview({
     [assignments, attempts],
   )
   return (
-    <section className="space-y-3">
-      <details className="rounded-lg border border-slate-200 bg-white overflow-hidden">
-        <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-slate-900 hover:bg-slate-50 select-none flex items-center justify-between">
-          <span>📨 주간 리포트 미리보기 (지난 7일)</span>
-          <span className="text-[11px] font-normal text-slate-500">
-            실제 발송과 동일한 7일 윈도우
-          </span>
-        </summary>
-        <div className="px-4 pb-4 pt-1 space-y-3 border-t border-slate-100">
-          <p className="text-[11px] text-slate-500 mt-2">
-            <strong className="font-semibold text-slate-700">
-              {studentName}님
-            </strong>{' '}
-            앞으로 발송될 var1~var3 내용. 마지막 격려 멘트(var4)는 알림톡 설정의
-            주간 리포트 closing 값으로 들어갑니다.
-          </p>
-          <div className="space-y-2">
-            <PreviewBlock label="var1" body={vars.var1} />
-            <PreviewBlock label="var2" body={vars.var2} />
-            <PreviewBlock label="var3" body={vars.var3} />
-          </div>
+    <details className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+      <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-slate-900 hover:bg-slate-50 select-none flex items-center justify-between gap-2">
+        <span>📨 주간 리포트 미리보기 (지난 7일)</span>
+        <span className="text-[11px] font-normal text-slate-500 hidden sm:inline">
+          실제 발송과 동일한 7일 윈도우
+        </span>
+      </summary>
+      <div className="px-4 pb-4 pt-1 space-y-3 border-t border-slate-100">
+        <p className="text-[11px] text-slate-500 mt-2">
+          <strong className="font-semibold text-slate-700">{studentName}님</strong>{' '}
+          앞으로 발송될 var1~var3 내용. 마지막 격려 멘트(var4)는 알림톡 설정의 주간
+          리포트 closing 값으로 들어갑니다.
+        </p>
+        <div className="space-y-2">
+          <PreviewBlock label="var1" body={vars.var1} />
+          <PreviewBlock label="var2" body={vars.var2} />
+          <PreviewBlock label="var3" body={vars.var3} />
         </div>
-      </details>
-    </section>
+      </div>
+    </details>
   )
 }
 
@@ -1444,7 +1642,7 @@ function SubjectPicker({
   return (
     <div className="mt-3 flex items-center gap-3 flex-wrap text-xs">
       <span className="text-slate-500">수강 과목:</span>
-      <label className="inline-flex items-center gap-1.5 cursor-pointer">
+      <label className="inline-flex items-center gap-1.5 cursor-pointer py-1">
         <input
           type="checkbox"
           checked={korean}
@@ -1453,7 +1651,7 @@ function SubjectPicker({
         />
         국어
       </label>
-      <label className="inline-flex items-center gap-1.5 cursor-pointer">
+      <label className="inline-flex items-center gap-1.5 cursor-pointer py-1">
         <input
           type="checkbox"
           checked={english}
@@ -1467,7 +1665,7 @@ function SubjectPicker({
           type="button"
           onClick={save}
           disabled={saving || !valid}
-          className="rounded-md bg-slate-900 text-white text-[11px] font-medium px-2.5 py-1 hover:bg-slate-800 disabled:opacity-50"
+          className="rounded-md bg-slate-900 text-white text-[11px] font-medium px-2.5 py-1 touch:py-1.5 hover:bg-slate-800 disabled:opacity-50"
         >
           {saving ? '저장 중…' : '저장'}
         </button>
@@ -1505,7 +1703,7 @@ function ColorPicker({
   return (
     <div className="mt-3 flex items-center gap-2 flex-wrap text-xs">
       <span className="text-slate-500">캘린더 색상:</span>
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1.5">
         {STUDENT_COLOR_KEYS.map((k) => {
           const c = STUDENT_COLORS[k]
           const active = k === currentColor.key
@@ -1517,7 +1715,7 @@ function ColorPicker({
               disabled={saving !== null}
               title={c.label}
               aria-label={c.label}
-              className={`w-5 h-5 rounded-full border-2 transition ${c.dot} ${
+              className={`w-5 h-5 touch:w-6 touch:h-6 rounded-full border-2 transition ${c.dot} ${
                 active ? 'border-slate-900 scale-110' : 'border-white'
               } disabled:opacity-50`}
             />

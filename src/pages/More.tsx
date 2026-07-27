@@ -119,7 +119,7 @@ export function More() {
   }
 
   return (
-    <div className="space-y-5 max-w-lg">
+    <div className="space-y-5 max-w-lg mx-auto">
       {/* 인사말 */}
       <header className="flex items-start justify-between gap-3">
         <div>

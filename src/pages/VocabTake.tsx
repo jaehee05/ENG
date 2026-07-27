@@ -135,7 +135,7 @@ export function VocabTake() {
 
   if (blocked) {
     return (
-      <div className="space-y-4 max-w-2xl">
+      <div className="space-y-4 max-w-2xl mx-auto">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
           단어 시험
         </p>
@@ -155,7 +155,7 @@ export function VocabTake() {
   }
 
   return (
-    <div className="space-y-5 max-w-3xl">
+    <div className="space-y-5 max-w-3xl mx-auto">
       <header className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
