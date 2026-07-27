@@ -8,10 +8,13 @@ import {
   updateKoreanMockAttemptAnswers,
 } from '../lib/firestore'
 import {
+  choiceMark,
   gradeFromScore,
+  hasMockExplanation,
   hasMockPassage,
   MOCK_SUBJECT_LABEL,
   questionPoints,
+  wrongChoiceMarks,
   type Attempt,
   type KoreanMock,
   type KoreanMockQuestion,
@@ -211,13 +214,13 @@ export function KoreanMockResult() {
     }
   }
   const pointsOf = (n: number) => pointsByNumber.get(n) ?? 2
-  // 문항 번호 → 해설(HTML). 공통 + 응시한 선택과목 문항.
-  const explByNumber = new Map<number, string>()
-  // 문항 번호 → 오답 리뷰용 지문. 틀린 문항에서만 펼쳐 보여준다.
+  // 문항 번호 → 문항. 공통 + 응시한 선택과목 문항.
+  // 해설(정답/오답)과 오답 리뷰 지문을 모두 여기서 꺼내 쓴다.
+  const explByNumber = new Map<number, KoreanMockQuestion>()
   const passageByNumber = new Map<number, KoreanMockQuestion>()
   if (mock) {
     const collect = (q: KoreanMockQuestion) => {
-      if (q.explanation) explByNumber.set(q.number, q.explanation)
+      if (hasMockExplanation(q)) explByNumber.set(q.number, q)
       if (hasMockPassage(q)) passageByNumber.set(q.number, q)
     }
     for (const q of mock.questions) collect(q)
@@ -575,7 +578,7 @@ export function KoreanMockResult() {
       {explNumber != null &&
         (() => {
           const r = results.find((x) => x.number === explNumber)
-          const html = explByNumber.get(explNumber)
+          const explQ = explByNumber.get(explNumber)
           // 지문은 틀렸을 때만 (관리자는 검수용으로 항상)
           const pq = passageByNumber.get(explNumber)
           const passageQ = pq && (!r?.correct || canEdit) ? pq : undefined
@@ -626,24 +629,44 @@ export function KoreanMockResult() {
                     <MockPassageReview question={passageQ} subject={subj} />
                   )}
 
-                  {html ? (
+                  {explQ?.explanation && (
                     <div>
-                      {passageQ && (
-                        <p className="text-xs font-semibold text-slate-500 mb-1.5">
-                          해설
-                        </p>
-                      )}
+                      <p className="text-xs font-semibold text-slate-500 mb-1.5">
+                        정답 해설{' '}
+                        {r && (
+                          <span className="text-brand-700">
+                            {choiceMark(r.correctAnswer)}
+                          </span>
+                        )}
+                      </p>
                       <div
                         className="rte-view text-sm text-slate-800"
-                        dangerouslySetInnerHTML={{ __html: html }}
+                        dangerouslySetInnerHTML={{ __html: explQ.explanation }}
                       />
                     </div>
-                  ) : (
-                    !passageQ && (
-                      <p className="text-sm text-slate-400 py-6 text-center">
-                        아직 해설이 없어요.
+                  )}
+
+                  {explQ?.explanationWrong && (
+                    <div>
+                      <p className="text-xs font-semibold text-slate-500 mb-1.5">
+                        오답 해설{' '}
+                        {r && (
+                          <span className="text-slate-400 font-normal">
+                            {wrongChoiceMarks(r.correctAnswer).join(' ')}
+                          </span>
+                        )}
                       </p>
-                    )
+                      <div
+                        className="rte-view text-sm text-slate-800"
+                        dangerouslySetInnerHTML={{ __html: explQ.explanationWrong }}
+                      />
+                    </div>
+                  )}
+
+                  {!explQ && !passageQ && (
+                    <p className="text-sm text-slate-400 py-6 text-center">
+                      아직 해설이 없어요.
+                    </p>
                   )}
                 </div>
               </div>

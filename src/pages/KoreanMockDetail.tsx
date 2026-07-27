@@ -23,10 +23,13 @@ import { MockCutoffEditor } from '../components/MockCutoffEditor'
 import { ExamFilePicker } from '../components/ExamFilePicker'
 import { RichTextEditor } from '../components/RichTextEditor'
 import {
+  choiceMark,
   getMockSubject,
+  hasMockExplanation,
   hasMockPassage,
   MOCK_SUBJECT_LABEL,
   questionPoints,
+  wrongChoiceMarks,
   type Attempt,
   type ExplStyle,
   type KoreanMock,
@@ -71,6 +74,7 @@ export function KoreanMockDetail() {
     qIdx: number
   } | null>(null)
   const [explDraft, setExplDraft] = useState('')
+  const [explWrongDraft, setExplWrongDraft] = useState('')
   const [explSaving, setExplSaving] = useState(false)
   const [explStyles, setExplStylesState] = useState<ExplStyle[]>([])
   // 같은 모달 안에서 해설 / 오답 리뷰 지문을 탭으로 전환
@@ -234,6 +238,7 @@ export function KoreanMockDetail() {
         ? mock.questions[qIdx]
         : mock.electives?.[group]?.questions[qIdx]
     setExplDraft(q?.explanation ?? '')
+    setExplWrongDraft(q?.explanationWrong ?? '')
     setPassageDraft(q?.passage ?? '')
     setPassageKoDraft(q?.passageKo ?? '')
     setGlossDraft(q?.glossary ?? [])
@@ -282,13 +287,18 @@ export function KoreanMockDetail() {
     }
   }
 
-  async function applyExpl(html: string | undefined) {
-    // Firestore는 undefined 필드를 거부하므로, 삭제 시 키 자체를 제거
+  /** 정답·오답 해설을 함께 저장. clear=true 면 둘 다 삭제. */
+  async function applyExpl(clear = false) {
+    const correct = clear ? '' : explDraft.trim()
+    const wrong = clear ? '' : explWrongDraft.trim()
+    // Firestore는 undefined 필드를 거부하므로, 비면 키 자체를 제거
     await saveQuestionPatch((q) => {
-      if (html) return { ...q, explanation: html }
-      const rest = { ...q }
-      delete rest.explanation
-      return rest
+      const next = { ...q }
+      if (correct) next.explanation = correct
+      else delete next.explanation
+      if (wrong) next.explanationWrong = wrong
+      else delete next.explanationWrong
+      return next
     }, '해설 저장 실패')
   }
 
@@ -587,13 +597,13 @@ export function KoreanMockDetail() {
                     type="button"
                     onClick={() => openExpl(sec.group, j)}
                     className={`rounded-md px-2 py-1.5 text-xs font-semibold border transition ${
-                      q.explanation || hasMockPassage(q)
+                      hasMockExplanation(q) || hasMockPassage(q)
                         ? 'bg-brand-100 text-brand-700 border-brand-300'
                         : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
                     }`}
                   >
                     {q.number}
-                    {q.explanation ? ' ✓' : ''}
+                    {hasMockExplanation(q) ? ' ✓' : ''}
                     {hasMockPassage(q) ? ' ¶' : ''}
                   </button>
                 ))}
@@ -613,13 +623,28 @@ export function KoreanMockDetail() {
             className="w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-2xl shadow-xl p-4 space-y-3 max-h-[92vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-sm font-bold text-slate-900">
-              {(explTarget.group === 'common'
-                ? mock.questions[explTarget.qIdx]
-                : mock.electives?.[explTarget.group]?.questions[explTarget.qIdx]
-              )?.number}
-              번 문항
-            </h3>
+            {(() => {
+              const q =
+                explTarget.group === 'common'
+                  ? mock.questions[explTarget.qIdx]
+                  : mock.electives?.[explTarget.group]?.questions[explTarget.qIdx]
+              return (
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-slate-900">
+                    {q?.number}번 문항
+                  </h3>
+                  {/* 빠른 정답으로 입력해 둔 답을 원문자로 자동 표시 */}
+                  {q && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
+                      정답 {choiceMark(q.answer)}
+                    </span>
+                  )}
+                  <span className="text-[11px] text-slate-400">
+                    {q ? `${questionPoints(q)}점` : ''}
+                  </span>
+                </div>
+              )
+            })()}
 
             <div className="flex border-b border-slate-200">
               {(
@@ -648,16 +673,58 @@ export function KoreanMockDetail() {
 
             {explTab === 'expl' ? (
               <>
-                <RichTextEditor
-                  value={explDraft}
-                  onChange={setExplDraft}
-                  styles={explStyles}
-                  onStylesChange={saveExplStyles}
-                />
+                {(() => {
+                  const q =
+                    explTarget.group === 'common'
+                      ? mock.questions[explTarget.qIdx]
+                      : mock.electives?.[explTarget.group]?.questions[
+                          explTarget.qIdx
+                        ]
+                  const wrongMarks = q ? wrongChoiceMarks(q.answer).join(' ') : ''
+                  return (
+                    <>
+                      <div>
+                        <p className="text-xs font-medium text-slate-600 mb-1">
+                          정답 해설{' '}
+                          <span className="text-slate-400 font-normal">
+                            — 왜 {q ? choiceMark(q.answer) : ''} 가 답인지
+                          </span>
+                        </p>
+                        <RichTextEditor
+                          value={explDraft}
+                          onChange={setExplDraft}
+                          styles={explStyles}
+                          onStylesChange={saveExplStyles}
+                        />
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-medium text-slate-600 mb-1">
+                          오답 해설{' '}
+                          <span className="text-slate-400 font-normal">
+                            — 왜 {wrongMarks} 는 아닌지
+                          </span>
+                        </p>
+                        <RichTextEditor
+                          value={explWrongDraft}
+                          onChange={setExplWrongDraft}
+                          styles={explStyles}
+                          onStylesChange={saveExplStyles}
+                        />
+                      </div>
+                    </>
+                  )
+                })()}
+
+                <p className="text-[11px] text-slate-400">
+                  둘 중 하나만 입력해도 됩니다. 비워둔 쪽은 학생 화면에 나오지
+                  않습니다.
+                </p>
+
                 <div className="flex items-center justify-between gap-2">
                   <button
                     type="button"
-                    onClick={() => applyExpl(undefined)}
+                    onClick={() => applyExpl(true)}
                     disabled={explSaving}
                     className="text-xs text-slate-400 hover:text-red-600 px-1 disabled:opacity-50"
                   >
@@ -674,7 +741,7 @@ export function KoreanMockDetail() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => applyExpl(explDraft.trim() ? explDraft : undefined)}
+                      onClick={() => applyExpl()}
                       disabled={explSaving}
                       className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700 disabled:opacity-50"
                     >

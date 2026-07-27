@@ -350,8 +350,13 @@ export interface KoreanMockQuestion {
   answer: number
   /** 배점 (기본 2). */
   points?: number
-  /** 문항 해설 (HTML, 관리자 입력). 정오표에서 문항 탭 시 표시. */
+  /**
+   * 정답 해설 (HTML, 관리자 입력). 정오표에서 문항 탭 시 표시.
+   * 정답/오답 해설을 나누기 전에 입력된 기존 해설도 이 필드에 그대로 남아 있다.
+   */
   explanation?: string
+  /** 오답 해설 (HTML, 관리자 입력). 왜 나머지 선택지가 답이 아닌지. */
+  explanationWrong?: string
   /**
    * 오답 리뷰용 지문 원문. 모의고사는 종이 시험지로 풀기 때문에 응시 중에는
    * 쓰이지 않고, 채점 후 학생이 "틀린" 문항을 열었을 때만 펼쳐 보여준다.
@@ -366,6 +371,24 @@ export interface KoreanMockQuestion {
 /** 오답 리뷰로 보여줄 지문이 붙어 있는 문항인지. */
 export function hasMockPassage(q: KoreanMockQuestion): boolean {
   return typeof q.passage === 'string' && q.passage.trim().length > 0
+}
+
+/** 정답/오답 어느 쪽이든 해설이 있는지. */
+export function hasMockExplanation(q: KoreanMockQuestion): boolean {
+  return Boolean(q.explanation?.trim() || q.explanationWrong?.trim())
+}
+
+/** 선택지 원문자. answer(1~5)를 ①~⑤ 로 옮길 때 쓴다. */
+export const CHOICE_MARKS = ['①', '②', '③', '④', '⑤'] as const
+
+/** 정답 번호(1~5)를 원문자로. 범위를 벗어나면 숫자 그대로. */
+export function choiceMark(n: number): string {
+  return CHOICE_MARKS[n - 1] ?? String(n)
+}
+
+/** 정답을 뺀 나머지 선택지 원문자들 (오답 해설 작성 힌트용). */
+export function wrongChoiceMarks(answer: number): string[] {
+  return CHOICE_MARKS.filter((_, i) => i + 1 !== answer)
 }
 
 /** 선택과목 옵션 (수능형: 공통 + 택1). */
