@@ -458,6 +458,7 @@ export function KoreanMockDetail() {
         JSON.stringify(explTargetQuestion.glossary ?? [])
     : false
   const explBackdrop = useBackdropDismiss({
+    open: explTarget != null,
     onDismiss: () => setExplTarget(null),
     dirty: explDirty,
     disabled: explSaving || aiBusy !== null,
@@ -655,8 +656,10 @@ export function KoreanMockDetail() {
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm"
           {...explBackdrop}
         >
+          {/* 해설 편집은 정답 1개 + 선지별 4개까지 에디터가 쌓이고 본문도 길다.
+              폰은 그대로 두고, 화면이 넓으면 넓게 쓴다. */}
           <div
-            className="w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-2xl shadow-xl p-4 space-y-3 max-h-[92vh] overflow-y-auto"
+            className="w-full sm:max-w-lg lg:max-w-3xl 2xl:max-w-5xl bg-white rounded-t-2xl sm:rounded-2xl shadow-xl p-4 lg:p-5 space-y-3 max-h-[92vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {(() => {

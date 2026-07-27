@@ -381,6 +381,7 @@ export function StudentSchedule() {
   const monthLabel = `${cursor.year}년 ${cursor.monthIndex + 1}월`
 
   const addBackdrop = useBackdropDismiss({
+    open: addOpen,
     onDismiss: () => setAddOpen(false),
     dirty:
       addStudentUid !== '' ||
