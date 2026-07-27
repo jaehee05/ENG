@@ -648,11 +648,21 @@ export function assignmentManualOverride(
   return null
 }
 
-/** 학생 과제창 노출 여부. startAt이 미래면 아직 숨김. */
+/**
+ * 학생 과제창 노출 여부.
+ * - startAt이 미래면 아직 숨김.
+ * - 'reading'(지문 문제풀이)은 학생 비노출. 영어는 모의고사로 출제하고 지문은
+ *   모의고사 오답 리뷰에서 보여주는 방식으로 옮겼다. 이미 부여된 지문 과제도
+ *   학생 목록에서 숨긴다. 데이터는 남아 있어 관리자 화면에서는 그대로 보인다.
+ *   (되살리려면 이 줄과 Layout.tsx 의 canReading 을 함께 복구할 것)
+ *
+ * 관리자 화면은 이 함수를 거치지 않으므로 영향받지 않는다.
+ */
 export function isAssignmentVisibleToStudent(
   a: Assignment,
   now: Date = new Date(),
 ): boolean {
+  if (a.type === 'reading') return false
   if (!a.startAt) return true
   return a.startAt.toMillis() <= now.getTime()
 }
