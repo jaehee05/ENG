@@ -30,7 +30,7 @@ import {
   hasMockPassage,
   MOCK_SUBJECT_LABEL,
   questionPoints,
-  wrongChoiceMarks,
+  wrongChoiceNumbers,
   type Attempt,
   type ExplStyle,
   type KoreanMock,
@@ -75,7 +75,8 @@ export function KoreanMockDetail() {
     qIdx: number
   } | null>(null)
   const [explDraft, setExplDraft] = useState('')
-  const [explWrongDraft, setExplWrongDraft] = useState('')
+  // 선지별 오답 해설 초안. 키는 선택지 번호('1'~'5').
+  const [explChoiceDraft, setExplChoiceDraft] = useState<Record<string, string>>({})
   const [explSaving, setExplSaving] = useState(false)
   const [explStyles, setExplStylesState] = useState<ExplStyle[]>([])
   // 같은 모달 안에서 해설 / 오답 리뷰 지문을 탭으로 전환
@@ -239,7 +240,7 @@ export function KoreanMockDetail() {
         ? mock.questions[qIdx]
         : mock.electives?.[group]?.questions[qIdx]
     setExplDraft(q?.explanation ?? '')
-    setExplWrongDraft(q?.explanationWrong ?? '')
+    setExplChoiceDraft({ ...(q?.explanationChoices ?? {}) })
     setPassageDraft(q?.passage ?? '')
     setPassageKoDraft(q?.passageKo ?? '')
     setGlossDraft(q?.glossary ?? [])
@@ -288,17 +289,27 @@ export function KoreanMockDetail() {
     }
   }
 
-  /** 정답·오답 해설을 함께 저장. clear=true 면 둘 다 삭제. */
+  /** 정답 해설 + 선지별 오답 해설을 함께 저장. clear=true 면 모두 삭제. */
   async function applyExpl(clear = false) {
     const correct = clear ? '' : explDraft.trim()
-    const wrong = clear ? '' : explWrongDraft.trim()
-    // Firestore는 undefined 필드를 거부하므로, 비면 키 자체를 제거
     await saveQuestionPatch((q) => {
       const next = { ...q }
       if (correct) next.explanation = correct
       else delete next.explanation
-      if (wrong) next.explanationWrong = wrong
-      else delete next.explanationWrong
+
+      // 빈 값과 정답 번호는 저장하지 않는다 (Firestore는 undefined도 거부)
+      const choices: Record<string, string> = {}
+      if (!clear) {
+        for (const [k, html] of Object.entries(explChoiceDraft)) {
+          if (Number(k) === q.answer) continue
+          if (html && html.trim()) choices[k] = html.trim()
+        }
+      }
+      if (Object.keys(choices).length) next.explanationChoices = choices
+      else delete next.explanationChoices
+
+      // 구버전 통짜 오답 해설은 선지별로 갈아탄 시점에 정리한다
+      if (clear || Object.keys(choices).length) delete next.explanationWrong
       return next
     }, '해설 저장 실패')
   }
@@ -439,7 +450,8 @@ export function KoreanMockDetail() {
       : undefined
   const explDirty = explTargetQuestion
     ? explDraft.trim() !== (explTargetQuestion.explanation ?? '').trim() ||
-      explWrongDraft.trim() !== (explTargetQuestion.explanationWrong ?? '').trim() ||
+      JSON.stringify(explChoiceDraft) !==
+        JSON.stringify(explTargetQuestion.explanationChoices ?? {}) ||
       passageDraft.trim() !== (explTargetQuestion.passage ?? '').trim() ||
       passageKoDraft.trim() !== (explTargetQuestion.passageKo ?? '').trim() ||
       JSON.stringify(glossDraft) !==
@@ -704,7 +716,6 @@ export function KoreanMockDetail() {
                       : mock.electives?.[explTarget.group]?.questions[
                           explTarget.qIdx
                         ]
-                  const wrongMarks = q ? wrongChoiceMarks(q.answer).join(' ') : ''
                   return (
                     <>
                       <div>
@@ -722,19 +733,54 @@ export function KoreanMockDetail() {
                         />
                       </div>
 
-                      <div>
-                        <p className="text-xs font-medium text-slate-600 mb-1">
+                      <div className="space-y-3">
+                        <p className="text-xs font-medium text-slate-600">
                           오답 해설{' '}
                           <span className="text-slate-400 font-normal">
-                            — 왜 {wrongMarks} 는 아닌지
+                            — 선지별로 입력하면 앞에 번호가 자동으로 붙습니다
                           </span>
                         </p>
-                        <RichTextEditor
-                          value={explWrongDraft}
-                          onChange={setExplWrongDraft}
-                          styles={explStyles}
-                          onStylesChange={saveExplStyles}
-                        />
+
+                        {q &&
+                          wrongChoiceNumbers(q.answer).map((n) => (
+                            <div key={n}>
+                              <p className="text-xs font-semibold text-slate-500 mb-1">
+                                {choiceMark(n)}
+                              </p>
+                              <RichTextEditor
+                                value={explChoiceDraft[String(n)] ?? ''}
+                                onChange={(html) =>
+                                  setExplChoiceDraft((prev) => ({
+                                    ...prev,
+                                    [String(n)]: html,
+                                  }))
+                                }
+                                styles={explStyles}
+                                onStylesChange={saveExplStyles}
+                              />
+                            </div>
+                          ))}
+
+                        {/* 선지별로 나누기 전에 넣어둔 통짜 오답 해설이 남아 있으면
+                            사라진 줄 알까 봐 그대로 보여준다. 위에 선지별로 채워
+                            저장하면 이 값은 정리된다. */}
+                        {explTargetQuestion?.explanationWrong && (
+                          <div className="rounded-md border border-amber-200 bg-amber-50 p-3">
+                            <p className="text-[11px] font-semibold text-amber-800 mb-1">
+                              이전 형식으로 입력된 오답 해설
+                            </p>
+                            <div
+                              className="rte-view text-sm text-slate-800"
+                              dangerouslySetInnerHTML={{
+                                __html: explTargetQuestion.explanationWrong,
+                              }}
+                            />
+                            <p className="text-[11px] text-amber-700 mt-2">
+                              위 선지 칸에 옮겨 적고 저장하면 이 블록은 사라집니다.
+                              옮기기 전까지는 학생에게 그대로 보입니다.
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </>
                   )

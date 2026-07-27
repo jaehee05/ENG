@@ -12,9 +12,9 @@ import {
   gradeFromScore,
   hasMockExplanation,
   hasMockPassage,
+  mockWrongChoiceEntries,
   MOCK_SUBJECT_LABEL,
   questionPoints,
-  wrongChoiceMarks,
   type Attempt,
   type KoreanMock,
   type KoreanMockQuestion,
@@ -579,6 +579,7 @@ export function KoreanMockResult() {
         (() => {
           const r = results.find((x) => x.number === explNumber)
           const explQ = explByNumber.get(explNumber)
+          const wrongEntries = explQ ? mockWrongChoiceEntries(explQ) : []
           // 지문은 틀렸을 때만 (관리자는 검수용으로 항상)
           const pq = passageByNumber.get(explNumber)
           const passageQ = pq && (!r?.correct || canEdit) ? pq : undefined
@@ -646,15 +647,33 @@ export function KoreanMockResult() {
                     </div>
                   )}
 
-                  {explQ?.explanationWrong && (
+                  {explQ && wrongEntries.length > 0 && (
                     <div>
                       <p className="text-xs font-semibold text-slate-500 mb-1.5">
-                        오답 해설{' '}
-                        {r && (
-                          <span className="text-slate-400 font-normal">
-                            {wrongChoiceMarks(r.correctAnswer).join(' ')}
-                          </span>
-                        )}
+                        오답 해설
+                      </p>
+                      <div className="space-y-3">
+                        {wrongEntries.map((e) => (
+                          <div key={e.choice} className="flex gap-2">
+                            {/* 선지 번호는 저장하지 않고 표시할 때 붙인다 */}
+                            <span className="shrink-0 text-sm font-semibold text-slate-500 leading-7">
+                              {e.mark}
+                            </span>
+                            <div
+                              className="rte-view text-sm text-slate-800 min-w-0 flex-1"
+                              dangerouslySetInnerHTML={{ __html: e.html }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 선지별로 나누기 전 형식으로 입력된 오답 해설 (그대로 표시) */}
+                  {explQ?.explanationWrong && wrongEntries.length === 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-slate-500 mb-1.5">
+                        오답 해설
                       </p>
                       <div
                         className="rte-view text-sm text-slate-800"
