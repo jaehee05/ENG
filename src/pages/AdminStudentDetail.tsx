@@ -5,7 +5,6 @@ import { ScheduleManager } from '../components/ScheduleManager'
 import { DESKTOP_QUERY, useMediaQuery } from '../lib/useMediaQuery'
 import {
   getAccount,
-  setReadingAccess,
   updateAccountColorKey,
   updateAccountSubjects,
 } from '../lib/account'
@@ -1090,23 +1089,8 @@ export function AdminStudentDetail() {
         account={account}
         onSaved={(next) => setAccount({ ...account, colorKey: next })}
       />
-      <label className="mt-3 flex items-center gap-2 text-sm text-slate-700 cursor-pointer select-none py-1">
-        <input
-          type="checkbox"
-          checked={!!account.readingAccess}
-          onChange={async (e) => {
-            const next = e.target.checked
-            setAccount({ ...account, readingAccess: next })
-            try {
-              await setReadingAccess(account.id, next)
-            } catch {
-              setAccount({ ...account, readingAccess: !next })
-            }
-          }}
-          className="h-4 w-4 accent-brand-600"
-        />
-        지문 문제풀이 접근 허용
-      </label>
+      {/* 지문 문제풀이가 학생 비노출로 바뀌면서 "접근 허용" 체크박스는 아무 효과가
+          없어져 제거했다. 되살리려면 Layout.tsx 의 canReading 과 함께 복구할 것. */}
     </div>
   )
 

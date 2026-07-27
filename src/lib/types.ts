@@ -352,6 +352,20 @@ export interface KoreanMockQuestion {
   points?: number
   /** 문항 해설 (HTML, 관리자 입력). 정오표에서 문항 탭 시 표시. */
   explanation?: string
+  /**
+   * 오답 리뷰용 지문 원문. 모의고사는 종이 시험지로 풀기 때문에 응시 중에는
+   * 쓰이지 않고, 채점 후 학생이 "틀린" 문항을 열었을 때만 펼쳐 보여준다.
+   */
+  passage?: string
+  /** 지문 한국어 해석 (영어 지문에서만 의미 있음). */
+  passageKo?: string
+  /** 지문 어휘. 탭하면 뜻이 뜨는 단어들 (영어 지문에서만 의미 있음). */
+  glossary?: WordEntry[]
+}
+
+/** 오답 리뷰로 보여줄 지문이 붙어 있는 문항인지. */
+export function hasMockPassage(q: KoreanMockQuestion): boolean {
+  return typeof q.passage === 'string' && q.passage.trim().length > 0
 }
 
 /** 선택과목 옵션 (수능형: 공통 + 택1). */

@@ -18,12 +18,13 @@ import {
   uploadMockExplanationPdf,
 } from '../lib/mockStorage'
 import { MyAttemptsBox } from '../components/MyAttemptsBox'
-import { estimateMockCutoffs } from '../lib/api'
+import { estimateMockCutoffs, extractGlossary, translatePassage } from '../lib/api'
 import { MockCutoffEditor } from '../components/MockCutoffEditor'
 import { ExamFilePicker } from '../components/ExamFilePicker'
 import { RichTextEditor } from '../components/RichTextEditor'
 import {
   getMockSubject,
+  hasMockPassage,
   MOCK_SUBJECT_LABEL,
   questionPoints,
   type Attempt,
@@ -33,6 +34,7 @@ import {
   type KoreanMockQuestion,
   type MockGradeCut,
   type MockSubject,
+  type WordEntry,
 } from '../lib/types'
 
 const SUBJECT_BADGE_CLASS: Record<MockSubject, string> = {
@@ -71,6 +73,13 @@ export function KoreanMockDetail() {
   const [explDraft, setExplDraft] = useState('')
   const [explSaving, setExplSaving] = useState(false)
   const [explStyles, setExplStylesState] = useState<ExplStyle[]>([])
+  // 같은 모달 안에서 해설 / 오답 리뷰 지문을 탭으로 전환
+  const [explTab, setExplTab] = useState<'expl' | 'passage'>('expl')
+  const [passageDraft, setPassageDraft] = useState('')
+  const [passageKoDraft, setPassageKoDraft] = useState('')
+  const [glossDraft, setGlossDraft] = useState<WordEntry[]>([])
+  const [aiBusy, setAiBusy] = useState<'ko' | 'gloss' | null>(null)
+  const [aiError, setAiError] = useState<string | null>(null)
   const [cutoffBusy, setCutoffBusy] = useState(false)
   const [cutoffError, setCutoffError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -225,22 +234,28 @@ export function KoreanMockDetail() {
         ? mock.questions[qIdx]
         : mock.electives?.[group]?.questions[qIdx]
     setExplDraft(q?.explanation ?? '')
+    setPassageDraft(q?.passage ?? '')
+    setPassageKoDraft(q?.passageKo ?? '')
+    setGlossDraft(q?.glossary ?? [])
+    setExplTab('expl')
+    setAiError(null)
     setExplTarget({ group, qIdx })
   }
-  async function applyExpl(html: string | undefined) {
+
+  /**
+   * 대상 문항 하나를 변환해 저장한다. 공통/선택과목 어느 쪽이든 동일하게 처리.
+   * 해설·지문 편집이 모두 이 경로를 쓴다.
+   */
+  async function saveQuestionPatch(
+    transform: (q: KoreanMockQuestion) => KoreanMockQuestion,
+    failMessage: string,
+  ) {
     if (!mock || !explTarget) return
     setExplSaving(true)
-    // Firestore는 undefined 필드를 거부하므로, 삭제 시 키 자체를 제거
-    const withExpl = (q: KoreanMockQuestion): KoreanMockQuestion => {
-      if (html) return { ...q, explanation: html }
-      const rest = { ...q }
-      delete rest.explanation
-      return rest
-    }
     try {
       if (explTarget.group === 'common') {
         const nq = mock.questions.map((q, i) =>
-          i === explTarget.qIdx ? withExpl(q) : q,
+          i === explTarget.qIdx ? transform(q) : q,
         )
         await updateKoreanMock(mock.id, { questions: nq })
         setMock({ ...mock, questions: nq })
@@ -251,7 +266,7 @@ export function KoreanMockDetail() {
             ? {
                 ...el,
                 questions: el.questions.map((q, j) =>
-                  j === explTarget.qIdx ? withExpl(q) : q,
+                  j === explTarget.qIdx ? transform(q) : q,
                 ),
               }
             : el,
@@ -261,9 +276,71 @@ export function KoreanMockDetail() {
       }
       setExplTarget(null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : '해설 저장 실패')
+      setError(e instanceof Error ? e.message : failMessage)
     } finally {
       setExplSaving(false)
+    }
+  }
+
+  async function applyExpl(html: string | undefined) {
+    // Firestore는 undefined 필드를 거부하므로, 삭제 시 키 자체를 제거
+    await saveQuestionPatch((q) => {
+      if (html) return { ...q, explanation: html }
+      const rest = { ...q }
+      delete rest.explanation
+      return rest
+    }, '해설 저장 실패')
+  }
+
+  /** 지문·해석·어휘를 한 번에 저장. 빈 값은 키를 지워 Firestore undefined 오류를 피한다. */
+  async function applyPassage(clear = false) {
+    const passage = clear ? '' : passageDraft.trim()
+    const passageKo = clear ? '' : passageKoDraft.trim()
+    const glossary = clear ? [] : glossDraft.filter((w) => w.en.trim() && w.ko.trim())
+    await saveQuestionPatch((q) => {
+      const next = { ...q }
+      if (passage) next.passage = passage
+      else delete next.passage
+      if (passage && passageKo) next.passageKo = passageKo
+      else delete next.passageKo
+      if (passage && glossary.length) next.glossary = glossary
+      else delete next.glossary
+      return next
+    }, '지문 저장 실패')
+  }
+
+  async function runTranslate() {
+    const text = passageDraft.trim()
+    if (!text) {
+      setAiError('먼저 지문을 입력하세요.')
+      return
+    }
+    setAiBusy('ko')
+    setAiError(null)
+    try {
+      setPassageKoDraft(await translatePassage(text))
+    } catch (e) {
+      setAiError(e instanceof Error ? e.message : '해석 생성 실패')
+    } finally {
+      setAiBusy(null)
+    }
+  }
+
+  async function runGlossary() {
+    const text = passageDraft.trim()
+    if (!text) {
+      setAiError('먼저 지문을 입력하세요.')
+      return
+    }
+    setAiBusy('gloss')
+    setAiError(null)
+    try {
+      const res = await extractGlossary({ passage: text, choices: [] })
+      setGlossDraft(res.glossary)
+    } catch (e) {
+      setAiError(e instanceof Error ? e.message : '어휘 추출 실패')
+    } finally {
+      setAiBusy(null)
     }
   }
 
@@ -344,6 +421,8 @@ export function KoreanMockDetail() {
   if (loading) return <p className="text-slate-500 text-sm">불러오는 중…</p>
   if (error) return <p className="text-red-600 text-sm">{error}</p>
   if (!mock) return null
+
+  const mockSubject = getMockSubject(mock)
 
   return (
     <div className="space-y-5 max-w-3xl mx-auto">
@@ -476,10 +555,17 @@ export function KoreanMockDetail() {
       {isAdmin && (
         <section className="space-y-3">
           <div>
-            <h2 className="text-base font-semibold text-slate-900">문항 해설</h2>
+            <h2 className="text-base font-semibold text-slate-900">
+              문항 해설 · 오답 리뷰 지문
+            </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              문항 번호를 눌러 해설을 입력·수정·삭제하세요. 학생 결과 정오표에서
-              해당 문항을 누르면 표시됩니다.
+              문항 번호를 눌러 해설과 지문을 입력하세요. 해설은 학생 결과
+              정오표에서 해당 문항을 누르면 표시되고, 지문은 그중 <b>틀린 문항</b>
+              에서만 펼쳐집니다.
+            </p>
+            <p className="text-[11px] text-slate-400 mt-1">
+              <span className="text-brand-700 font-semibold">✓</span> 해설 있음 ·{' '}
+              <span className="text-brand-700 font-semibold">¶</span> 지문 있음
             </p>
           </div>
           {(
@@ -501,13 +587,14 @@ export function KoreanMockDetail() {
                     type="button"
                     onClick={() => openExpl(sec.group, j)}
                     className={`rounded-md px-2 py-1.5 text-xs font-semibold border transition ${
-                      q.explanation
+                      q.explanation || hasMockPassage(q)
                         ? 'bg-brand-100 text-brand-700 border-brand-300'
                         : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
                     }`}
                   >
                     {q.number}
                     {q.explanation ? ' ✓' : ''}
+                    {hasMockPassage(q) ? ' ¶' : ''}
                   </button>
                 ))}
               </div>
@@ -531,42 +618,222 @@ export function KoreanMockDetail() {
                 ? mock.questions[explTarget.qIdx]
                 : mock.electives?.[explTarget.group]?.questions[explTarget.qIdx]
               )?.number}
-              번 해설
+              번 문항
             </h3>
-            <RichTextEditor
-              value={explDraft}
-              onChange={setExplDraft}
-              styles={explStyles}
-              onStylesChange={saveExplStyles}
-            />
-            <div className="flex items-center justify-between gap-2">
-              <button
-                type="button"
-                onClick={() => applyExpl(undefined)}
-                disabled={explSaving}
-                className="text-xs text-slate-400 hover:text-red-600 px-1 disabled:opacity-50"
-              >
-                해설 삭제
-              </button>
-              <div className="flex items-center gap-2">
+
+            <div className="flex border-b border-slate-200">
+              {(
+                [
+                  { key: 'expl', label: '해설' },
+                  { key: 'passage', label: '오답 리뷰 지문' },
+                ] as const
+              ).map((t) => (
                 <button
+                  key={t.key}
                   type="button"
-                  onClick={() => setExplTarget(null)}
-                  disabled={explSaving}
-                  className="text-sm text-slate-500 hover:text-slate-900 px-2"
+                  onClick={() => setExplTab(t.key)}
+                  className={`relative px-3 h-10 text-sm font-medium transition ${
+                    explTab === t.key
+                      ? 'text-slate-900'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
                 >
-                  취소
+                  {t.label}
+                  {explTab === t.key && (
+                    <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-brand-600" />
+                  )}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => applyExpl(explDraft.trim() ? explDraft : undefined)}
-                  disabled={explSaving}
-                  className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700 disabled:opacity-50"
-                >
-                  {explSaving ? '저장 중…' : '저장'}
-                </button>
-              </div>
+              ))}
             </div>
+
+            {explTab === 'expl' ? (
+              <>
+                <RichTextEditor
+                  value={explDraft}
+                  onChange={setExplDraft}
+                  styles={explStyles}
+                  onStylesChange={saveExplStyles}
+                />
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => applyExpl(undefined)}
+                    disabled={explSaving}
+                    className="text-xs text-slate-400 hover:text-red-600 px-1 disabled:opacity-50"
+                  >
+                    해설 삭제
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setExplTarget(null)}
+                      disabled={explSaving}
+                      className="text-sm text-slate-500 hover:text-slate-900 px-2"
+                    >
+                      취소
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyExpl(explDraft.trim() ? explDraft : undefined)}
+                      disabled={explSaving}
+                      className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700 disabled:opacity-50"
+                    >
+                      {explSaving ? '저장 중…' : '저장'}
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-[11px] text-slate-500">
+                  학생이 이 문항을 <b className="font-semibold">틀렸을 때만</b> 결과
+                  화면에서 펼쳐 보입니다. 맞힌 문항에는 노출되지 않습니다.
+                </p>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">
+                    지문
+                  </label>
+                  <textarea
+                    value={passageDraft}
+                    onChange={(e) => setPassageDraft(e.target.value)}
+                    rows={7}
+                    placeholder="시험지의 지문을 붙여넣으세요."
+                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                </div>
+
+                {/* 해석·어휘는 영어 지문에서만 의미가 있다. */}
+                {mockSubject === 'english' && (
+                  <>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={runTranslate}
+                        disabled={aiBusy !== null || explSaving}
+                        className="rounded-md border border-brand-200 bg-brand-50 text-brand-700 text-xs font-medium px-3 py-1.5 hover:bg-brand-100 disabled:opacity-50"
+                      >
+                        {aiBusy === 'ko' ? '해석 생성 중…' : '✨ 해석 자동 생성'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={runGlossary}
+                        disabled={aiBusy !== null || explSaving}
+                        className="rounded-md border border-brand-200 bg-brand-50 text-brand-700 text-xs font-medium px-3 py-1.5 hover:bg-brand-100 disabled:opacity-50"
+                      >
+                        {aiBusy === 'gloss' ? '어휘 추출 중…' : '✨ 어휘 자동 추출'}
+                      </button>
+                    </div>
+                    {aiError && <p className="text-xs text-red-600">{aiError}</p>}
+
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">
+                        한국어 해석
+                      </label>
+                      <textarea
+                        value={passageKoDraft}
+                        onChange={(e) => setPassageKoDraft(e.target.value)}
+                        rows={5}
+                        placeholder="비워두면 해석은 표시되지 않습니다."
+                        className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-brand-500"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-medium text-slate-600">
+                          어휘 ({glossDraft.length})
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setGlossDraft((prev) => [...prev, { en: '', ko: '' }])
+                          }
+                          className="text-[11px] text-brand-700 hover:underline"
+                        >
+                          + 단어 추가
+                        </button>
+                      </div>
+                      {glossDraft.length === 0 ? (
+                        <p className="text-[11px] text-slate-400 py-2">
+                          어휘가 없습니다. 지문을 넣고 자동 추출을 눌러보세요.
+                        </p>
+                      ) : (
+                        <ul className="space-y-1 max-h-48 overflow-y-auto">
+                          {glossDraft.map((w, i) => (
+                            <li key={i} className="flex items-center gap-1.5">
+                              <input
+                                value={w.en}
+                                onChange={(e) =>
+                                  setGlossDraft((prev) =>
+                                    prev.map((x, j) =>
+                                      j === i ? { ...x, en: e.target.value } : x,
+                                    ),
+                                  )
+                                }
+                                placeholder="word"
+                                className="flex-1 min-w-0 rounded border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-brand-500"
+                              />
+                              <input
+                                value={w.ko}
+                                onChange={(e) =>
+                                  setGlossDraft((prev) =>
+                                    prev.map((x, j) =>
+                                      j === i ? { ...x, ko: e.target.value } : x,
+                                    ),
+                                  )
+                                }
+                                placeholder="뜻"
+                                className="flex-1 min-w-0 rounded border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-brand-500"
+                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setGlossDraft((prev) => prev.filter((_, j) => j !== i))
+                                }
+                                className="text-slate-400 hover:text-red-600 px-1 text-xs"
+                                aria-label="삭제"
+                              >
+                                ✕
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => applyPassage(true)}
+                    disabled={explSaving || aiBusy !== null}
+                    className="text-xs text-slate-400 hover:text-red-600 px-1 disabled:opacity-50"
+                  >
+                    지문 삭제
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setExplTarget(null)}
+                      disabled={explSaving}
+                      className="text-sm text-slate-500 hover:text-slate-900 px-2"
+                    >
+                      취소
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => applyPassage()}
+                      disabled={explSaving || aiBusy !== null}
+                      className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700 disabled:opacity-50"
+                    >
+                      {explSaving ? '저장 중…' : '저장'}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
