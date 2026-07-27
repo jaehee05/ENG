@@ -1,17 +1,23 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
+import { GlossedPassage } from '../components/GlossedPassage'
 import {
   getAttempt,
   getKoreanMock,
   updateKoreanMockAttemptAnswers,
 } from '../lib/firestore'
 import {
+  choiceMark,
   gradeFromScore,
+  hasMockExplanation,
+  hasMockPassage,
   MOCK_SUBJECT_LABEL,
   questionPoints,
+  wrongChoiceMarks,
   type Attempt,
   type KoreanMock,
+  type KoreanMockQuestion,
   type KoreanMockResult,
   type MockSubject,
 } from '../lib/types'
@@ -55,6 +61,65 @@ function ScoreRing({ score, total }: { score: number; total: number }) {
         </span>
         <span className="text-xs text-slate-400 mt-1">{total}점 만점 중</span>
       </div>
+    </div>
+  )
+}
+
+/**
+ * 오답 리뷰 지문. 영어는 어휘를 탭하면 뜻이 뜨는 GlossedPassage로,
+ * 국어는 지문이 그 자체로 읽을 대상이라 그대로 보여준다.
+ * 해석은 기본으로 접어 둔다 — 먼저 원문을 다시 읽어보게 하려는 의도.
+ */
+function MockPassageReview({
+  question,
+  subject,
+}: {
+  question: KoreanMockQuestion
+  subject: MockSubject
+}) {
+  const [showKo, setShowKo] = useState(false)
+  const glossary = question.glossary ?? []
+  const passage = question.passage ?? ''
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-semibold text-slate-500">지문</p>
+      <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+        {subject === 'english' && glossary.length > 0 ? (
+          <GlossedPassage
+            passage={passage}
+            glossary={glossary}
+            className="text-[15px] leading-8 text-slate-900 break-words whitespace-pre-wrap text-justify"
+          />
+        ) : (
+          <p className="text-[15px] leading-8 text-slate-900 whitespace-pre-wrap break-words text-justify">
+            {passage}
+          </p>
+        )}
+      </div>
+
+      {subject === 'english' && glossary.length > 0 && (
+        <p className="text-[11px] text-slate-400">
+          회색으로 표시된 단어를 누르면 뜻이 나옵니다.
+        </p>
+      )}
+
+      {question.passageKo && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowKo((v) => !v)}
+            className="text-xs font-medium text-brand-700 hover:underline py-1"
+          >
+            {showKo ? '해석 접기' : '해석 보기'}
+          </button>
+          {showKo && (
+            <p className="mt-1 rounded-lg border border-slate-200 bg-white p-3 text-sm leading-7 text-slate-700 whitespace-pre-wrap break-words">
+              {question.passageKo}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -149,14 +214,20 @@ export function KoreanMockResult() {
     }
   }
   const pointsOf = (n: number) => pointsByNumber.get(n) ?? 2
-  // 문항 번호 → 해설(HTML). 공통 + 응시한 선택과목 문항.
-  const explByNumber = new Map<number, string>()
+  // 문항 번호 → 문항. 공통 + 응시한 선택과목 문항.
+  // 해설(정답/오답)과 오답 리뷰 지문을 모두 여기서 꺼내 쓴다.
+  const explByNumber = new Map<number, KoreanMockQuestion>()
+  const passageByNumber = new Map<number, KoreanMockQuestion>()
   if (mock) {
-    for (const q of mock.questions) if (q.explanation) explByNumber.set(q.number, q.explanation)
+    const collect = (q: KoreanMockQuestion) => {
+      if (hasMockExplanation(q)) explByNumber.set(q.number, q)
+      if (hasMockPassage(q)) passageByNumber.set(q.number, q)
+    }
+    for (const q of mock.questions) collect(q)
     const el = attempt.mockElectiveName
       ? mock.electives?.find((e) => e.name === attempt.mockElectiveName)
       : undefined
-    for (const q of el?.questions ?? []) if (q.explanation) explByNumber.set(q.number, q.explanation)
+    for (const q of el?.questions ?? []) collect(q)
   }
   const totalPoints = results.reduce((s, r) => s + pointsOf(r.number), 0)
   const score = results.reduce((s, r) => s + (r.correct ? pointsOf(r.number) : 0), 0)
@@ -348,7 +419,10 @@ export function KoreanMockResult() {
             {results.map((r, i) => {
               const unanswered = r.userAnswer === 0
               const hasExpl = explByNumber.has(r.number)
-              const tappable = !editing && hasExpl
+              // 지문은 틀린 문항에서만. 관리자는 검수용으로 항상 볼 수 있다.
+              const showPassage =
+                passageByNumber.has(r.number) && (!r.correct || canEdit)
+              const tappable = !editing && (hasExpl || showPassage)
               return (
                 <tr
                   key={i}
@@ -359,6 +433,11 @@ export function KoreanMockResult() {
                 >
                   <td className="px-3 py-2.5 font-semibold text-slate-800">
                     {r.number}번
+                    {showPassage && (
+                      <span className="ml-1.5 inline-block rounded bg-brand-50 text-brand-700 px-1.5 py-0.5 text-[10px] font-medium align-middle">
+                        지문
+                      </span>
+                    )}
                   </td>
                   <td className="px-2 py-2.5 text-center text-slate-500 tabular-nums">
                     {pointsOf(r.number)}
@@ -499,7 +578,10 @@ export function KoreanMockResult() {
       {explNumber != null &&
         (() => {
           const r = results.find((x) => x.number === explNumber)
-          const html = explByNumber.get(explNumber)
+          const explQ = explByNumber.get(explNumber)
+          // 지문은 틀렸을 때만 (관리자는 검수용으로 항상)
+          const pq = passageByNumber.get(explNumber)
+          const passageQ = pq && (!r?.correct || canEdit) ? pq : undefined
           return (
             <div
               className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm"
@@ -511,7 +593,7 @@ export function KoreanMockResult() {
               >
                 <div className="sticky top-0 bg-white border-b border-slate-100 px-5 py-3 flex items-center justify-between">
                   <h3 className="text-base font-bold text-slate-900">
-                    {explNumber}번 해설
+                    {explNumber}번 {r && !r.correct ? '오답 리뷰' : '해설'}
                   </h3>
                   <button
                     type="button"
@@ -543,12 +625,45 @@ export function KoreanMockResult() {
                       </span>
                     </div>
                   )}
-                  {html ? (
-                    <div
-                      className="rte-view text-sm text-slate-800"
-                      dangerouslySetInnerHTML={{ __html: html }}
-                    />
-                  ) : (
+                  {passageQ && (
+                    <MockPassageReview question={passageQ} subject={subj} />
+                  )}
+
+                  {explQ?.explanation && (
+                    <div>
+                      <p className="text-xs font-semibold text-slate-500 mb-1.5">
+                        정답 해설{' '}
+                        {r && (
+                          <span className="text-brand-700">
+                            {choiceMark(r.correctAnswer)}
+                          </span>
+                        )}
+                      </p>
+                      <div
+                        className="rte-view text-sm text-slate-800"
+                        dangerouslySetInnerHTML={{ __html: explQ.explanation }}
+                      />
+                    </div>
+                  )}
+
+                  {explQ?.explanationWrong && (
+                    <div>
+                      <p className="text-xs font-semibold text-slate-500 mb-1.5">
+                        오답 해설{' '}
+                        {r && (
+                          <span className="text-slate-400 font-normal">
+                            {wrongChoiceMarks(r.correctAnswer).join(' ')}
+                          </span>
+                        )}
+                      </p>
+                      <div
+                        className="rte-view text-sm text-slate-800"
+                        dangerouslySetInnerHTML={{ __html: explQ.explanationWrong }}
+                      />
+                    </div>
+                  )}
+
+                  {!explQ && !passageQ && (
                     <p className="text-sm text-slate-400 py-6 text-center">
                       아직 해설이 없어요.
                     </p>

@@ -648,7 +648,8 @@ export function Dashboard() {
           </h2>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
             {shortcuts
-              .filter((c) => c.to !== '/reading' || isAdmin || profile?.readingAccess === true)
+              // 지문 문제풀이는 학생 비노출 — 모의고사 오답 리뷰로 대체
+              .filter((c) => c.to !== '/reading' || isAdmin)
               .map((c) => (
               <Link
                 key={c.to}

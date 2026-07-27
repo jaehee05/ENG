@@ -189,8 +189,12 @@ export function Layout() {
     '/wordbook',
     '/history',
   ])
-  // 지문 문제풀이는 관리자가 지정한 학생에게만 노출.
-  const canReading = isAdmin || profile?.readingAccess === true
+  // 지문 문제풀이는 학생에게 비노출. 영어도 모의고사로 출제하고, 지문 상세는
+  // 모의고사 오답 리뷰에서 보여주는 방식으로 옮겼다.
+  // 관리자는 오답 리뷰용 지문 자산을 만들어야 하므로 계속 접근한다.
+  // 학생에게 다시 열려면 아래를 `isAdmin || profile?.readingAccess === true` 로
+  // 되돌리고 학생 상세 > 설정의 접근 허용 체크박스를 복구하면 된다.
+  const canReading = isAdmin
   const filterForSubjects = (items: NavItem[]) => {
     const bySubject =
       subj.english || isAdmin

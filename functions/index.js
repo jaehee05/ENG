@@ -561,6 +561,13 @@ function isAssignmentDoneSrv(asn, attempts) {
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
+// 지문 문제풀이를 학생에게서 내렸다(영어는 모의고사로 출제하고, 지문은 모의고사
+// 오답 리뷰에서 보여주는 방식). 학생이 열 수도 풀 수도 없는 과제를 완료율 분모에
+// 넣으면 학부모 주간 리포트에 영구 0%로 나가므로 집계에서 뺀다.
+// 앱쪽 규칙(src/lib/types.ts isAssignmentVisibleToStudent)과 맞춘 값이므로,
+// 지문을 다시 열 때 양쪽을 함께 되돌릴 것.
+const READING_ASSIGNMENTS_VISIBLE = false;
+
 function tsToMillis(ts) {
   if (!ts) return null;
   if (typeof ts.toMillis === "function") return ts.toMillis();
@@ -588,7 +595,9 @@ function buildWeeklyReportVarsSrv(assignments, attempts, windowStartMs) {
 
   const recentAsn = assignments.filter((a) => inWindow(a.dueAt || a.createdAt));
   const vocabAsn = recentAsn.filter((a) => a.type === "vocab");
-  const readingAsn = recentAsn.filter((a) => a.type === "reading");
+  const readingAsn = READING_ASSIGNMENTS_VISIBLE
+    ? recentAsn.filter((a) => a.type === "reading")
+    : [];
   const vocabDone = vocabAsn.filter((a) => isAssignmentDoneSrv(a, attempts)).length;
   const readingDone = readingAsn.filter((a) => isAssignmentDoneSrv(a, attempts)).length;
   const vocabPct = vocabAsn.length > 0 ? Math.round((vocabDone / vocabAsn.length) * 100) : null;

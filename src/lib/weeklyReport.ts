@@ -27,6 +27,14 @@ export const VOCAB_PASS_THRESHOLD = 25
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
+/**
+ * 지문 문제풀이를 학생에게서 내렸으므로, 학생이 열 수도 풀 수도 없는 지문 과제를
+ * 완료율 분모에서 뺀다. 실제 발송은 functions/index.js 의
+ * READING_ASSIGNMENTS_VISIBLE 이 결정하므로 두 값을 항상 같이 바꿀 것.
+ * (이 파일은 관리자 미리보기 전용이라, 어긋나면 미리보기와 실제 발송이 달라진다)
+ */
+const READING_ASSIGNMENTS_VISIBLE = false
+
 export interface WeeklyReportVars {
   /** var1: 과제 성취도 */
   var1: string
@@ -65,7 +73,9 @@ export function buildWeeklyReportVars(
   const recentAttempts = attempts.filter((a) => inWindow(a.createdAt))
 
   const vocabAsn = recentAsn.filter((a) => a.type === 'vocab')
-  const readingAsn = recentAsn.filter((a) => a.type === 'reading')
+  const readingAsn = READING_ASSIGNMENTS_VISIBLE
+    ? recentAsn.filter((a) => a.type === 'reading')
+    : []
   const vocabDone = vocabAsn.filter((a) => isAssignmentDone(a, attempts)).length
   const readingDone = readingAsn.filter((a) =>
     isAssignmentDone(a, attempts),

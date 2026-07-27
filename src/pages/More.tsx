@@ -93,7 +93,8 @@ export function More() {
   const subj = profile ? accountSubjects(profile) : { korean: true, english: true }
   const showEnglish = subj.english || isAdmin
   const showMock = isAdmin || subj.korean
-  const canReading = isAdmin || profile?.readingAccess === true
+  // 지문 문제풀이는 학생 비노출 — 모의고사 오답 리뷰로 대체
+  const canReading = isAdmin
 
   const [noti, toggleNoti] = useLocalToggle('pref_noti', true)
   const [marketing, toggleMarketing] = useLocalToggle('pref_marketing', true)
