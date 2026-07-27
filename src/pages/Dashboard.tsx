@@ -366,6 +366,7 @@ export function Dashboard() {
   })()
 
   const ddayBackdrop = useBackdropDismiss({
+    open: ddayOpen,
     onDismiss: () => setDdayOpen(false),
     dirty:
       ddayTitle.trim() !== (dday?.title ?? '').trim() ||
