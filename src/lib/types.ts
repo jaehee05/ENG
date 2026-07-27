@@ -355,7 +355,17 @@ export interface KoreanMockQuestion {
    * 정답/오답 해설을 나누기 전에 입력된 기존 해설도 이 필드에 그대로 남아 있다.
    */
   explanation?: string
-  /** 오답 해설 (HTML, 관리자 입력). 왜 나머지 선택지가 답이 아닌지. */
+  /**
+   * 선지별 오답 해설. 키는 선택지 번호('1'~'5'), 값은 해설 HTML.
+   * 정답 번호 키는 쓰지 않는다. 표시할 때 앞에 원문자(①~⑤)가 자동으로 붙으므로
+   * 값에는 번호를 넣지 않는다.
+   * (Firestore 맵이라 키가 문자열이다)
+   */
+  explanationChoices?: Record<string, string>
+  /**
+   * @deprecated 선지별로 나누기 전의 통짜 오답 해설.
+   * 기존 입력분을 잃지 않도록 남겨두고, 있으면 그대로 보여준다.
+   */
   explanationWrong?: string
   /**
    * 오답 리뷰용 지문 원문. 모의고사는 종이 시험지로 풀기 때문에 응시 중에는
@@ -375,7 +385,33 @@ export function hasMockPassage(q: KoreanMockQuestion): boolean {
 
 /** 정답/오답 어느 쪽이든 해설이 있는지. */
 export function hasMockExplanation(q: KoreanMockQuestion): boolean {
-  return Boolean(q.explanation?.trim() || q.explanationWrong?.trim())
+  return Boolean(
+    q.explanation?.trim() ||
+      q.explanationWrong?.trim() ||
+      mockWrongChoiceEntries(q).length > 0,
+  )
+}
+
+/**
+ * 선지별 오답 해설을 표시 순서(선지 번호 오름차순)로 뽑는다.
+ * 정답 번호와 빈 값은 제외한다.
+ */
+export function mockWrongChoiceEntries(
+  q: KoreanMockQuestion,
+): { choice: number; mark: string; html: string }[] {
+  const src = q.explanationChoices
+  if (!src) return []
+  return Object.entries(src)
+    .map(([k, html]) => ({ choice: Number(k), html }))
+    .filter(
+      (e) =>
+        Number.isFinite(e.choice) &&
+        e.choice !== q.answer &&
+        typeof e.html === 'string' &&
+        e.html.trim().length > 0,
+    )
+    .sort((a, b) => a.choice - b.choice)
+    .map((e) => ({ choice: e.choice, mark: choiceMark(e.choice), html: e.html }))
 }
 
 /** 선택지 원문자. answer(1~5)를 ①~⑤ 로 옮길 때 쓴다. */
@@ -389,6 +425,11 @@ export function choiceMark(n: number): string {
 /** 정답을 뺀 나머지 선택지 원문자들 (오답 해설 작성 힌트용). */
 export function wrongChoiceMarks(answer: number): string[] {
   return CHOICE_MARKS.filter((_, i) => i + 1 !== answer)
+}
+
+/** 정답을 뺀 나머지 선택지 번호들 (선지별 오답 해설 입력칸 생성용). */
+export function wrongChoiceNumbers(answer: number): number[] {
+  return CHOICE_MARKS.map((_, i) => i + 1).filter((n) => n !== answer)
 }
 
 /** 선택과목 옵션 (수능형: 공통 + 택1). */
