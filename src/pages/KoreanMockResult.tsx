@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import { GlossedPassage } from '../components/GlossedPassage'
+import { BackLink } from '../components/BackLink'
 import {
   getAttempt,
   getKoreanMock,
@@ -264,6 +265,7 @@ export function KoreanMockResult() {
 
   return (
     <div className="space-y-4 max-w-lg mx-auto">
+      <BackLink to={`/korean-mocks/${id}`} label="모의고사" />
       <header className="text-center">
         <h1 className="text-lg font-bold text-slate-900">시험 결과</h1>
       </header>

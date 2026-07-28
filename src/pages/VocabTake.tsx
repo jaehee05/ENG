@@ -7,6 +7,7 @@ import {
   listAttemptsForUser,
 } from '../lib/firestore'
 import { gradeVocabAnswers } from '../lib/grading'
+import { BackLink } from '../components/BackLink'
 import { highlightHead } from '../lib/highlightWord'
 import {
   choiceSetMap,
@@ -195,6 +196,15 @@ export function VocabTake() {
 
   return (
     <div className="space-y-5 max-w-3xl mx-auto">
+      <BackLink
+        to={`/vocab/${set.id}`}
+        label="시험지"
+        confirmMessage={
+          answered > 0
+            ? '지금 나가면 입력한 답이 저장되지 않습니다. 나갈까요?'
+            : undefined
+        }
+      />
       <header className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">

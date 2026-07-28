@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { BackLink } from '../components/BackLink'
 import { useAuth } from '../contexts/useAuth'
 import { getAttempt, updateVocabResults } from '../lib/firestore'
 import type { Attempt, VocabResult as VocabResultRow } from '../lib/types'
@@ -58,6 +59,7 @@ export function WordbookResult() {
 
   return (
     <div className="space-y-5 max-w-3xl mx-auto">
+      <BackLink to="/wordbook" label="내 단어장" />
       <header>
         <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
           결과

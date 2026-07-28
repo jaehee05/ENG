@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { BackLink } from '../components/BackLink'
 import {
   applyReadingOrder,
   getReading,
@@ -196,6 +197,7 @@ export function ReadingDetail() {
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto relative">
+      <BackLink to="/reading" label="지문 목록" />
       {isAdmin && prevReading && (
         <Link
           to={`/reading/${prevReading.id}`}

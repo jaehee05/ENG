@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { BackLink } from '../components/BackLink'
 import { useAuth } from '../contexts/useAuth'
 import { createWordbookAttempt } from '../lib/firestore'
 import { gradeVocabAnswers } from '../lib/grading'
@@ -74,6 +75,15 @@ export function WordbookTake() {
 
   return (
     <div className="space-y-5 max-w-3xl mx-auto">
+      <BackLink
+        to="/wordbook"
+        label="내 단어장"
+        confirmMessage={
+          answered > 0
+            ? '지금 나가면 입력한 답이 저장되지 않습니다. 나갈까요?'
+            : undefined
+        }
+      />
       <header>
         <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
           단어 시험
