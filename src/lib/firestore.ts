@@ -41,6 +41,8 @@ import type {
   ReadingResult,
   UserNotification,
   VocabResult,
+  VocabChoice,
+  VocabFormat,
   VocabSeries,
   VocabSet,
   WordEntry,
@@ -69,6 +71,10 @@ export async function createVocabSet(input: {
   maxAttempts?: number
   studentUid?: string
   studentName?: string
+  /** 'choice' 면 5지선다. 미지정이면 기존 주관식. */
+  format?: VocabFormat
+  /** format==='choice' 일 때 단어별 선지. */
+  choiceSets?: VocabChoice[]
   createdBy: string
   createdByName: string
 }): Promise<string> {
@@ -78,6 +84,11 @@ export async function createVocabSet(input: {
     createdBy: input.createdBy,
     createdByName: input.createdByName,
     createdAt: serverTimestamp(),
+  }
+  // 주관식은 필드를 아예 넣지 않는다 — 기존 시험지와 같은 모양을 유지.
+  if (input.format === 'choice') {
+    payload.format = 'choice'
+    payload.choiceSets = input.choiceSets ?? []
   }
   if (input.maxAttempts && input.maxAttempts > 0) {
     payload.maxAttempts = Math.trunc(input.maxAttempts)

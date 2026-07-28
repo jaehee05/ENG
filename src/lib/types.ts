@@ -75,10 +75,31 @@ export interface WordEntry {
   senses?: VocabSense[]
 }
 
+/** 단어 시험 형식. 미설정=written(주관식) — 기존 시험지 호환. */
+export type VocabFormat = 'written' | 'choice'
+
+/**
+ * 5지선다 문항 하나.
+ * 선지는 만들 때 한 번 섞어서 저장하고 answer 로 정답 위치를 기록한다.
+ * 응시할 때마다 섞으면 같은 시험지를 다시 풀 때 위치가 달라져 오답 복습이 어긋난다.
+ */
+export interface VocabChoice {
+  /** 대상 단어. VocabSet.words 의 en 과 매칭한다. */
+  en: string
+  /** 선지 5개 (정답 포함, 이미 섞인 상태). */
+  choices: string[]
+  /** choices 안에서의 정답 인덱스 (0-base). */
+  answer: number
+}
+
 export interface VocabSet {
   id: string
   title: string
   words: WordEntry[]
+  /** 'written'(주관식) | 'choice'(5지선다). 미설정이면 'written'. */
+  format?: VocabFormat
+  /** format==='choice' 일 때만. 단어별 선지 — en 으로 words 와 맞춘다. */
+  choiceSets?: VocabChoice[]
   /** 소유 학생 UID. 없으면 legacy(공용) 시험지 — 학생 뷰 미노출, 관리자만 표시. */
   studentUid?: string
   studentName?: string
@@ -329,8 +350,15 @@ export function questionsWithoutShared(
 export interface VocabResult {
   en: string
   ko: string
+  /** 주관식은 학생이 쓴 문장, 5지선다는 고른 선지 텍스트(미선택이면 빈 문자열). */
   userAnswer: string
   correct: boolean
+  /** 5지선다 응시 기록. 결과 화면에서 응시 당시 선지를 그대로 보여주기 위해 남긴다. */
+  choices?: string[]
+  /** choices 안에서의 정답 인덱스. */
+  answerIndex?: number
+  /** 학생이 고른 인덱스. 미선택이면 -1. */
+  userIndex?: number
 }
 
 export interface ReadingResult {
@@ -381,6 +409,20 @@ export interface KoreanMockQuestion {
 /** 오답 리뷰로 보여줄 지문이 붙어 있는 문항인지. */
 export function hasMockPassage(q: KoreanMockQuestion): boolean {
   return typeof q.passage === 'string' && q.passage.trim().length > 0
+}
+
+/** 시험지 형식. 레거시(미설정)는 주관식. */
+export function getVocabFormat(v: Pick<VocabSet, 'format'>): VocabFormat {
+  return v.format === 'choice' ? 'choice' : 'written'
+}
+
+/** 단어(en) → 선지 로 바로 꺼내 쓰기 위한 맵. */
+export function choiceSetMap(v: VocabSet): Map<string, VocabChoice> {
+  const m = new Map<string, VocabChoice>()
+  for (const c of v.choiceSets ?? []) {
+    if (c && typeof c.en === 'string' && Array.isArray(c.choices)) m.set(c.en, c)
+  }
+  return m
 }
 
 /** 정답/오답 어느 쪽이든 해설이 있는지. */
