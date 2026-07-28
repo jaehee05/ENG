@@ -32,6 +32,8 @@ export function CorpusDetail() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [perDayRaw, setPerDayRaw] = useState('30')
+  /** 한 번에 만들 DAY 개수. 1이면 기존과 동일하게 한 개만. */
+  const [dayCountRaw, setDayCountRaw] = useState('1')
   const [format, setFormat] = useState<VocabFormat>('written')
   // AI 오답 생성이 일부라도 실패했는지 — 교재 내 뜻으로 채워지므로 생성은 성공한다
   const [choiceWarning, setChoiceWarning] = useState(false)
@@ -102,6 +104,10 @@ export function CorpusDetail() {
   const used = genProg.usedCount
   const remaining = Math.max(0, total - used)
   const nextDay = genProg.lastDayNumber + 1
+  // 남은 단어로 실제 만들 수 있는 DAY 수 (요청보다 적을 수 있다)
+  const requestedDays = Math.max(1, Number.parseInt(dayCountRaw, 10) || 1)
+  const perDayNum = Math.max(1, Number.parseInt(perDayRaw, 10) || 1)
+  const plannedDays = Math.min(requestedDays, Math.ceil(remaining / perDayNum))
 
   async function handleGenerate() {
     if (!series || !profile) return
@@ -115,6 +121,11 @@ export function CorpusDetail() {
       setNotice('DAY당 단어 수는 양의 정수여야 합니다.')
       return
     }
+    const requested = Number.parseInt(dayCountRaw, 10)
+    if (!Number.isFinite(requested) || requested <= 0) {
+      setNotice('만들 DAY 수는 양의 정수여야 합니다.')
+      return
+    }
     const allWords = series.words ?? []
     if (remaining <= 0) {
       setNotice('이 학생은 교재 단어를 모두 사용했습니다. 단어를 추가하세요.')
@@ -125,49 +136,78 @@ export function CorpusDetail() {
       const n = Number.parseInt(maxAttemptsRaw, 10)
       if (Number.isFinite(n) && n > 0) maxAttempts = n
     }
+    // 남은 단어보다 많이 요청하면 남은 만큼만 만든다
+    const count = Math.min(requested, Math.ceil(remaining / perDay))
+
     setGenerating(true)
     setNotice(null)
+    setChoiceWarning(false)
+
+    // 진행도는 DAY 하나를 만들 때마다 갱신한다. 마지막에 한 번만 쓰면
+    // 중간에 실패했을 때 이미 만들어진 시험지가 진행도에 안 잡혀,
+    // 다음 생성이 같은 단어를 또 내보낸다.
+    let cursor = used
+    let day = nextDay
+    let madeDays = 0
+    let madeWords = 0
     try {
-      const slice = allWords.slice(used, Math.min(used + perDay, allWords.length))
+      for (let i = 0; i < count; i++) {
+        const slice = allWords.slice(cursor, Math.min(cursor + perDay, allWords.length))
+        if (slice.length === 0) break
 
-      // 5지선다는 만들 때 선지를 한 번 생성해 저장한다.
-      // 오답은 이 DAY 안이 아니라 교재 전체에서 빌려온다 — DAY 안에서만 뽑으면
-      // 30단어짜리 DAY에서 같은 오답이 계속 반복된다.
-      let choiceSets
-      if (format === 'choice') {
-        setNotice('선지 생성 중...')
-        const built = await buildVocabChoices(slice, allWords)
-        choiceSets = built.choiceSets
-        if (built.aiFailed) setChoiceWarning(true)
+        // 5지선다는 만들 때 선지를 한 번 생성해 저장한다.
+        // 오답은 이 DAY 안이 아니라 교재 전체에서 빌려온다 — DAY 안에서만
+        // 뽑으면 30단어짜리 DAY에서 같은 오답이 계속 반복된다.
+        let choiceSets
+        if (format === 'choice') {
+          setNotice(`${i + 1}/${count} DAY ${day} 선지 생성 중...`)
+          const built = await buildVocabChoices(slice, allWords)
+          choiceSets = built.choiceSets
+          if (built.aiFailed) setChoiceWarning(true)
+        } else if (count > 1) {
+          setNotice(`${i + 1}/${count} DAY ${day} 생성 중...`)
+        }
+
+        await createVocabSet({
+          title: `${series.title} DAY ${day}`,
+          words: slice,
+          maxAttempts,
+          studentUid: genUid,
+          studentName: student?.displayName ?? '',
+          format,
+          choiceSets,
+          createdBy: profile.id,
+          createdByName: profile.displayName,
+        })
+
+        cursor += slice.length
+        madeWords += slice.length
+        madeDays++
+        await updateVocabSeries(series.id, {
+          studentProgress: {
+            ...(series.studentProgress ?? {}),
+            [genUid]: { usedCount: cursor, lastDayNumber: day },
+          },
+          perDay,
+          maxAttempts,
+        })
+        day++
       }
 
-      await createVocabSet({
-        title: `${series.title} DAY ${nextDay}`,
-        words: slice,
-        maxAttempts,
-        studentUid: genUid,
-        studentName: student?.displayName ?? '',
-        format,
-        choiceSets,
-        createdBy: profile.id,
-        createdByName: profile.displayName,
-      })
-      const nextProgress = {
-        ...(series.studentProgress ?? {}),
-        [genUid]: { usedCount: used + slice.length, lastDayNumber: nextDay },
-      }
-      await updateVocabSeries(series.id, {
-        studentProgress: nextProgress,
-        perDay,
-        maxAttempts,
-      })
       const refreshed = await getVocabSeries(series.id)
       if (refreshed) setSeries(refreshed)
+      const range =
+        madeDays === 1 ? `DAY ${nextDay}` : `DAY ${nextDay}~${nextDay + madeDays - 1}`
       setNotice(
-        `${student?.displayName} · "${series.title} DAY ${nextDay}" ${slice.length}단어 생성 완료.`,
+        `${student?.displayName} · "${series.title}" ${range} ${madeDays}개 · ${madeWords}단어 생성 완료.` +
+          (madeDays < requested ? ' (남은 단어만큼만 만들었습니다)' : ''),
       )
     } catch (err) {
-      setNotice(err instanceof Error ? err.message : '생성 실패')
+      // 실패해도 여기까지 만든 것은 진행도에 반영돼 있다
+      const refreshed = await getVocabSeries(series.id)
+      if (refreshed) setSeries(refreshed)
+      const done = madeDays > 0 ? ` (${madeDays}개까지는 생성됨)` : ''
+      setNotice((err instanceof Error ? err.message : '생성 실패') + done)
     } finally {
       setGenerating(false)
     }
@@ -557,16 +597,29 @@ export function CorpusDetail() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">
-              이번 DAY 단어 수
+              DAY당 단어 수
             </label>
             <input
               type="number"
               min={1}
               value={perDayRaw}
               onChange={(e) => setPerDayRaw(e.target.value)}
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">
+              만들 DAY 수{' '}
+              <span className="font-normal text-slate-400">(한 번에)</span>
+            </label>
+            <input
+              type="number"
+              min={1}
+              value={dayCountRaw}
+              onChange={(e) => setDayCountRaw(e.target.value)}
               className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
           </div>
@@ -587,26 +640,46 @@ export function CorpusDetail() {
         </div>
         {genUid && (
           <p className="text-xs text-slate-600">
-            이 학생: 사용 {used} · 남은 {remaining} · 다음 제목{' '}
-            <strong>{series.title} DAY {nextDay}</strong>
-            {remaining < Number.parseInt(perDayRaw || '0', 10) && remaining > 0 && (
+            이 학생: 사용 {used} · 남은 {remaining} ·{' '}
+            {plannedDays <= 1 ? (
+              <>
+                다음 제목 <strong>{series.title} DAY {nextDay}</strong>
+              </>
+            ) : (
+              <>
+                만들 범위{' '}
+                <strong>
+                  DAY {nextDay}~{nextDay + plannedDays - 1}
+                </strong>{' '}
+                ({plannedDays}개)
+              </>
+            )}
+            {plannedDays < requestedDays && (
               <span className="ml-2 text-amber-700">
-                (남은 {remaining}개만 사용)
+                남은 단어로는 {plannedDays}개까지만 가능합니다
               </span>
             )}
+          </p>
+        )}
+        {format === 'choice' && plannedDays > 1 && (
+          <p className="text-[11px] text-amber-700">
+            5지선다는 DAY마다 선지를 생성하므로 {plannedDays}개를 만들면
+            시간이 꽤 걸립니다. 중간에 실패해도 그때까지 만든 DAY는 남습니다.
           </p>
         )}
         <button
           type="button"
           onClick={handleGenerate}
           disabled={generating || !genUid || remaining <= 0}
-          className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700 disabled:opacity-50"
+          className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 touch:py-2.5 hover:bg-brand-700 disabled:opacity-50"
         >
           {generating
             ? '생성 중...'
-            : genUid
-              ? `DAY ${nextDay} 시험지 생성`
-              : '학생을 선택하세요'}
+            : !genUid
+              ? '학생을 선택하세요'
+              : plannedDays <= 1
+                ? `DAY ${nextDay} 시험지 생성`
+                : `DAY ${nextDay}~${nextDay + plannedDays - 1} 시험지 ${plannedDays}개 생성`}
         </button>
       </section>
 
