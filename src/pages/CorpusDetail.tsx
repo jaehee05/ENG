@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import {
   createVocabSet,
@@ -12,10 +12,12 @@ import { listAccounts } from '../lib/account'
 import {
   parseWordList,
   type UserAccount,
+  type VocabFormat,
   type VocabSense,
   type VocabSeries,
   type WordEntry,
 } from '../lib/types'
+import { buildVocabChoices } from '../lib/vocabChoices'
 import {
   looksLikeTextbookVocab,
   parseSenseBody,
@@ -30,9 +32,14 @@ export function CorpusDetail() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [perDayRaw, setPerDayRaw] = useState('30')
+  const [format, setFormat] = useState<VocabFormat>('written')
+  // AI 오답 생성이 일부라도 실패했는지 — 교재 내 뜻으로 채워지므로 생성은 성공한다
+  const [choiceWarning, setChoiceWarning] = useState(false)
   const [maxAttemptsRaw, setMaxAttemptsRaw] = useState('')
   const [students, setStudents] = useState<UserAccount[]>([])
-  const [genUid, setGenUid] = useState('')
+  // 학생 상세에서 ?student= 로 넘어오면 그 학생을 미리 골라둔다
+  const [search] = useSearchParams()
+  const [genUid, setGenUid] = useState(search.get('student') ?? '')
   const [appendText, setAppendText] = useState('')
   const [generating, setGenerating] = useState(false)
   const [appending, setAppending] = useState(false)
@@ -122,12 +129,26 @@ export function CorpusDetail() {
     setNotice(null)
     try {
       const slice = allWords.slice(used, Math.min(used + perDay, allWords.length))
+
+      // 5지선다는 만들 때 선지를 한 번 생성해 저장한다.
+      // 오답은 이 DAY 안이 아니라 교재 전체에서 빌려온다 — DAY 안에서만 뽑으면
+      // 30단어짜리 DAY에서 같은 오답이 계속 반복된다.
+      let choiceSets
+      if (format === 'choice') {
+        setNotice('선지 생성 중...')
+        const built = await buildVocabChoices(slice, allWords)
+        choiceSets = built.choiceSets
+        if (built.aiFailed) setChoiceWarning(true)
+      }
+
       await createVocabSet({
         title: `${series.title} DAY ${nextDay}`,
         words: slice,
         maxAttempts,
         studentUid: genUid,
         studentName: student?.displayName ?? '',
+        format,
+        choiceSets,
         createdBy: profile.id,
         createdByName: profile.displayName,
       })
@@ -473,6 +494,12 @@ export function CorpusDetail() {
           {notice}
         </p>
       )}
+      {choiceWarning && (
+        <p className="text-sm text-amber-700">
+          일부 단어는 AI 오답 생성에 실패해 이 교재의 다른 단어 뜻으로 채웠습니다.
+          시험지는 정상 생성됐습니다.
+        </p>
+      )}
 
       <section className="rounded-lg border border-brand-200 bg-brand-50/40 p-4 space-y-3">
         <h2 className="text-sm font-semibold text-brand-700">
@@ -500,6 +527,36 @@ export function CorpusDetail() {
             })}
           </select>
         </div>
+        <div>
+          <p className="block text-xs font-medium text-slate-600 mb-1.5">시험 형식</p>
+          <div className="grid grid-cols-2 gap-1 rounded-md border border-slate-200 bg-white p-1 max-w-xs">
+            {(
+              [
+                { key: 'written', label: '주관식' },
+                { key: 'choice', label: '5지선다' },
+              ] as { key: VocabFormat; label: string }[]
+            ).map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => setFormat(opt.key)}
+                className={`rounded px-2 py-1.5 touch:py-2 text-xs font-medium transition ${
+                  format === opt.key
+                    ? 'bg-slate-900 text-white'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[11px] text-slate-500 mt-1.5">
+            {format === 'written'
+              ? '학생이 뜻을 직접 입력하고 AI가 채점합니다.'
+              : '단어마다 선지 5개를 만듭니다. 오답은 반대 뜻이나 철자가 비슷한 단어의 뜻으로, 부족하면 이 교재의 다른 뜻으로 채웁니다. 생성에 시간이 조금 걸립니다.'}
+          </p>
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">
