@@ -6,7 +6,6 @@ import { Login } from './pages/Login'
 import { Signup } from './pages/Signup'
 import { Dashboard } from './pages/Dashboard'
 import { VocabList } from './pages/VocabList'
-import { VocabNew } from './pages/VocabNew'
 import { VocabDetail } from './pages/VocabDetail'
 import { VocabTake } from './pages/VocabTake'
 import { VocabSheet } from './pages/VocabSheet'
@@ -95,7 +94,6 @@ function App() {
 
           <Route element={<ProtectedRoute adminOnly />}>
             <Route element={<Layout />}>
-              <Route path="/vocab/new" element={<VocabNew />} />
               <Route path="/vocab/corpora" element={<CorporaList />} />
               <Route path="/vocab/corpora/new" element={<CorpusNew />} />
               <Route path="/vocab/corpora/:id" element={<CorpusDetail />} />

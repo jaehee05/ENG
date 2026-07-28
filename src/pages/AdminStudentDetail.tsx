@@ -517,8 +517,9 @@ export function AdminStudentDetail() {
 
   const contactActions = (
     <div className="flex flex-wrap items-center gap-1.5">
+      {/* 교재를 고르면 이 학생이 자동 선택된 채로 DAY 시험지를 만들 수 있다. */}
       <Link
-        to={`/vocab/new?student=${account.id}`}
+        to={`/vocab/corpora?student=${account.id}`}
         className="rounded-md bg-slate-900 text-white text-xs font-medium px-3 py-2 touch:py-2.5 hover:bg-slate-800"
       >
         + 단어 시험지

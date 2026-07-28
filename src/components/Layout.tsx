@@ -60,14 +60,6 @@ const checkIcon = (
     <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
   </svg>
 )
-const studentsIcon = (
-  <svg {...iconProps}>
-    <circle cx="9" cy="8" r="3.5" />
-    <path d="M2 20c0-3 3.5-5 7-5s7 2 7 5" />
-    <circle cx="17" cy="9" r="3" />
-    <path d="M22 19c0-2.5-2.5-4-5-4" />
-  </svg>
-)
 const notifyIcon = (
   <svg {...iconProps}>
     <path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8" />
@@ -122,9 +114,10 @@ const studentExtraNav: NavItem[] = [
   { to: '/history', label: '기록', icon: historyIcon },
 ]
 
+// 학생 관리는 '관리' 허브 안에 있다. 탭에 따로 두면 관리→학생을 두 번 누르는
+// 꼴이라 중복이므로 뺐다.
 const adminExtraNav: NavItem[] = [
   { to: '/admin', label: '관리', icon: adminGearIcon },
-  { to: '/admin/students', label: '학생', icon: studentsIcon },
   { to: '/admin/notify', label: '알림', icon: notifyIcon },
 ]
 

@@ -270,17 +270,12 @@ export function VocabList({ manage = false }: { manage?: boolean }) {
             >
               {reprocessing ? '재분석 중…' : '단어 재분석'}
             </button>
+            {/* 시험지는 교재에서만 만든다 — 붙여넣기로 만드는 별도 경로는 없앴다. */}
             <Link
               to="/vocab/corpora"
-              className="rounded-md border border-slate-200 text-slate-700 text-xs font-medium px-3 py-1.5 hover:bg-slate-50"
-            >
-              교재
-            </Link>
-            <Link
-              to="/vocab/new"
               className="rounded-md bg-slate-900 text-white text-xs font-medium px-3 py-1.5 hover:bg-slate-800"
             >
-              + 새 시험지
+              + 교재에서 만들기
             </Link>
           </div>
         )}
