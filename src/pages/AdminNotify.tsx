@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { listAccounts } from '../lib/account'
 import { BackLink } from '../components/BackLink'
 import {
+  cleanupDuplicatePushTokens,
   createPushSchedule,
   deletePushSchedule,
   isAssignmentDone,
@@ -210,6 +211,8 @@ export function AdminNotify() {
   const [pushTitle, setPushTitle] = useState('')
   const [pushBody, setPushBody] = useState('')
   const [pushSending, setPushSending] = useState(false)
+  const [tokenCleanBusy, setTokenCleanBusy] = useState(false)
+  const [tokenCleanNote, setTokenCleanNote] = useState<string | null>(null)
   const [pushNote, setPushNote] = useState<string | null>(null)
   const [pushSelected, setPushSelected] = useState<Set<string>>(new Set())
   const [pushAll, setPushAll] = useState(true)
@@ -811,6 +814,53 @@ export function AdminNotify() {
         <p className="text-[11px] text-slate-500">
           학생이 iOS 앱에서 로그인 + 푸시 권한 허용한 경우만 발송됩니다 (firestore의 fcmTokens가 있는 학생). 알림톡과 별도.
         </p>
+
+        {/* 한 기기를 여러 계정으로 쓴 흔적 정리. 예전에는 로그아웃 시 토큰을
+            떼어내지 않아 같은 토큰이 여러 계정에 남았고, 그래서 남의 푸시가
+            갔다. 지금은 로그인·로그아웃에서 자동 정리되지만 이미 쌓인 건
+            이 버튼으로 한 번 털어낸다. */}
+        <div className="border-t border-slate-200 pt-3 flex items-center justify-between gap-2 flex-wrap">
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-slate-700">중복 기기 정리</p>
+            <p className="text-[11px] text-slate-500">
+              한 기기가 여러 계정에 등록돼 있으면 남의 푸시까지 갑니다. 중복된
+              등록을 모두 해제합니다 — 해당 기기는 앱을 한 번 열면 지금 로그인한
+              계정으로 다시 등록됩니다.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={async () => {
+              if (
+                !window.confirm(
+                  '여러 계정에 중복 등록된 기기의 푸시 등록을 모두 해제할까요?\n해당 기기는 앱을 한 번 열면 자동으로 다시 등록됩니다.',
+                )
+              )
+                return
+              setTokenCleanBusy(true)
+              setTokenCleanNote(null)
+              try {
+                const r = await cleanupDuplicatePushTokens()
+                setTokenCleanNote(
+                  r.tokens === 0
+                    ? '중복 등록된 기기가 없습니다.'
+                    : `기기 ${r.tokens}대 · 계정 ${r.accounts}개에서 중복 등록을 해제했습니다.`,
+                )
+              } catch (e) {
+                setTokenCleanNote(e instanceof Error ? e.message : '정리 실패')
+              } finally {
+                setTokenCleanBusy(false)
+              }
+            }}
+            disabled={tokenCleanBusy}
+            className="shrink-0 rounded-md border border-slate-300 text-slate-700 text-xs font-medium px-3 py-1.5 touch:py-2 hover:bg-slate-100 disabled:opacity-50"
+          >
+            {tokenCleanBusy ? '정리 중…' : '중복 정리'}
+          </button>
+        </div>
+        {tokenCleanNote && (
+          <p className="text-[11px] text-brand-700">{tokenCleanNote}</p>
+        )}
       </div>
 
       <div className="rounded-lg border border-slate-300 bg-white p-4 space-y-3">
