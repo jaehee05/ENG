@@ -143,17 +143,96 @@ export async function updateVocabSetOwner(
   })
 }
 
+/**
+ * 교재 단어를 나눠 담는 청크 크기.
+ *
+ * Firestore 문서 하나는 1 MiB 를 넘을 수 없다. 보강 정보(예문·영영정의·동의어)가
+ * 붙은 단어는 하나에 대략 600~700 바이트라, 단어를 통째로 한 배열에 넣으면
+ * 1600개 근처에서 저장이 막힌다. 그래서 하위 컬렉션에 나눠 담는다.
+ * 250개면 청크 하나가 약 160 KB 로 상한에 넉넉히 못 미친다.
+ */
+const WORD_CHUNK_SIZE = 250
+
+function wordChunkCol(seriesId: string) {
+  return collection(db, 'vocabSeries', seriesId, 'wordChunks')
+}
+
+/** 청크에서 단어를 읽어 순서대로 이어붙인다. 청크가 없으면 null. */
+async function readWordChunks(seriesId: string): Promise<WordEntry[] | null> {
+  const snap = await getDocs(query(wordChunkCol(seriesId), orderBy('seq')))
+  if (snap.empty) return null
+  const out: WordEntry[] = []
+  for (const d of snap.docs) {
+    const arr = (d.data() as { words?: WordEntry[] }).words
+    if (Array.isArray(arr)) out.push(...arr)
+  }
+  return out
+}
+
+/**
+ * 단어를 청크로 다시 쓴다. 남는 청크는 지우고, 문서 본문의 레거시 words 배열도
+ * 함께 비운다(옛 교재를 저장하는 순간 자연스럽게 옮겨간다).
+ */
+async function writeWordChunks(seriesId: string, words: WordEntry[]): Promise<void> {
+  const existing = await getDocs(wordChunkCol(seriesId))
+  const chunkCount = Math.ceil(words.length / WORD_CHUNK_SIZE)
+
+  // 배치 하나에 500 작업 상한이 있어, 넘칠 것 같으면 나눠서 커밋한다.
+  const ops: ((b: ReturnType<typeof writeBatch>) => void)[] = []
+  for (let i = 0; i < chunkCount; i++) {
+    // 문서 ID를 0 패딩해 문자열 정렬과 seq 정렬이 어긋나지 않게 한다
+    const ref = doc(wordChunkCol(seriesId), String(i).padStart(4, '0'))
+    const slice = words.slice(i * WORD_CHUNK_SIZE, (i + 1) * WORD_CHUNK_SIZE)
+    ops.push((b) => b.set(ref, { seq: i, words: slice }))
+  }
+  for (const d of existing.docs) {
+    const seq = (d.data() as { seq?: number }).seq
+    if (typeof seq !== 'number' || seq >= chunkCount) ops.push((b) => b.delete(d.ref))
+  }
+
+  const BATCH_LIMIT = 450
+  for (let i = 0; i < ops.length; i += BATCH_LIMIT) {
+    const batch = writeBatch(db)
+    for (const op of ops.slice(i, i + BATCH_LIMIT)) op(batch)
+    await batch.commit()
+  }
+
+  // 청크를 다 쓴 뒤에 개수를 갱신한다. 중간에 실패하면 개수가 안 맞느니
+  // 예전 값으로 남는 편이 낫다.
+  await updateDoc(doc(db, 'vocabSeries', seriesId), {
+    wordCount: words.length,
+    words: deleteField(),
+    updatedAt: serverTimestamp(),
+  })
+}
+
+/**
+ * 목록용. 단어 본문은 읽지 않는다 — 교재가 많으면 청크를 전부 읽는 건 낭비다.
+ * 개수는 문서에 비정규화해 둔 wordCount 를 쓰고, 아직 옮기지 않은 옛 교재는
+ * 인라인 words 길이로 채운다.
+ */
 export async function listVocabSeries(): Promise<VocabSeries[]> {
   const snap = await getDocs(
     query(collection(db, 'vocabSeries'), orderBy('createdAt', 'desc')),
   )
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<VocabSeries, 'id'>) }))
+  return snap.docs.map((d) => {
+    const data = d.data() as Omit<VocabSeries, 'id'>
+    return {
+      id: d.id,
+      ...data,
+      wordCount: data.wordCount ?? data.words?.length ?? 0,
+    }
+  })
 }
 
 export async function getVocabSeries(id: string): Promise<VocabSeries | null> {
   const snap = await getDoc(doc(db, 'vocabSeries', id))
   if (!snap.exists()) return null
-  return { id: snap.id, ...(snap.data() as Omit<VocabSeries, 'id'>) }
+  const data = snap.data() as Omit<VocabSeries, 'id'>
+  // 청크가 있으면 그걸 쓰고, 없으면 아직 옮기지 않은 옛 교재의 인라인 배열을 쓴다
+  const chunked = await readWordChunks(id)
+  const words = chunked ?? data.words ?? []
+  return { id: snap.id, ...data, words, wordCount: words.length }
 }
 
 export async function createVocabSeries(input: {
@@ -179,10 +258,12 @@ export async function createVocabSeries(input: {
   if (input.perDay && input.perDay > 0) {
     payload.perDay = Math.trunc(input.perDay)
   }
-  if (input.words && input.words.length > 0) {
-    payload.words = input.words
-  }
+  payload.wordCount = input.words?.length ?? 0
   const ref = await addDoc(collection(db, 'vocabSeries'), payload)
+  // 단어는 문서 본문이 아니라 하위 청크로 (1 MiB 문서 상한 회피)
+  if (input.words && input.words.length > 0) {
+    await writeWordChunks(ref.id, input.words)
+  }
   return ref.id
 }
 
@@ -213,12 +294,26 @@ export async function updateVocabSeries(
 ): Promise<void> {
   const update: Record<string, unknown> = { updatedAt: serverTimestamp() }
   for (const [k, v] of Object.entries(patch)) {
+    // words 는 문서에 넣지 않고 청크로 따로 쓴다
+    if (k === 'words') continue
     if (v !== undefined) update[k] = v
   }
-  await updateDoc(doc(db, 'vocabSeries', id), update)
+  if (Object.keys(update).length > 1) {
+    await updateDoc(doc(db, 'vocabSeries', id), update)
+  }
+  if (patch.words !== undefined) {
+    await writeWordChunks(id, patch.words)
+  }
 }
 
 export async function deleteVocabSeries(id: string): Promise<void> {
+  // 하위 청크를 먼저 지운다 — 문서만 지우면 청크가 고아로 남는다
+  const chunks = await getDocs(wordChunkCol(id))
+  if (!chunks.empty) {
+    const batch = writeBatch(db)
+    for (const d of chunks.docs) batch.delete(d.ref)
+    await batch.commit()
+  }
   await deleteDoc(doc(db, 'vocabSeries', id))
 }
 

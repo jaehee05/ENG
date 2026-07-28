@@ -59,7 +59,8 @@ export function CorporaList() {
 
       <div className="space-y-3">
         {items.map((s) => {
-          const total = s.words?.length ?? 0
+          // 목록은 단어 본문을 읽지 않는다 — 개수는 비정규화된 wordCount 사용
+          const total = s.wordCount ?? s.words?.length ?? 0
           const used = s.usedCount ?? 0
           const remaining = Math.max(0, total - used)
           return (

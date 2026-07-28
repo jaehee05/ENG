@@ -115,8 +115,14 @@ export interface VocabSeries {
   title: string
   lastDayNumber: number
   maxAttempts?: number
-  /** Master word list — all words that may be used to spawn DAY tests. */
+  /**
+   * 마스터 단어 목록. 저장은 하위 컬렉션 wordChunks 에 나눠서 한다
+   * (Firestore 문서 1개 상한 1 MiB — 1600개 근처에서 막힌다).
+   * getVocabSeries 는 청크를 합쳐 채워 주고, listVocabSeries 는 비워 둔다.
+   */
   words?: WordEntry[]
+  /** 단어 개수. 목록에서 청크를 읽지 않고 개수만 보여주기 위한 비정규화 값. */
+  wordCount?: number
   /** Default words per DAY when generating next test. */
   perDay?: number
   /** How many words have already been used in DAY tests (cursor). 레거시 공용 커서. */
