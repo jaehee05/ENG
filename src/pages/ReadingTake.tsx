@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { BackLink } from '../components/BackLink'
 import { useAuth } from '../contexts/useAuth'
 import { createReadingAttempt, getReading } from '../lib/firestore'
 import { listMyWordbookKeys, lookupWord } from '../lib/wordbook'
@@ -116,6 +117,15 @@ export function ReadingTake() {
 
   return (
     <div className="space-y-5 max-w-3xl mx-auto">
+      <BackLink
+        to={`/reading/${id}`}
+        label="지문"
+        confirmMessage={
+          answers.some((a) => a >= 0)
+            ? '지금 나가면 고른 답이 저장되지 않습니다. 나갈까요?'
+            : undefined
+        }
+      />
       <header>
         <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
           지문 문제풀이

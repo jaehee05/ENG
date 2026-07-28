@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { BackLink } from '../components/BackLink'
 import { useAuth } from '../contexts/useAuth'
 import { listAccounts } from '../lib/account'
 import {
@@ -186,6 +187,7 @@ export function VocabDetail() {
 
   return (
     <div className="space-y-5 max-w-3xl mx-auto">
+      <BackLink to="/vocab" label="단어 시험지" />
       <header className="flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">

@@ -22,6 +22,7 @@ import { estimateMockCutoffs, extractGlossary, translatePassage } from '../lib/a
 import { MockCutoffEditor } from '../components/MockCutoffEditor'
 import { ExamFilePicker } from '../components/ExamFilePicker'
 import { RichTextEditor } from '../components/RichTextEditor'
+import { BackLink } from '../components/BackLink'
 import { useBackdropDismiss } from '../lib/useBackdropDismiss'
 import {
   choiceMark,
@@ -473,6 +474,7 @@ export function KoreanMockDetail() {
 
   return (
     <div className="space-y-5 max-w-3xl mx-auto">
+      <BackLink to={isAdmin ? '/admin/korean-mocks' : '/korean-mocks'} label="모의고사 목록" />
       <header className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">

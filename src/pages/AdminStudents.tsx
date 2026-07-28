@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import { BackLink } from '../components/BackLink'
 import { useAuth } from '../contexts/useAuth'
 import { formatPhoneKR } from '../lib/phone'
 import {
@@ -516,6 +517,7 @@ export function AdminStudents() {
 
   return (
     <div className="space-y-5">
+      <BackLink to="/admin" label="관리" />
       <header>
         <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
           관리자
