@@ -10,14 +10,7 @@ import { VocabDetail } from './pages/VocabDetail'
 import { VocabTake } from './pages/VocabTake'
 import { VocabSheet } from './pages/VocabSheet'
 import { VocabResult } from './pages/VocabResult'
-import { ReadingList } from './pages/ReadingList'
-import { ReadingNew } from './pages/ReadingNew'
-import { ReadingEdit } from './pages/ReadingEdit'
-import { ReadingImport } from './pages/ReadingImport'
-import { ReadingDetail } from './pages/ReadingDetail'
-import { ReadingTake } from './pages/ReadingTake'
 import { ReadingResult } from './pages/ReadingResult'
-import { ReadingSheet } from './pages/ReadingSheet'
 import { Wordbook } from './pages/Wordbook'
 import { WordbookTake } from './pages/WordbookTake'
 import { WordbookResult } from './pages/WordbookResult'
@@ -67,10 +60,6 @@ function App() {
               <Route path="/vocab/:id/sheet" element={<VocabSheet />} />
               <Route path="/vocab/:id/result/:attemptId" element={<VocabResult />} />
 
-              <Route path="/reading" element={<ReadingList />} />
-              <Route path="/reading/:id" element={<ReadingDetail />} />
-              <Route path="/reading/:id/take" element={<ReadingTake />} />
-              <Route path="/reading/:id/sheet" element={<ReadingSheet />} />
               <Route path="/reading/:id/result/:attemptId" element={<ReadingResult />} />
 
               <Route path="/wordbook" element={<Wordbook />} />
@@ -97,11 +86,7 @@ function App() {
               <Route path="/vocab/corpora" element={<CorporaList />} />
               <Route path="/vocab/corpora/new" element={<CorpusNew />} />
               <Route path="/vocab/corpora/:id" element={<CorpusDetail />} />
-              <Route path="/reading/new" element={<ReadingNew />} />
-              <Route path="/reading/import" element={<ReadingImport />} />
-              <Route path="/reading/:id/edit" element={<ReadingEdit />} />
               <Route path="/admin" element={<AdminHub />} />
-              <Route path="/admin/readings" element={<ReadingList manage />} />
               <Route path="/admin/vocab" element={<VocabList manage />} />
               <Route path="/admin/korean-mocks" element={<KoreanMockList manage />} />
               <Route path="/admin/korean-mocks/new" element={<KoreanMockNew />} />
