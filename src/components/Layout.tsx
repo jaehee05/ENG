@@ -30,12 +30,6 @@ const homeIcon = (
     <path d="M5 10v10h14V10" />
   </svg>
 )
-const readingIcon = (
-  <svg {...iconProps}>
-    <path d="M4 5a2 2 0 0 1 2-2h5v18H6a2 2 0 0 1-2-2V5Z" />
-    <path d="M20 5a2 2 0 0 0-2-2h-5v18h5a2 2 0 0 0 2-2V5Z" />
-  </svg>
-)
 const vocabIcon = (
   <svg {...iconProps}>
     <path d="M9 4h6a2 2 0 0 1 2 2v14l-5-2-5 2V6a2 2 0 0 1 2-2Z" />
@@ -96,7 +90,6 @@ const adminGearIcon = (
 const studentNav: NavItem[] = [
   { to: '/', label: '홈', end: true, icon: homeIcon },
   { to: '/assignments', label: '과제', icon: checkIcon },
-  { to: '/reading', label: '지문', icon: readingIcon },
   { to: '/vocab', label: '단어', icon: vocabIcon },
   { to: '/schedule', label: '일정', icon: calendarIcon },
 ]
@@ -177,23 +170,16 @@ export function Layout() {
   const subj = profile ? accountSubjects(profile) : { korean: true, english: true }
   const englishOnlyPaths = new Set<string>([
     // 홈(/)은 국어 전용 학생에게도 노출(학습 바로가기 숨기고 과제 리스트 표시).
-    '/reading',
     '/vocab',
     '/wordbook',
     '/history',
   ])
-  // 지문 문제풀이는 학생에게 비노출. 영어도 모의고사로 출제하고, 지문 상세는
-  // 모의고사 오답 리뷰에서 보여주는 방식으로 옮겼다.
-  // 관리자는 오답 리뷰용 지문 자산을 만들어야 하므로 계속 접근한다.
-  // 학생에게 다시 열려면 아래를 `isAdmin || profile?.readingAccess === true` 로
-  // 되돌리고 학생 상세 > 설정의 접근 허용 체크박스를 복구하면 된다.
-  const canReading = isAdmin
   const filterForSubjects = (items: NavItem[]) => {
     const bySubject =
       subj.english || isAdmin
         ? items
         : items.filter((i) => !englishOnlyPaths.has(i.to))
-    return canReading ? bySubject : bySubject.filter((i) => i.to !== '/reading')
+    return bySubject
   }
 
   const mockNavItem: NavItem = {

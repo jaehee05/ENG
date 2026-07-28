@@ -58,17 +58,6 @@ const sIcon = {
 
 const shortcuts: ShortcutCard[] = [
   {
-    to: '/reading',
-    title: '지문 문제풀이',
-    desc: '오늘 풀 지문',
-    icon: (
-      <svg {...sIcon}>
-        <path d="M4 5a2 2 0 0 1 2-2h5v18H6a2 2 0 0 1-2-2V5Z" />
-        <path d="M20 5a2 2 0 0 0-2-2h-5v18h5a2 2 0 0 0 2-2V5Z" />
-      </svg>
-    ),
-  },
-  {
     to: '/vocab',
     title: '단어 시험지',
     desc: 'DAY 단위 시험',
@@ -658,8 +647,6 @@ export function Dashboard() {
           </h2>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
             {shortcuts
-              // 지문 문제풀이는 학생 비노출 — 모의고사 오답 리뷰로 대체
-              .filter((c) => c.to !== '/reading' || isAdmin)
               .map((c) => (
               <Link
                 key={c.to}

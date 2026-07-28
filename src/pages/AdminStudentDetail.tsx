@@ -123,8 +123,8 @@ export function AdminStudentDetail() {
   const [error, setError] = useState<string | null>(null)
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
 
-  const [assignType, setAssignType] = useState<AssignmentType>('reading')
-  const [assignCategory, setAssignCategory] = useState<AssignmentCategory>('problem')
+  const [assignType, setAssignType] = useState<AssignmentType>('vocab')
+  const [assignCategory, setAssignCategory] = useState<AssignmentCategory>('vocab')
   const [categories, setCategories] = useState<CategoryConfig[]>([])
   const [assignRefId, setAssignRefId] = useState('')
   const [assignStart, setAssignStart] = useState('')
@@ -254,32 +254,7 @@ export function AdminStudentDetail() {
     return { pending, done }
   }, [assignments, attempts])
 
-  const [bundleMode, setBundleMode] = useState(false)
-  const [bundleCategory, setBundleCategory] = useState('')
-
-  const readingCategories = useMemo(() => {
-    const TITLE_RE = /^(.+?)\s+(\d+(?:-\d+)?)\s*(?:번|문제)?\s*$/
-    const map = new Map<string, Reading[]>()
-    for (const r of readings) {
-      const m = TITLE_RE.exec(r.title.trim())
-      if (!m) continue
-      const cat = m[1].trim()
-      if (!map.has(cat)) map.set(cat, [])
-      map.get(cat)!.push(r)
-    }
-    return [...map.entries()]
-      .map(([category, list]) => ({ category, list }))
-      .sort((a, b) =>
-        a.category.localeCompare(b.category, 'ko', { numeric: true }),
-      )
-  }, [readings])
-
-  const assignOptions =
-    assignType === 'vocab'
-      ? vocabSets
-      : assignType === 'korean_mock'
-        ? koreanMocks
-        : readings
+  const assignOptions = assignType === 'vocab' ? vocabSets : koreanMocks
   const [customTitle, setCustomTitle] = useState('')
   const [pushOnAssign, setPushOnAssign] = useState(true)
 
@@ -349,44 +324,6 @@ export function AdminStudentDetail() {
         setAssignDue('')
         setAssignNote('')
         await maybePushAssignment([title])
-        await reloadAssignments()
-        setAssignFormOpen(false)
-      } catch (err) {
-        setAssignError(err instanceof Error ? err.message : '과제 부여에 실패했습니다.')
-      } finally {
-        setAssigning(false)
-      }
-      return
-    }
-
-    if (bundleMode && assignType === 'reading') {
-      const group = readingCategories.find((g) => g.category === bundleCategory)
-      if (!group || group.list.length === 0) {
-        setAssignError('묶음 과제로 부여할 시험명을 선택하세요.')
-        return
-      }
-      setAssigning(true)
-      try {
-        for (const r of group.list) {
-          await createAssignment({
-            studentUid: id,
-            studentName: account.displayName,
-            assignedBy: profile.id,
-            assignedByName: profile.displayName,
-            type: 'reading',
-            category: assignCategory,
-            refId: r.id,
-            refTitle: r.title,
-            note: assignNote,
-            startAt: startDate,
-            dueAt: dueDate,
-          })
-        }
-        setBundleCategory('')
-        setAssignStart('')
-        setAssignDue('')
-        setAssignNote('')
-        await maybePushAssignment(group.list.map((r) => r.title))
         await reloadAssignments()
         setAssignFormOpen(false)
       } catch (err) {
@@ -608,7 +545,6 @@ export function AdminStudentDetail() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 rounded-md border border-slate-200 bg-white p-1">
               {(
                 [
-                  { key: 'reading', label: '지문 문제풀이' },
                   { key: 'vocab', label: '단어 시험지' },
                   { key: 'korean_mock', label: '모의고사' },
                   { key: 'custom', label: '외부 과제' },
@@ -623,7 +559,6 @@ export function AdminStudentDetail() {
                       setAssignType(opt.key)
                       setAssignRefId('')
                       setAssignCategory(defaultCategoryKey(opt.key))
-                      if (opt.key !== 'reading') setBundleMode(false)
                     }}
                     className={`rounded px-2 py-1.5 touch:py-2 text-xs font-medium transition ${
                       active
@@ -636,20 +571,6 @@ export function AdminStudentDetail() {
                 )
               })}
             </div>
-            {assignType === 'reading' && readingCategories.length > 0 && (
-              <label className="mt-2 flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={bundleMode}
-                  onChange={(e) => setBundleMode(e.target.checked)}
-                  className="accent-brand-600"
-                />
-                <span className="font-medium">묶음(풀세트)으로 부여</span>
-                <span className="text-slate-400">
-                  같은 시험명의 지문 전부를 한 번에 부여
-                </span>
-              </label>
-            )}
             {assignType === 'custom' && (
               <p className="text-[11px] text-slate-500 mt-1.5">
                 학생 풀이 화면 없는 외부 과제. 완료는 관리자가 수동 표시.
@@ -657,18 +578,14 @@ export function AdminStudentDetail() {
             )}
           </div>
 
-          {/* 2. 대상 — 지문/시험지/제목 */}
+          {/* 2. 대상 — 시험지/모의고사/제목 */}
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">
               {assignType === 'custom'
                 ? '과제명'
                 : assignType === 'vocab'
                   ? '단어 시험지'
-                  : assignType === 'korean_mock'
-                    ? '모의고사'
-                    : bundleMode
-                      ? '시험명 묶음'
-                      : '지문'}
+                  : '모의고사'}
             </label>
             {assignType === 'custom' ? (
               <input
@@ -678,19 +595,6 @@ export function AdminStudentDetail() {
                 placeholder="예: 학원 종이 시험지 3회, 모의고사 오답노트 등"
                 className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
-            ) : assignType === 'reading' && bundleMode ? (
-              <select
-                value={bundleCategory}
-                onChange={(e) => setBundleCategory(e.target.value)}
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              >
-                <option value="">— 선택 —</option>
-                {readingCategories.map((g) => (
-                  <option key={g.category} value={g.category}>
-                    {g.category} ({g.list.length}개)
-                  </option>
-                ))}
-              </select>
             ) : (
               <select
                 value={assignRefId}
@@ -772,7 +676,7 @@ export function AdminStudentDetail() {
                 className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
             </div>
-            {assignType === 'vocab' && !bundleMode && (
+            {assignType === 'vocab' && (
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">
                   완료 기준{' '}
