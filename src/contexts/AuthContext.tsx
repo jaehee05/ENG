@@ -107,6 +107,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function logOut() {
+    // 이 기기 토큰을 계정에서 먼저 떼어낸다. 안 그러면 다음 사람이 이 기기를
+    // 써도 이전 사용자의 푸시가 계속 이 기기로 온다.
+    const leavingUid = profile?.id
+    if (leavingUid) {
+      await import('../lib/pushSetup')
+        .then((m) => m.unregisterPushTokenForUser(leavingUid))
+        .catch(() => {})
+    }
     setAdminSecret('')
     persist(null)
   }

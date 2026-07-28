@@ -1,5 +1,6 @@
 import {
   addDoc,
+  arrayRemove,
   collection,
   deleteDoc,
   deleteField,
@@ -1002,6 +1003,52 @@ export async function markAttemptWrongReviewed(
   await updateDoc(doc(db, 'attempts', id), {
     wrongReviewedAt: value ? serverTimestamp() : null,
   })
+}
+
+/**
+ * 여러 계정에 중복으로 붙어 있는 푸시 토큰을 전부 떼어낸다. 관리자 전용.
+ *
+ * 기기 하나의 토큰이 여러 users 문서에 남아 있으면, A 에게 보낸 푸시가
+ * 그 기기를 지금 쓰는 B 에게도 간다. 어느 쪽이 진짜 주인인지 서버에서는
+ * 알 수 없으므로 중복된 토큰은 양쪽 모두에서 지운다. 해당 기기가 앱을
+ * 한 번 열면 지금 로그인한 계정으로 다시 등록된다.
+ *
+ * @returns 정리한 토큰 수와 영향받은 계정 수
+ */
+export async function cleanupDuplicatePushTokens(): Promise<{
+  tokens: number
+  accounts: number
+}> {
+  const snap = await getDocs(collection(db, 'users'))
+  const owners = new Map<string, string[]>()
+  for (const d of snap.docs) {
+    const arr = (d.data() as { fcmTokens?: unknown }).fcmTokens
+    if (!Array.isArray(arr)) continue
+    for (const t of arr) {
+      if (typeof t !== 'string' || !t) continue
+      const list = owners.get(t) ?? []
+      list.push(d.id)
+      owners.set(t, list)
+    }
+  }
+  // 두 계정 이상이 들고 있는 토큰만 대상
+  const dupes = [...owners.entries()].filter(([, uids]) => uids.length > 1)
+  if (dupes.length === 0) return { tokens: 0, accounts: 0 }
+
+  const removeByUid = new Map<string, string[]>()
+  for (const [token, uids] of dupes) {
+    for (const uid of uids) {
+      const list = removeByUid.get(uid) ?? []
+      list.push(token)
+      removeByUid.set(uid, list)
+    }
+  }
+  const batch = writeBatch(db)
+  for (const [uid, tokens] of removeByUid) {
+    batch.update(doc(db, 'users', uid), { fcmTokens: arrayRemove(...tokens) })
+  }
+  await batch.commit()
+  return { tokens: dupes.length, accounts: removeByUid.size }
 }
 
 /** 모든 vocabSets + vocabSeries의 maxAttempts 필드를 일괄 삭제. 관리자 전용. */
