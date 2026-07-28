@@ -2,7 +2,12 @@ import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { getVocabSet } from '../lib/firestore'
 import { highlightHead } from '../lib/highlightWord'
-import type { VocabSet, WordEntry } from '../lib/types'
+import {
+  choiceSetMap,
+  getVocabFormat,
+  type VocabSet,
+  type WordEntry,
+} from '../lib/types'
 
 const renderExampleWithBoldWord = highlightHead
 
@@ -83,6 +88,9 @@ export function VocabSheet() {
   if (loading) return <p className="text-slate-500 text-sm">불러오는 중...</p>
   if (error) return <p className="text-red-600 text-sm">{error}</p>
   if (!set) return null
+
+  const isChoice = getVocabFormat(set) === 'choice'
+  const choiceMap = choiceSetMap(set)
 
   return (
     <div className="space-y-4">
@@ -168,7 +176,23 @@ export function VocabSheet() {
                         <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-slate-900 text-white text-[8pt] font-bold align-middle">
                           1
                         </span>
-                        {withAnswers ? (
+                        {isChoice ? (
+                          // 5지선다는 아래에 선지를 따로 깔고, 여기엔 답 칸만 둔다
+                          withAnswers ? (
+                            <span className="text-[11pt] font-semibold text-slate-900">
+                              {(() => {
+                                const c = choiceMap.get(w.en)
+                                return c ? `${c.answer + 1}번 · ${w.ko}` : w.ko
+                              })()}
+                            </span>
+                          ) : (
+                            // 번호를 적을 답란
+                            <span
+                              className="inline-block w-10 border-b border-slate-500 align-baseline"
+                              style={{ height: '1.4em' }}
+                            />
+                          )
+                        ) : withAnswers ? (
                           <span className="text-[11pt] font-semibold text-slate-900">
                             {w.ko}
                           </span>
@@ -179,6 +203,28 @@ export function VocabSheet() {
                           />
                         )}
                       </div>
+
+                      {isChoice &&
+                        (() => {
+                          const c = choiceMap.get(w.en)
+                          if (!c || c.choices.length === 0) return null
+                          return (
+                            <ol className="mt-1 space-y-0.5 text-[10.5pt] leading-snug text-slate-800">
+                              {c.choices.map((choice, ci) => (
+                                <li
+                                  key={ci}
+                                  className={
+                                    withAnswers && ci === c.answer
+                                      ? 'font-semibold text-slate-900'
+                                      : ''
+                                  }
+                                >
+                                  {ci + 1}. {choice}
+                                </li>
+                              ))}
+                            </ol>
+                          )
+                        })()}
                       {showHints &&
                         (hints.definitionEn ||
                           (hints.synonyms && hints.synonyms.length > 0)) && (

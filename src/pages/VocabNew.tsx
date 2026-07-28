@@ -11,11 +11,13 @@ import {
 import type { UserAccount } from '../lib/types'
 import {
   parseWordList,
+  type VocabFormat,
   type VocabSense,
   type VocabSeries,
   type WordEntry,
 } from '../lib/types'
 import { enrichVocab } from '../lib/api'
+import { buildVocabChoices } from '../lib/vocabChoices'
 import { looksLikeTextbookVocab, parseTextbookVocab } from '../lib/parseTextbookVocab'
 
 const PLACEHOLDER = `abandon : 버리다, 포기하다
@@ -59,6 +61,9 @@ export function VocabNew() {
   const [splitProgress, setSplitProgress] = useState<string | null>(null)
   const [seriesList, setSeriesList] = useState<VocabSeries[]>([])
   const [seriesMode, setSeriesMode] = useState<string>('new') // 'new' or series.id
+  const [format, setFormat] = useState<VocabFormat>('written')
+  // AI 오답 생성이 일부라도 실패했는지 — 교재 내 뜻으로 채워지므로 저장은 성공한다
+  const [choiceWarning, setChoiceWarning] = useState(false)
 
   // 학생 목록 (관리자)
   useEffect(() => {
@@ -223,6 +228,15 @@ export function VocabNew() {
       maxAttempts = n
     }
 
+    // 5지선다는 만들 때 선지를 한 번 생성해 저장한다. 응시할 때마다 만들면
+    // 재응시할 때 선지가 달라지고 AI 호출이 학생 수만큼 늘어난다.
+    const makeChoices = async (slice: WordEntry[], pool: WordEntry[]) => {
+      if (format !== 'choice') return undefined
+      const { choiceSets, aiFailed } = await buildVocabChoices(slice, pool)
+      if (aiFailed) setChoiceWarning(true)
+      return choiceSets
+    }
+
     if (splitByDay) {
       const perDay = Number.parseInt(perDayRaw, 10)
       if (!Number.isFinite(perDay) || perDay <= 0) {
@@ -247,13 +261,21 @@ export function VocabNew() {
         for (let i = 0; i < total; i++) {
           const dayNumber = startDay + i
           const slice = cleaned.slice(i * perDay, (i + 1) * perDay)
-          setSplitProgress(`${i + 1}/${total} DAY ${dayNumber} 저장 중...`)
+          setSplitProgress(
+            format === 'choice'
+              ? `${i + 1}/${total} DAY ${dayNumber} 선지 생성 중...`
+              : `${i + 1}/${total} DAY ${dayNumber} 저장 중...`,
+          )
+          // 오답은 교재 전체(cleaned)에서 빌려온다 — DAY 안에서만 뽑으면 반복된다.
+          const choiceSets = await makeChoices(slice, cleaned)
           lastId = await createVocabSet({
             title: `${base} DAY ${dayNumber}`,
             words: slice,
             maxAttempts,
             studentUid,
             studentName,
+            format,
+            choiceSets,
             createdBy: profile.id,
             createdByName: profile.displayName,
           })
@@ -272,12 +294,20 @@ export function VocabNew() {
 
     setSubmitting(true)
     try {
+      const cleanedWords = words.map(cleanWord)
+      // 교재를 골랐으면 교재 전체 단어를, 아니면 이번 시험지 단어를 오답 풀로 쓴다.
+      const pool = selectedSeries?.words?.length ? selectedSeries.words : cleanedWords
+      if (format === 'choice') setSplitProgress('선지 생성 중...')
+      const choiceSets = await makeChoices(cleanedWords, pool)
+      setSplitProgress(null)
       const id = await createVocabSet({
         title: title.trim(),
-        words: words.map(cleanWord),
+        words: cleanedWords,
         maxAttempts,
         studentUid,
         studentName,
+        format,
+        choiceSets,
         createdBy: profile.id,
         createdByName: profile.displayName,
       })
@@ -360,6 +390,36 @@ export function VocabNew() {
             disabled={!!selectedSeries}
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-slate-100 disabled:text-slate-500"
           />
+        </div>
+
+        <div>
+          <p className="block text-sm font-medium text-slate-700 mb-1.5">시험 형식</p>
+          <div className="grid grid-cols-2 gap-1 rounded-md border border-slate-200 bg-white p-1 max-w-sm">
+            {(
+                [
+                  { key: 'written', label: '주관식' },
+                  { key: 'choice', label: '5지선다' },
+                ] as { key: VocabFormat; label: string }[]
+              ).map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => setFormat(opt.key)}
+                className={`rounded px-2 py-1.5 touch:py-2 text-xs font-medium transition ${
+                  format === opt.key
+                    ? 'bg-slate-900 text-white'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[11px] text-slate-500 mt-1.5">
+            {format === 'written'
+              ? '학생이 뜻을 직접 입력하고 AI가 채점합니다.'
+              : '단어마다 선지 5개를 만듭니다. 오답은 반대 뜻이나 철자가 비슷한 다른 단어의 뜻으로, 부족하면 교재 내 다른 뜻으로 채웁니다. 저장할 때 한 번 생성되며 시간이 조금 걸립니다.'}
+          </p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -565,6 +625,12 @@ export function VocabNew() {
 
         {error && <p className="text-sm text-red-600">{error}</p>}
         {splitProgress && <p className="text-sm text-brand-700">{splitProgress}</p>}
+        {choiceWarning && (
+          <p className="text-sm text-amber-700">
+            일부 단어는 AI 오답 생성에 실패해 교재 내 다른 단어의 뜻으로 채웠습니다.
+            시험지는 정상 저장되며, 선지는 시험지 화면에서 확인·수정할 수 있습니다.
+          </p>
+        )}
 
         <div className="flex gap-2">
           <button

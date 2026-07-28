@@ -90,11 +90,9 @@ export function VocabResult() {
           <div className="col-span-1 text-center">결과</div>
         </div>
         {results.map((r, i) => (
+          <div key={i} className={r.correct ? '' : 'bg-red-50/40'}>
           <div
-            key={i}
-            className={`grid grid-cols-12 px-4 py-2 items-center text-sm border-b border-slate-100 last:border-b-0 ${
-              r.correct ? '' : 'bg-red-50/40'
-            }`}
+            className="grid grid-cols-12 px-4 py-2 items-center text-sm border-b border-slate-100 last:border-b-0"
           >
             <div className="col-span-1 text-slate-500">{i + 1}</div>
             <div className="col-span-3 font-medium text-slate-900">{r.en}</div>
@@ -127,6 +125,32 @@ export function VocabResult() {
                 </span>
               )}
             </div>
+          </div>
+          {/* 5지선다 오답: 어떤 선지들 중에 틀렸는지 보여준다 */}
+          {!r.correct && r.choices && r.choices.length > 0 && (
+            <ul className="px-4 pb-2.5 pl-12 space-y-1 text-[13px] border-b border-slate-100 last:border-b-0">
+              {r.choices.map((c, ci) => {
+                const isAnswer = ci === r.answerIndex
+                const isPicked = ci === r.userIndex
+                return (
+                  <li
+                    key={ci}
+                    className={
+                      isAnswer
+                        ? 'text-brand-700 font-medium'
+                        : isPicked
+                          ? 'text-red-700'
+                          : 'text-slate-500'
+                    }
+                  >
+                    {ci + 1}. {c}
+                    {isAnswer && ' ← 정답'}
+                    {isPicked && !isAnswer && ' ← 내가 고른 답'}
+                  </li>
+                )
+              })}
+            </ul>
+          )}
           </div>
         ))}
       </div>

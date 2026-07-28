@@ -8,7 +8,13 @@ import {
 } from '../lib/firestore'
 import { gradeVocabAnswers } from '../lib/grading'
 import { highlightHead } from '../lib/highlightWord'
-import type { VocabSet, WordEntry } from '../lib/types'
+import {
+  choiceSetMap,
+  getVocabFormat,
+  type VocabChoice,
+  type VocabSet,
+  type WordEntry,
+} from '../lib/types'
 
 const renderExampleWithBoldWord = highlightHead
 
@@ -47,10 +53,18 @@ export function VocabTake() {
   const [usedAttempts, setUsedAttempts] = useState(0)
   const [order, setOrder] = useState<number[]>([])
   const [answers, setAnswers] = useState<string[]>([])
+  /** 5지선다에서 고른 선지 인덱스. 슬롯 기준, 미선택은 -1. */
+  const [picks, setPicks] = useState<number[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showHints, setShowHints] = useState(true)
+
+  const isChoice = set ? getVocabFormat(set) === 'choice' : false
+  const choiceMap = useMemo(
+    () => (set ? choiceSetMap(set) : new Map<string, VocabChoice>()),
+    [set],
+  )
 
   const fromRaw = Number.parseInt(search.get('from') ?? '', 10)
   const toRaw = Number.parseInt(search.get('to') ?? '', 10)
@@ -81,6 +95,7 @@ export function VocabTake() {
         }
         setOrder(idx)
         setAnswers(new Array(idx.length).fill(''))
+        setPicks(new Array(idx.length).fill(-1))
       })
       .catch((e) => setError(e.message ?? '불러오기 실패'))
       .finally(() => setLoading(false))
@@ -89,7 +104,13 @@ export function VocabTake() {
   const blocked =
     !!set?.maxAttempts && !isAdmin && usedAttempts >= (set.maxAttempts ?? 0)
 
-  const answered = useMemo(() => answers.filter((a) => a.trim()).length, [answers])
+  const answered = useMemo(
+    () =>
+      isChoice
+        ? picks.filter((p) => p >= 0).length
+        : answers.filter((a) => a.trim()).length,
+    [isChoice, picks, answers],
+  )
   const hasAnyHint = useMemo(
     () =>
       set?.words.some(
@@ -110,11 +131,29 @@ export function VocabTake() {
     if (!set || !profile) return
     setSubmitting(true)
     try {
-      const inputs = order.map((wordIdx, slotIdx) => {
-        const w = set.words[wordIdx]
-        return { en: w.en, ko: w.ko, userAnswer: answers[slotIdx] ?? '' }
-      })
-      const results = await gradeVocabAnswers(inputs)
+      // 5지선다는 인덱스 비교라 AI 채점이 필요 없다 — 즉시·정확하게 채점된다.
+      const results =
+        isChoice
+          ? order.map((wordIdx, slotIdx) => {
+              const w = set.words[wordIdx]
+              const c = choiceMap.get(w.en)
+              const picked = picks[slotIdx] ?? -1
+              return {
+                en: w.en,
+                ko: w.ko,
+                userAnswer: picked >= 0 ? (c?.choices[picked] ?? '') : '',
+                correct: c != null && picked === c.answer,
+                choices: c?.choices ?? [],
+                answerIndex: c?.answer ?? -1,
+                userIndex: picked,
+              }
+            })
+          : await gradeVocabAnswers(
+              order.map((wordIdx, slotIdx) => {
+                const w = set.words[wordIdx]
+                return { en: w.en, ko: w.ko, userAnswer: answers[slotIdx] ?? '' }
+              }),
+            )
       const attemptId = await createVocabAttempt({
         studentUid: profile.id,
         studentName: profile.displayName,
@@ -209,29 +248,78 @@ export function VocabTake() {
                     </span>
                   )}
                 </div>
-                <input
-                  id={`vocab-input-${slotIdx}`}
-                  type="text"
-                  value={answers[slotIdx] ?? ''}
-                  onChange={(e) => {
-                    const next = [...answers]
-                    next[slotIdx] = e.target.value
-                    setAnswers(next)
-                  }}
-                  onKeyDown={(e) => {
-                    // 엔터: 폼 제출 막고 다음 단어로 이동. 마지막 단어는 이동만 없이 제출 안 됨.
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      if (slotIdx < order.length - 1) {
-                        document
-                          .getElementById(`vocab-input-${slotIdx + 1}`)
-                          ?.focus()
-                      }
+                {isChoice ? (
+                  (() => {
+                    const c = choiceMap.get(w.en)
+                    if (!c || c.choices.length === 0) {
+                      return (
+                        <p className="text-sm text-amber-700">
+                          이 단어는 선지가 없습니다. 관리자에게 알려주세요.
+                        </p>
+                      )
                     }
-                  }}
-                  placeholder="한국어 뜻"
-                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-[16px] text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-slate-400 focus:outline-none transition"
-                />
+                    return (
+                      <ul className="space-y-1.5">
+                        {c.choices.map((choice, ci) => {
+                          const picked = picks[slotIdx] === ci
+                          return (
+                            <li key={ci}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const next = [...picks]
+                                  // 같은 선지를 다시 누르면 선택 해제
+                                  next[slotIdx] = picked ? -1 : ci
+                                  setPicks(next)
+                                }}
+                                className={`w-full flex items-start gap-2.5 rounded-lg border px-3 py-2.5 touch:py-3 text-left text-[15px] transition ${
+                                  picked
+                                    ? 'border-brand-500 bg-brand-50 text-slate-900'
+                                    : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                                }`}
+                              >
+                                <span
+                                  className={`shrink-0 inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold ${
+                                    picked
+                                      ? 'bg-brand-600 text-white'
+                                      : 'bg-slate-100 text-slate-500'
+                                  }`}
+                                >
+                                  {ci + 1}
+                                </span>
+                                <span className="min-w-0">{choice}</span>
+                              </button>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    )
+                  })()
+                ) : (
+                  <input
+                    id={`vocab-input-${slotIdx}`}
+                    type="text"
+                    value={answers[slotIdx] ?? ''}
+                    onChange={(e) => {
+                      const next = [...answers]
+                      next[slotIdx] = e.target.value
+                      setAnswers(next)
+                    }}
+                    onKeyDown={(e) => {
+                      // 엔터: 폼 제출 막고 다음 단어로 이동. 마지막 단어는 이동만 없이 제출 안 됨.
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        if (slotIdx < order.length - 1) {
+                          document
+                            .getElementById(`vocab-input-${slotIdx + 1}`)
+                            ?.focus()
+                        }
+                      }
+                    }}
+                    placeholder="한국어 뜻"
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-[16px] text-slate-900 placeholder:text-slate-400 focus:bg-white focus:border-slate-400 focus:outline-none transition"
+                  />
+                )}
                 {showHints &&
                   (hints.definitionEn ||
                     (hints.synonyms && hints.synonyms.length > 0) ||

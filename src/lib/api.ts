@@ -185,6 +185,35 @@ export async function enrichVocab(
   return all
 }
 
+export interface WordDistractors {
+  en: string
+  distractors: string[]
+}
+
+/** 5지선다 오답 선지 생성. 반대뜻 / 유사스펠링 단어의 뜻을 섞어 받는다. */
+export async function makeVocabDistractors(
+  words: { en: string; ko: string }[],
+): Promise<WordDistractors[]> {
+  if (words.length === 0) return []
+  const res = await fetch('/api/vocab-distractors', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ words }),
+  })
+  if (!res.ok) {
+    let message = `요청 실패 (HTTP ${res.status})`
+    try {
+      const body = (await res.json()) as { error?: string }
+      if (body.error) message = body.error
+    } catch {
+      // ignore
+    }
+    throw new Error(message)
+  }
+  const data = (await res.json()) as { words?: WordDistractors[] }
+  return data.words ?? []
+}
+
 export function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
