@@ -56,8 +56,19 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           echo "Uploading bundle $VERSION ..."
           # CLI 8.9.x 에 auth 버그(Invalid API key) 가 있어 항상 latest 사용. package.json 잠금 무시.
+          # --channel production 이 붙어 있어 이 명령만으로 production 채널까지 지정된다.
           npx --yes @capgo/cli@latest bundle upload --apikey "$CAPGO_API_KEY" --channel production
-          npx --yes @capgo/cli@latest channel set production --bundle "$VERSION" --apikey "$CAPGO_API_KEY"
+
+          # 아래 channel set 은 위 업로드가 이미 한 일을 한 번 더 확인하는 안전장치다.
+          # 실패해도 배포는 이미 끝난 상태이므로 잡을 실패시키지 않는다.
+          #
+          # 실패시키면 안 되는 이유(2026-07-28 실제로 겪음): 이 단계에서 죽으면
+          # 뒤의 "Commit version bump" 가 skip 되어 package.json 이 안 올라간다.
+          # 그러면 다음 배포가 같은 버전을 다시 올리려다 "Version already exists"
+          # 로 막혀, 실제로는 성공한 배포 하나 때문에 이후 배포가 전부 깨진다.
+          if ! npx --yes @capgo/cli@latest channel set production --bundle "$VERSION" --apikey "$CAPGO_API_KEY"; then
+            echo "::warning::channel set 실패 — 업로드 단계에서 이미 production 채널이 지정됐다면 배포는 정상입니다. Capgo 대시보드에서 production 채널이 $VERSION 인지 확인하세요. (API 키 권한 문제일 수 있음)"
+          fi
 
       - name: Commit version bump
         run: |
