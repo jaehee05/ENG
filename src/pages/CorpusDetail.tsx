@@ -176,6 +176,12 @@ export function CorpusDetail() {
           studentName: student?.displayName ?? '',
           format,
           choiceSets,
+          // 삭제할 때 진행도를 되돌리려면 어느 교재의 몇 번째 DAY 가
+          // 어느 구간을 썼는지 시험지에 남아 있어야 한다.
+          seriesId: series.id,
+          dayNumber: day,
+          wordStart: cursor,
+          wordEnd: cursor + slice.length,
           createdBy: profile.id,
           createdByName: profile.displayName,
         })

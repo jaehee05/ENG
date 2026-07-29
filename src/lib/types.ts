@@ -103,6 +103,17 @@ export interface VocabSet {
   /** 소유 학생 UID. 없으면 legacy(공용) 시험지 — 학생 뷰 미노출, 관리자만 표시. */
   studentUid?: string
   studentName?: string
+  /**
+   * 이 시험지를 만든 교재(VocabSeries) ID. 교재에서 DAY 생성으로 만든 것만 있다.
+   * 삭제할 때 어느 교재의 진행도를 다시 계산할지 이걸로 찾는다. 이 필드가
+   * 생기기 전 시험지는 제목("{교재명} DAY N")으로 되짚는다.
+   */
+  seriesId?: string
+  /** 교재 안에서의 DAY 번호. */
+  dayNumber?: number
+  /** 이 DAY 가 쓴 단어 구간 [wordStart, wordEnd). 교재 단어 배열 기준. */
+  wordStart?: number
+  wordEnd?: number
   /** Per-student attempt cap. Undefined = unlimited. */
   maxAttempts?: number
   createdBy: string
