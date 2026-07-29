@@ -900,6 +900,17 @@ export async function createKoreanMockAttempt(input: {
   return ref.id
 }
 
+/** 특정 단어 시험지의 모든 학생 응시 기록 (관리자 전용). 최신순. */
+export async function listVocabAttemptsForSet(refId: string): Promise<Attempt[]> {
+  const snap = await getDocs(
+    query(collection(db, 'attempts'), where('refId', '==', refId)),
+  )
+  return snap.docs
+    .map((d) => ({ id: d.id, ...(d.data() as Omit<Attempt, 'id'>) }))
+    .filter((a) => a.type === 'vocab')
+    .sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0))
+}
+
 /** 특정 국어 모의고사의 모든 응시 기록을 가져옴 (관리자 전용). */
 export async function listKoreanMockAttempts(refId: string): Promise<Attempt[]> {
   const snap = await getDocs(

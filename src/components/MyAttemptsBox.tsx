@@ -11,9 +11,21 @@ function fmtDate(ts: Attempt['createdAt']): string {
 interface Props {
   attempts: Attempt[]
   buildResultPath: (a: Attempt) => string
+  /**
+   * 있으면 기록마다 삭제 버튼이 붙는다. 관리자 전용 — 확인과 실제 삭제는
+   * 호출부가 맡는다(응시 횟수 제한이 어떻게 풀리는지는 화면마다 다르다).
+   */
+  onDelete?: (a: Attempt) => void
+  /** 삭제 중인 기록 id. 그 줄의 버튼만 잠근다. */
+  deletingId?: string | null
 }
 
-export function MyAttemptsBox({ attempts, buildResultPath }: Props) {
+export function MyAttemptsBox({
+  attempts,
+  buildResultPath,
+  onDelete,
+  deletingId,
+}: Props) {
   const [open, setOpen] = useState(false)
   const sorted = [...attempts].sort(
     (a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0),
@@ -86,6 +98,16 @@ export function MyAttemptsBox({ attempts, buildResultPath }: Props) {
                 >
                   보기
                 </Link>
+                {onDelete && (
+                  <button
+                    type="button"
+                    onClick={() => onDelete(a)}
+                    disabled={deletingId === a.id}
+                    className="text-xs text-slate-400 hover:text-red-600 underline-offset-2 hover:underline disabled:opacity-50"
+                  >
+                    {deletingId === a.id ? '삭제 중…' : '삭제'}
+                  </button>
+                )}
               </div>
             </li>
           )

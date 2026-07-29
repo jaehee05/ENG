@@ -6,8 +6,8 @@ export interface SheetStatus {
   set: VocabSet
   /** 정식 응시(연습 제외). 최신순. */
   tries: Attempt[]
-  /** 연습 응시 횟수. 통계에는 넣지 않고 화면에만 따로 보여준다. */
-  practiceCount: number
+  /** 연습 응시. 통계에는 넣지 않고 화면에만 따로 보여준다. 최신순. */
+  practiceTries: Attempt[]
   /** 최고 정답 수 / 그때의 문항 수. 정식 응시가 없으면 null. */
   best: Attempt | null
   /** 최고 정답률(%). 정식 응시가 없거나 문항이 0이면 null. */
@@ -43,6 +43,9 @@ export function sheetStatuses(sets: VocabSet[], attempts: Attempt[]): SheetStatu
   return sets.map((set) => {
     const all = byRef.get(set.id) ?? []
     const tries = all.filter((a) => !a.practice).sort((x, y) => millis(y) - millis(x))
+    const practiceTries = all
+      .filter((a) => a.practice)
+      .sort((x, y) => millis(y) - millis(x))
     let best: Attempt | null = null
     for (const a of tries) {
       if (!best || a.correct > best.correct) best = a
@@ -50,7 +53,7 @@ export function sheetStatuses(sets: VocabSet[], attempts: Attempt[]): SheetStatu
     return {
       set,
       tries,
-      practiceCount: all.length - tries.length,
+      practiceTries,
       best,
       bestRate: best ? rate(best) : null,
       last: tries[0] ?? null,

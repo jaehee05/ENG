@@ -3,9 +3,12 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { BackLink } from '../components/BackLink'
 import { useAuth } from '../contexts/useAuth'
 import {
+  deleteAttempt,
   deleteVocabSet,
+  formatDate,
   getVocabSet,
   listAttemptsForUser,
+  listVocabAttemptsForSet,
   updateVocabSetTitle,
 } from '../lib/firestore'
 import { MyAttemptsBox } from '../components/MyAttemptsBox'
@@ -81,6 +84,9 @@ export function VocabDetail() {
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
   const [savingTitle, setSavingTitle] = useState(false)
+  const [deletingAttemptId, setDeletingAttemptId] = useState<string | null>(null)
+  /** 관리자 전용 — 이 시험지의 모든 학생 응시 기록. */
+  const [allAttempts, setAllAttempts] = useState<Attempt[]>([])
 
   useEffect(() => {
     if (!id || !profile) return
@@ -96,10 +102,50 @@ export function VocabDetail() {
       .finally(() => setLoading(false))
   }, [id, profile])
 
+  // 시험지가 학생 공용이라, 관리자는 이 시험지를 푼 모두의 기록을 본다.
+  useEffect(() => {
+    if (!id || !isAdmin) return
+    let cancelled = false
+    listVocabAttemptsForSet(id)
+      .then((atts) => {
+        if (!cancelled) setAllAttempts(atts)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [id, isAdmin])
+
   const myAttempts = useMemo(
     () => attempts.filter((a) => a.type === 'vocab' && a.refId === id),
     [attempts, id],
   )
+
+  /**
+   * 응시 기록 삭제(관리자). 정식 응시를 지우면 응시 횟수 제한이 그만큼
+   * 풀리므로, 다시 풀게 해 주려고 지우는 쓰임이 많다.
+   */
+  async function handleDeleteAttempt(a: Attempt) {
+    if (
+      !window.confirm(
+        `${a.studentName ? `${a.studentName} · ` : ''}${formatDate(a.createdAt) || '날짜 없음'} 응시 기록(${a.correct}/${a.total})을 삭제하시겠습니까?\n` +
+          (a.practice
+            ? '연습 기록이라 응시 횟수에는 영향이 없습니다.'
+            : '응시 횟수 제한이 있으면 한 번 더 풀 수 있게 됩니다.'),
+      )
+    )
+      return
+    setDeletingAttemptId(a.id)
+    try {
+      await deleteAttempt(a.id)
+      setAttempts((prev) => prev.filter((x) => x.id !== a.id))
+      setAllAttempts((prev) => prev.filter((x) => x.id !== a.id))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '기록 삭제 실패')
+    } finally {
+      setDeletingAttemptId(null)
+    }
+  }
 
   function startTitleEdit() {
     if (!set) return
@@ -238,7 +284,66 @@ export function VocabDetail() {
         <MyAttemptsBox
           attempts={myAttempts}
           buildResultPath={(a) => `/vocab/${set.id}/result/${a.id}`}
+          onDelete={isAdmin ? handleDeleteAttempt : undefined}
+          deletingId={deletingAttemptId}
         />
+      )}
+
+      {isAdmin && allAttempts.length > 0 && (
+        <section className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-100 flex items-baseline gap-2 flex-wrap">
+            <h2 className="text-sm font-medium text-slate-900">학생 응시 기록</h2>
+            <span className="text-xs text-slate-500">{allAttempts.length}건</span>
+          </div>
+          <ul className="divide-y divide-slate-100">
+            {allAttempts.map((a) => {
+              const ratio = a.total > 0 ? Math.round((a.correct / a.total) * 100) : 0
+              return (
+                <li
+                  key={a.id}
+                  className="px-4 py-2.5 flex items-center gap-2.5 text-sm"
+                >
+                  <Link
+                    to={`/vocab/student/${a.studentUid}`}
+                    className="min-w-0 truncate font-medium text-slate-800 hover:underline"
+                  >
+                    {a.studentName || '(이름 없음)'}
+                  </Link>
+                  {a.practice && (
+                    <span className="shrink-0 text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+                      연습
+                    </span>
+                  )}
+                  <span className="ml-auto shrink-0 text-[11px] text-slate-500">
+                    {formatDate(a.createdAt)}
+                  </span>
+                  <span className="shrink-0 text-xs text-slate-600">
+                    {a.correct}/{a.total}
+                  </span>
+                  <span
+                    className={`shrink-0 text-sm font-semibold ${ratio >= 80 ? 'text-brand-700' : ratio >= 50 ? 'text-slate-700' : 'text-red-600'}`}
+                  >
+                    {ratio}%
+                  </span>
+                  <Link
+                    to={`/vocab/${set.id}/result/${a.id}`}
+                    className="shrink-0 text-xs text-slate-500 hover:text-slate-900 underline underline-offset-2"
+                  >
+                    보기
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteAttempt(a)}
+                    disabled={deletingAttemptId === a.id}
+                    className="shrink-0 text-xs text-slate-400 hover:text-red-600 underline underline-offset-2 disabled:opacity-50"
+                  >
+                    {deletingAttemptId === a.id ? '삭제 중…' : '삭제'}
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
       )}
 
       <ul className="space-y-4">
