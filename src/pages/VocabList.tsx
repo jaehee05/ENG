@@ -218,10 +218,15 @@ export function VocabList({ manage = false }: { manage?: boolean }) {
   async function handleDelete(e: React.MouseEvent, s: VocabSet) {
     e.preventDefault()
     e.stopPropagation()
-    if (!window.confirm(`"${s.title}" 시험지를 삭제하시겠습니까?`)) return
+    if (
+      !window.confirm(
+        `"${s.title}" 시험지를 삭제하시겠습니까?\n교재에서 만든 DAY 시험지면 진행도도 함께 되돌아가, 같은 번호로 다시 만들 수 있습니다.`,
+      )
+    )
+      return
     setDeletingId(s.id)
     try {
-      await deleteVocabSet(s.id)
+      await deleteVocabSet(s)
       setSets((prev) => prev.filter((x) => x.id !== s.id))
     } catch (err) {
       setError(err instanceof Error ? err.message : '삭제 실패')

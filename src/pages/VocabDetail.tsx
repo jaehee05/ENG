@@ -169,11 +169,15 @@ export function VocabDetail() {
 
   async function handleDelete() {
     if (!set) return
-    if (!window.confirm(`"${set.title}" 시험지를 삭제하시겠습니까?\n이 시험지의 학생 응시 기록은 그대로 남습니다.`))
+    if (
+      !window.confirm(
+        `"${set.title}" 시험지를 삭제하시겠습니까?\n이 시험지의 학생 응시 기록은 그대로 남습니다.\n교재에서 만든 DAY 시험지면 진행도도 함께 되돌아가, 같은 번호로 다시 만들 수 있습니다.`,
+      )
+    )
       return
     setDeleting(true)
     try {
-      await deleteVocabSet(set.id)
+      await deleteVocabSet(set)
       navigate('/vocab')
     } catch (e) {
       setError(e instanceof Error ? e.message : '삭제 실패')
