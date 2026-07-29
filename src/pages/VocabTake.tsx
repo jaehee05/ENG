@@ -7,10 +7,10 @@ import {
   listAttemptsForUser,
 } from '../lib/firestore'
 import { gradeVocabAnswers } from '../lib/grading'
+import { reshuffleChoices } from '../lib/vocabChoices'
 import { BackLink } from '../components/BackLink'
 import { highlightHead } from '../lib/highlightWord'
 import {
-  choiceSetMap,
   getVocabFormat,
   type VocabChoice,
   type VocabSet,
@@ -62,10 +62,16 @@ export function VocabTake() {
   const [showHints, setShowHints] = useState(true)
 
   const isChoice = set ? getVocabFormat(set) === 'choice' : false
-  const choiceMap = useMemo(
-    () => (set ? choiceSetMap(set) : new Map<string, VocabChoice>()),
-    [set],
-  )
+  /**
+   * 이번 응시에 쓸 선지. 문항 순서와 마찬가지로 응시할 때 한 번 섞고 그대로
+   * 붙든다 — 렌더마다 다시 섞으면 고른 선지가 눌릴 때마다 움직인다.
+   */
+  const [shuffledSets, setShuffledSets] = useState<VocabChoice[]>([])
+  const choiceMap = useMemo(() => {
+    const m = new Map<string, VocabChoice>()
+    for (const c of shuffledSets) m.set(c.en, c)
+    return m
+  }, [shuffledSets])
 
   const fromRaw = Number.parseInt(search.get('from') ?? '', 10)
   const toRaw = Number.parseInt(search.get('to') ?? '', 10)
@@ -97,6 +103,7 @@ export function VocabTake() {
         setOrder(idx)
         setAnswers(new Array(idx.length).fill(''))
         setPicks(new Array(idx.length).fill(-1))
+        setShuffledSets(reshuffleChoices(s.choiceSets ?? []))
       })
       .catch((e) => setError(e.message ?? '불러오기 실패'))
       .finally(() => setLoading(false))

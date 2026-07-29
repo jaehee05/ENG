@@ -107,3 +107,29 @@ export async function buildVocabChoices(
 
   return { choiceSets, aiFailed }
 }
+
+/**
+ * 응시할 때마다 선지 순서를 새로 섞는다.
+ *
+ * 저장된 선지는 만들 때 한 번 섞은 뒤 고정이라, 같은 시험지를 두 번 풀면
+ * 정답이 늘 같은 자리에 있다. 시험지를 학생끼리 공유하게 되면서 정답 위치를
+ * 외워 오는 일이 생길 수 있어, 응시 시점에 한 번 더 섞는다. 저장된 문서는
+ * 건드리지 않고 화면·채점에 쓸 사본만 바꾼다.
+ */
+export function reshuffleChoices(sets: VocabChoice[]): VocabChoice[] {
+  return sets.map((c) => {
+    const answer = c.choices[c.answer]
+    const shuffled = [...c.choices]
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+    }
+    return {
+      ...c,
+      choices: shuffled,
+      // 같은 뜻이 두 번 들어간 선지는 없다(meaningKey 로 걸러서 만든다).
+      // 그래도 정답을 못 찾으면 원래 인덱스를 유지해 채점이 깨지지 않게 한다.
+      answer: answer === undefined ? c.answer : shuffled.indexOf(answer),
+    }
+  })
+}

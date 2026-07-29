@@ -2,11 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { BackLink } from '../components/BackLink'
 import { getAccount } from '../lib/account'
-import {
-  formatDate,
-  listAttemptsForUser,
-  listVocabSetsForStudent,
-} from '../lib/firestore'
+import { formatDate, listAttemptsForUser, listVocabSets } from '../lib/firestore'
 import {
   sheetStatuses,
   summarizeVocab,
@@ -37,17 +33,15 @@ export function AdminVocabStudent() {
   useEffect(() => {
     if (!uid) return
     let cancelled = false
-    Promise.all([
-      getAccount(uid),
-      listVocabSetsForStudent(uid),
-      listAttemptsForUser(uid),
-    ])
-      .then(([acc, sets, attempts]) => {
+    Promise.all([getAccount(uid), listVocabSets(), listAttemptsForUser(uid)])
+      .then(([acc, all, attempts]) => {
         if (cancelled) return
         if (!acc) {
           setError('학생을 찾을 수 없습니다.')
           return
         }
+        // 시험지는 교재 공용이다. 병합 전 옛 시험지만 소유자가 있어 남의 것은 뺀다.
+        const sets = all.filter((s) => !s.studentUid || s.studentUid === uid)
         // DAY 번호 순. 만든 순서로 두면 DAY 10 이 DAY 2 앞에 온다.
         const sorted = [...sets].sort((a, b) =>
           a.title.localeCompare(b.title, 'ko', { numeric: true }),

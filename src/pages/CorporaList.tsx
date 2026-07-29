@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { listVocabSeries } from '../lib/firestore'
 import type { VocabSeries } from '../lib/types'
 
@@ -7,9 +7,6 @@ export function CorporaList() {
   const [items, setItems] = useState<VocabSeries[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [search] = useSearchParams()
-  const student = search.get('student') ?? ''
-  const studentQuery = student ? `?student=${encodeURIComponent(student)}` : ''
 
   useEffect(() => {
     listVocabSeries()
@@ -66,8 +63,7 @@ export function CorporaList() {
           return (
             <Link
               key={s.id}
-              // 학생 상세에서 넘어온 경우 그 학생을 그대로 물고 간다
-              to={`/vocab/corpora/${s.id}${studentQuery}`}
+              to={`/vocab/corpora/${s.id}`}
               className="block rounded-lg border border-slate-200 bg-white p-4 hover:border-brand-300 hover:shadow-md transition"
             >
               <div className="flex items-baseline justify-between gap-3">
