@@ -157,47 +157,118 @@ async function findSeriesForSet(
   return { id: best.id, title: best.title, studentProgress: best.studentProgress }
 }
 
+export interface SeriesProgress {
+  usedCount: number
+  lastDayNumber: number
+}
+
 /**
- * 학생의 DAY 진행도를 "지금 남아 있는 시험지"에서 다시 계산해 저장한다.
+ * 남아 있는 시험지만 보고 이 교재의 DAY 진행도를 계산한다. 저장하지 않는다.
  *
  * 진행도를 생성할 때 더하기만 하면 시험지를 지웠을 때 어긋난다. 마지막 DAY 를
  * 지워도 커서가 그대로라 다음 생성이 번호를 이어 붙이고, 지운 DAY 가 쓰던
- * 단어는 영영 건너뛴다. 그래서 남은 시험지를 보고 매번 새로 계산한다.
+ * 단어는 영영 건너뛴다. 그래서 남은 시험지를 진실로 삼아 다시 계산한다.
  *
  * 중간 DAY 만 지운 경우(1~5 중 3번)는 커서를 되돌리지 않는다. 뒤쪽 DAY 가
  * 아직 그 뒤 단어를 쓰고 있어, 되돌리면 다음 생성이 같은 단어를 또 낸다.
+ *
+ * `sets` 는 한 학생의 시험지여야 한다 — 걸러내는 건 호출부 몫.
  */
-export async function syncVocabSeriesProgress(
-  series: Pick<VocabSeries, 'id' | 'title' | 'studentProgress'>,
-  studentUid: string,
-): Promise<{ usedCount: number; lastDayNumber: number }> {
+export function progressFromSets(
+  series: Pick<VocabSeries, 'id' | 'title'>,
+  sets: VocabSet[],
+): SeriesProgress {
   const mine: { day: number; set: VocabSet }[] = []
-  for (const s of await listVocabSetsForStudent(studentUid)) {
+  for (const s of sets) {
     // 다른 교재의 시험지가 우연히 제목이 맞는 일이 없도록, seriesId 가 붙어
     // 있으면 그것만 믿는다.
     if (s.seriesId && s.seriesId !== series.id) continue
     const day = s.dayNumber ?? dayNumberFromTitle(s.title, series.title)
     if (day !== null) mine.push({ day, set: s })
   }
+  if (mine.length === 0) return { usedCount: 0, lastDayNumber: 0 }
 
-  let prog = { usedCount: 0, lastDayNumber: 0 }
-  if (mine.length > 0) {
-    const last = mine.reduce((a, b) => (b.day > a.day ? b : a))
-    prog = {
-      lastDayNumber: last.day,
-      usedCount:
-        last.set.wordEnd ??
-        // 구간이 없는 옛 시험지는 그 DAY 까지의 단어 수를 더해 커서를 추정한다
-        mine
-          .filter((m) => m.day <= last.day)
-          .reduce((n, m) => n + (m.set.words?.length ?? 0), 0),
-    }
+  const last = mine.reduce((a, b) => (b.day > a.day ? b : a))
+  return {
+    lastDayNumber: last.day,
+    usedCount:
+      last.set.wordEnd ??
+      // 구간이 없는 옛 시험지는 그 DAY 까지의 단어 수를 더해 커서를 추정한다
+      mine
+        .filter((m) => m.day <= last.day)
+        .reduce((n, m) => n + (m.set.words?.length ?? 0), 0),
   }
+}
 
+/** 저장된 진행도와 실제(남은 시험지 기준)가 다른지. */
+export function progressDiffers(
+  stored: SeriesProgress | undefined,
+  actual: SeriesProgress,
+): boolean {
+  const s = stored ?? { usedCount: 0, lastDayNumber: 0 }
+  return s.usedCount !== actual.usedCount || s.lastDayNumber !== actual.lastDayNumber
+}
+
+/** 한 학생의 진행도를 남은 시험지 기준으로 계산한다. 저장하지 않는다. */
+export async function computeVocabSeriesProgress(
+  series: Pick<VocabSeries, 'id' | 'title'>,
+  studentUid: string,
+): Promise<SeriesProgress> {
+  return progressFromSets(series, await listVocabSetsForStudent(studentUid))
+}
+
+/** 한 학생의 진행도를 남은 시험지 기준으로 다시 계산해 저장한다. */
+export async function syncVocabSeriesProgress(
+  series: Pick<VocabSeries, 'id' | 'title' | 'studentProgress'>,
+  studentUid: string,
+): Promise<SeriesProgress> {
+  const prog = await computeVocabSeriesProgress(series, studentUid)
   await updateVocabSeries(series.id, {
     studentProgress: { ...(series.studentProgress ?? {}), [studentUid]: prog },
   })
   return prog
+}
+
+/**
+ * 교재의 모든 학생 진행도를 남은 시험지 기준으로 다시 계산한다. 실제로 달라진
+ * 학생만 반환하며, `apply` 가 false 면 계산만 하고 저장하지 않는다 (미리보기용).
+ *
+ * 이 기능이 없던 때 지운 시험지는 진행도에 그대로 남아 있다. 그걸 한 번에
+ * 걷어내는 용도다.
+ */
+export async function syncAllVocabSeriesProgress(
+  series: Pick<VocabSeries, 'id' | 'title' | 'studentProgress'>,
+  apply = true,
+): Promise<{ studentUid: string; before: SeriesProgress; after: SeriesProgress }[]> {
+  // 학생마다 따로 질의하면 왕복이 학생 수만큼 늘어난다. 한 번에 읽고 나눈다.
+  const byStudent = new Map<string, VocabSet[]>()
+  for (const s of await listVocabSets()) {
+    if (!s.studentUid) continue
+    const cur = byStudent.get(s.studentUid)
+    if (cur) cur.push(s)
+    else byStudent.set(s.studentUid, [s])
+  }
+
+  const stored = series.studentProgress ?? {}
+  // 시험지가 하나도 안 남은 학생도 0 으로 되돌려야 하므로, 진행도에만 있는
+  // 학생까지 함께 훑는다.
+  const uids = new Set([...Object.keys(stored), ...byStudent.keys()])
+
+  const changed: { studentUid: string; before: SeriesProgress; after: SeriesProgress }[] = []
+  const next = { ...stored }
+  for (const uid of uids) {
+    const after = progressFromSets(series, byStudent.get(uid) ?? [])
+    const before = stored[uid] ?? { usedCount: 0, lastDayNumber: 0 }
+    if (!progressDiffers(stored[uid], after)) continue
+    // 진행도에 없고 시험지도 없어 0 → 0 인 학생은 위에서 이미 걸러진다
+    changed.push({ studentUid: uid, before, after })
+    next[uid] = after
+  }
+
+  if (apply && changed.length > 0) {
+    await updateVocabSeries(series.id, { studentProgress: next })
+  }
+  return changed
 }
 
 /**
