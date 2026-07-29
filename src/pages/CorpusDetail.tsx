@@ -2,11 +2,16 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import {
+  computeVocabSeriesProgress,
   createVocabSet,
   deleteVocabSeries,
   getVocabSeries,
+  progressDiffers,
   renameVocabSeriesSheets,
+  syncAllVocabSeriesProgress,
+  syncVocabSeriesProgress,
   updateVocabSeries,
+  type SeriesProgress,
 } from '../lib/firestore'
 import { listAccounts } from '../lib/account'
 import {
@@ -43,6 +48,16 @@ export function CorpusDetail() {
   const [search] = useSearchParams()
   const [genUid, setGenUid] = useState(search.get('student') ?? '')
   const [appendText, setAppendText] = useState('')
+  /**
+   * 선택 학생의 "남은 시험지 기준" 진행도. 저장된 값과 다르면 지운 시험지가
+   * 진행도에 남아 있다는 뜻이라 맞출 수 있게 알린다. uid 를 같이 들고 있는
+   * 이유는 학생을 바꾼 직후 옛 결과를 그대로 보여주지 않기 위해서다.
+   */
+  const [actualProg, setActualProg] = useState<{
+    uid: string
+    prog: SeriesProgress
+  } | null>(null)
+  const [fixingProg, setFixingProg] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [appending, setAppending] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
@@ -86,6 +101,27 @@ export function CorpusDetail() {
       .catch(() => {})
   }, [])
 
+  // 학생을 고르면 남은 시험지에서 진행도를 계산해 저장된 값과 견줘 본다.
+  // 읽기만 한다 — 화면을 열었다고 진행도를 말없이 고쳐 쓰지는 않는다.
+  useEffect(() => {
+    let cancelled = false
+    const run = async () => {
+      if (!series || !genUid) return null
+      try {
+        const prog = await computeVocabSeriesProgress(series, genUid)
+        return { uid: genUid, prog }
+      } catch {
+        return null
+      }
+    }
+    run().then((r) => {
+      if (!cancelled) setActualProg(r)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [series, genUid])
+
   const appendIsTextbook = useMemo(
     () => looksLikeTextbookVocab(appendText),
     [appendText],
@@ -108,6 +144,75 @@ export function CorpusDetail() {
   const requestedDays = Math.max(1, Number.parseInt(dayCountRaw, 10) || 1)
   const perDayNum = Math.max(1, Number.parseInt(perDayRaw, 10) || 1)
   const plannedDays = Math.min(requestedDays, Math.ceil(remaining / perDayNum))
+  // 저장된 진행도가 남은 시험지와 어긋난 경우에만 값이 들어온다
+  const staleProg =
+    actualProg && actualProg.uid === genUid && progressDiffers(genProg, actualProg.prog)
+      ? actualProg.prog
+      : null
+
+  /** 진행도를 로컬 상태에도 반영한다 — 단어 청크를 다시 읽지 않기 위해. */
+  function applyProgLocally(patch: Record<string, SeriesProgress>) {
+    setSeries((prev) =>
+      prev
+        ? { ...prev, studentProgress: { ...(prev.studentProgress ?? {}), ...patch } }
+        : prev,
+    )
+  }
+
+  /** 선택 학생의 진행도를 남은 시험지 기준으로 맞춘다. */
+  async function handleFixProgress() {
+    if (!series || !genUid) return
+    setFixingProg(true)
+    setNotice(null)
+    try {
+      const p = await syncVocabSeriesProgress(series, genUid)
+      applyProgLocally({ [genUid]: p })
+      setActualProg({ uid: genUid, prog: p })
+      const name = students.find((s) => s.id === genUid)?.displayName ?? '학생'
+      setNotice(
+        `${name} 진행도를 남은 시험지에 맞췄습니다. ` +
+          (p.lastDayNumber === 0
+            ? 'DAY 1 부터 다시 만들 수 있습니다.'
+            : `다음은 DAY ${p.lastDayNumber + 1} · ${p.usedCount}단어까지 사용.`),
+      )
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : '진행도 맞추기 실패')
+    } finally {
+      setFixingProg(false)
+    }
+  }
+
+  /** 이 교재를 쓰는 모든 학생의 진행도를 한 번에 맞춘다. */
+  async function handleFixAllProgress() {
+    if (!series) return
+    if (
+      !window.confirm(
+        '모든 학생의 DAY 진행도를 남아 있는 시험지 기준으로 다시 계산합니다.\n지운 DAY 는 진행도에서 빠지고, 그 단어를 다시 낼 수 있게 됩니다.\n시험지와 응시 기록은 건드리지 않습니다. 계속할까요?',
+      )
+    )
+      return
+    setFixingProg(true)
+    setNotice(null)
+    try {
+      const changed = await syncAllVocabSeriesProgress(series)
+      if (changed.length === 0) {
+        setNotice('모든 학생 진행도가 이미 남은 시험지와 맞습니다.')
+        return
+      }
+      applyProgLocally(Object.fromEntries(changed.map((c) => [c.studentUid, c.after])))
+      const detail = changed
+        .map((c) => {
+          const name = students.find((s) => s.id === c.studentUid)?.displayName ?? '(퇴원/미상)'
+          return `${name} DAY ${c.before.lastDayNumber}→${c.after.lastDayNumber}`
+        })
+        .join(', ')
+      setNotice(`${changed.length}명 진행도를 맞췄습니다. ${detail}`)
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : '진행도 맞추기 실패')
+    } finally {
+      setFixingProg(false)
+    }
+  }
 
   async function handleGenerate() {
     if (!series || !profile) return
@@ -527,6 +632,15 @@ export function CorpusDetail() {
           </button>
           <button
             type="button"
+            onClick={handleFixAllProgress}
+            disabled={fixingProg}
+            className="rounded-md border border-slate-300 text-slate-700 text-sm font-medium px-3 py-1.5 hover:bg-slate-100 disabled:opacity-50"
+            title="예전에 지운 DAY 시험지가 진행도에 남아 있으면 걷어낸다"
+          >
+            {fixingProg ? '맞추는 중…' : '진행도 맞추기'}
+          </button>
+          <button
+            type="button"
             onClick={handleDelete}
             className="rounded-md border border-red-200 text-red-600 text-sm font-medium px-3 py-1.5 hover:bg-red-50"
           >
@@ -572,6 +686,32 @@ export function CorpusDetail() {
               )
             })}
           </select>
+          {staleProg && (
+            <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 space-y-1.5">
+              <p className="text-xs text-amber-800">
+                {staleProg.lastDayNumber < genProg.lastDayNumber
+                  ? '지운 DAY 시험지가 진행도에 남아 있습니다.'
+                  : '진행도가 남아 있는 시험지보다 뒤처져 있습니다.'}{' '}
+                저장된 값은{' '}
+                <strong>DAY {genProg.lastDayNumber}까지 · {genProg.usedCount}단어</strong>
+                인데, 남아 있는 시험지는{' '}
+                <strong>
+                  {staleProg.lastDayNumber === 0
+                    ? '없습니다'
+                    : `DAY ${staleProg.lastDayNumber}까지 · ${staleProg.usedCount}단어`}
+                </strong>
+                . 맞추면 다음 시험지는 DAY {staleProg.lastDayNumber + 1} 부터 만들어집니다.
+              </p>
+              <button
+                type="button"
+                onClick={handleFixProgress}
+                disabled={fixingProg}
+                className="rounded-md border border-amber-300 bg-white text-amber-800 text-xs font-medium px-2.5 py-1.5 hover:bg-amber-100 disabled:opacity-50"
+              >
+                {fixingProg ? '맞추는 중…' : '이 학생 진행도 맞추기'}
+              </button>
+            </div>
+          )}
         </div>
         <div>
           <p className="block text-xs font-medium text-slate-600 mb-1.5">시험 형식</p>
