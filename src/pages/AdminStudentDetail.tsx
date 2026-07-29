@@ -49,6 +49,35 @@ import {
   type WordLookup,
 } from '../lib/types'
 
+/**
+ * 단어 과제 통과 기준 기본값. DAY 시험지가 보통 30단어라 25개를 잡는다.
+ * 단어가 이보다 적은 시험지는 부여할 때 그 시험지 단어 수로 낮춘다 —
+ * 안 그러면 영영 통과할 수 없는 과제가 된다.
+ */
+const DEFAULT_MIN_CORRECT = '25'
+
+/**
+ * 시험지를 DAY 번호 순으로. 만든 순서(최신 먼저)로 두면 여러 개를 이어서
+ * 고를 때 거꾸로 훑어야 한다. numeric 비교라 DAY 2 가 DAY 10 앞에 온다.
+ */
+function byDay(a: VocabSet, b: VocabSet): number {
+  return a.title.localeCompare(b.title, 'ko', { numeric: true })
+}
+
+/**
+ * 통과 기준을 그 시험지 단어 수까지로 낮춘다. 교재 마지막 DAY 는 단어가
+ * 모자랄 수 있는데(70단어를 30씩 나누면 마지막은 10), 기준이 단어 수보다
+ * 높으면 다 맞혀도 통과가 안 된다.
+ */
+function cappedMinCorrect(
+  minCorrect: number | undefined,
+  set: VocabSet,
+): number | undefined {
+  const words = set.words?.length ?? 0
+  if (!minCorrect || words === 0) return minCorrect
+  return Math.min(minCorrect, words)
+}
+
 function isNotYetStarted(a: Assignment): boolean {
   if (!a.startAt) return false
   return a.startAt.toMillis() > Date.now()
@@ -127,10 +156,13 @@ export function AdminStudentDetail() {
   const [assignCategory, setAssignCategory] = useState<AssignmentCategory>('vocab')
   const [categories, setCategories] = useState<CategoryConfig[]>([])
   const [assignRefId, setAssignRefId] = useState('')
+  /** 단어는 DAY 시험지를 한 번에 여러 개 부여한다. 시험지마다 과제 1건. */
+  const [vocabIds, setVocabIds] = useState<string[]>([])
   const [assignStart, setAssignStart] = useState('')
   const [assignDue, setAssignDue] = useState('')
   const [assignNote, setAssignNote] = useState('')
-  const [assignMinCorrect, setAssignMinCorrect] = useState('')
+  /** 단어 과제 통과 기준(최소 정답 수). 30단어 DAY 기준 25개가 기본. */
+  const [assignMinCorrect, setAssignMinCorrect] = useState(DEFAULT_MIN_CORRECT)
   const [assigning, setAssigning] = useState(false)
   const [assignError, setAssignError] = useState<string | null>(null)
   // 과제 부여 폼은 기본 접힘. 목록(= 보러 온 것)이 먼저 보이도록.
@@ -224,6 +256,22 @@ export function AdminStudentDetail() {
     () => vocabSets.filter((s) => !s.studentUid),
     [vocabSets],
   )
+  const sortedVocabSets = useMemo(
+    () => [...studentVocabSets].sort(byDay),
+    [studentVocabSets],
+  )
+  const sortedLegacyVocabSets = useMemo(
+    () => [...legacyVocabSets].sort(byDay),
+    [legacyVocabSets],
+  )
+  /** 이미 부여한 시험지 — 여러 개 고를 때 중복 부여를 눈으로 걸러내라고 표시한다. */
+  const assignedVocabIds = useMemo(
+    () =>
+      new Set(
+        assignments.filter((a) => a.type === 'vocab' && a.refId).map((a) => a.refId),
+      ),
+    [assignments],
+  )
 
   const progress = useMemo(() => {
     const vocabDone = new Set(
@@ -272,7 +320,48 @@ export function AdminStudentDetail() {
     return { pending, done }
   }, [assignments, attempts])
 
-  const assignOptions = assignType === 'vocab' ? studentVocabSets : koreanMocks
+  function toggleVocabId(vid: string) {
+    setVocabIds((prev) =>
+      prev.includes(vid) ? prev.filter((x) => x !== vid) : [...prev, vid],
+    )
+  }
+
+  const minCorrectNum = Number.parseInt(assignMinCorrect, 10)
+  /** 통과 기준보다 단어가 적어, 부여할 때 기준이 낮춰질 시험지 수. */
+  const cappedCount = useMemo(() => {
+    if (!Number.isFinite(minCorrectNum) || minCorrectNum <= 0) return 0
+    const candidates = [...studentVocabSets, ...legacyVocabSets]
+    return vocabIds.filter((vid) => {
+      const w = candidates.find((s) => s.id === vid)?.words?.length ?? 0
+      return w > 0 && w < minCorrectNum
+    }).length
+  }, [vocabIds, studentVocabSets, legacyVocabSets, minCorrectNum])
+  /** 고른 것 중 이미 부여한 시험지 수. 막지는 않고 알려만 준다. */
+  const reassignCount = vocabIds.filter((vid) => assignedVocabIds.has(vid)).length
+
+  function renderVocabRow(s: VocabSet) {
+    const words = s.words?.length ?? 0
+    return (
+      <label
+        key={s.id}
+        className="flex items-center gap-2 px-3 py-2 touch:py-2.5 text-sm cursor-pointer hover:bg-slate-50"
+      >
+        <input
+          type="checkbox"
+          checked={vocabIds.includes(s.id)}
+          onChange={() => toggleVocabId(s.id)}
+          className="accent-brand-600 shrink-0"
+        />
+        <span className="flex-1 min-w-0 truncate text-slate-800">{s.title}</span>
+        {assignedVocabIds.has(s.id) && (
+          <span className="shrink-0 text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1 py-0.5">
+            부여됨
+          </span>
+        )}
+        <span className="shrink-0 text-[11px] text-slate-400">{words}단어</span>
+      </label>
+    )
+  }
   const [customTitle, setCustomTitle] = useState('')
   const [pushOnAssign, setPushOnAssign] = useState(true)
 
@@ -352,26 +441,78 @@ export function AdminStudentDetail() {
       return
     }
 
-    if (!assignRefId) {
-      setAssignError('과제로 부여할 항목을 선택하세요.')
-      return
-    }
-    // 단어는 이 학생 것과 공용만 후보다 — 목록에 없던 id 가 들어오면 여기서 걸린다
-    const source =
-      assignType === 'vocab'
-        ? [...studentVocabSets, ...legacyVocabSets]
-        : assignType === 'korean_mock'
-          ? koreanMocks
-          : readings
-    const target = source.find((s) => s.id === assignRefId)
-    if (!target) {
-      setAssignError('선택한 항목을 찾을 수 없습니다.')
-      return
-    }
     let minCorrect: number | undefined
     if (assignType === 'vocab' && assignMinCorrect.trim()) {
       const n = Number.parseInt(assignMinCorrect, 10)
       if (Number.isFinite(n) && n > 0) minCorrect = n
+    }
+
+    if (assignType === 'vocab') {
+      // 이 학생 것과 공용만 후보다 — 목록에 없던 id 는 여기서 걸러진다
+      const candidates = [...studentVocabSets, ...legacyVocabSets]
+      const picked = vocabIds
+        .map((vid) => candidates.find((s) => s.id === vid))
+        .filter((s): s is VocabSet => Boolean(s))
+        .sort(byDay)
+      if (picked.length === 0) {
+        setAssignError('과제로 부여할 시험지를 선택하세요.')
+        return
+      }
+      setAssigning(true)
+      // 하나씩 만든다. 중간에 실패해도 여기까지 만든 것은 그대로 두고,
+      // 알림과 목록에도 반영한 뒤 몇 개까지 됐는지 알린다.
+      const made: VocabSet[] = []
+      try {
+        for (const v of picked) {
+          await createAssignment({
+            studentUid: id,
+            studentName: account.displayName,
+            assignedBy: profile.id,
+            assignedByName: profile.displayName,
+            type: 'vocab',
+            category: assignCategory,
+            refId: v.id,
+            refTitle: v.title,
+            note: assignNote,
+            minCorrect: cappedMinCorrect(minCorrect, v),
+            startAt: startDate,
+            dueAt: dueDate,
+          })
+          made.push(v)
+        }
+        setVocabIds([])
+        setAssignStart('')
+        setAssignDue('')
+        setAssignNote('')
+        setAssignMinCorrect(DEFAULT_MIN_CORRECT)
+        setAssignFormOpen(false)
+      } catch (err) {
+        // 이미 부여된 것은 선택에서 뺀다 — 그대로 다시 누르면 중복으로 들어간다
+        const doneIds = new Set(made.map((v) => v.id))
+        setVocabIds((prev) => prev.filter((x) => !doneIds.has(x)))
+        setAssignError(
+          (err instanceof Error ? err.message : '과제 부여에 실패했습니다.') +
+            (made.length > 0 ? ` (${made.length}개까지는 부여됨 · 나머지만 남겨 뒀습니다)` : ''),
+        )
+      } finally {
+        if (made.length > 0) {
+          await maybePushAssignment(made.map((v) => v.title))
+          await reloadAssignments()
+        }
+        setAssigning(false)
+      }
+      return
+    }
+
+    if (!assignRefId) {
+      setAssignError('과제로 부여할 항목을 선택하세요.')
+      return
+    }
+    const source = assignType === 'korean_mock' ? koreanMocks : readings
+    const target = source.find((s) => s.id === assignRefId)
+    if (!target) {
+      setAssignError('선택한 항목을 찾을 수 없습니다.')
+      return
     }
     setAssigning(true)
     try {
@@ -393,7 +534,7 @@ export function AdminStudentDetail() {
       setAssignStart('')
       setAssignDue('')
       setAssignNote('')
-      setAssignMinCorrect('')
+      setAssignMinCorrect(DEFAULT_MIN_CORRECT)
       await maybePushAssignment([target.title])
       await reloadAssignments()
       setAssignFormOpen(false)
@@ -577,6 +718,7 @@ export function AdminStudentDetail() {
                     onClick={() => {
                       setAssignType(opt.key)
                       setAssignRefId('')
+                      setVocabIds([])
                       setAssignCategory(defaultCategoryKey(opt.key))
                     }}
                     className={`rounded px-2 py-1.5 touch:py-2 text-xs font-medium transition ${
@@ -614,6 +756,44 @@ export function AdminStudentDetail() {
                 placeholder="예: 학원 종이 시험지 3회, 모의고사 오답노트 등"
                 className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
+            ) : assignType === 'vocab' ? (
+              <div className="rounded-md border border-slate-300 bg-white">
+                <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-slate-200">
+                  <span className="text-xs text-slate-600">
+                    {vocabIds.length > 0
+                      ? `${vocabIds.length}개 선택 · 과제 ${vocabIds.length}건으로 부여`
+                      : '여러 개 고를 수 있습니다'}
+                  </span>
+                  <div className="flex gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setVocabIds(sortedVocabSets.map((s) => s.id))}
+                      className="text-[11px] text-slate-600 hover:text-slate-900 underline underline-offset-2"
+                    >
+                      전체 선택
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setVocabIds([])}
+                      className="text-[11px] text-slate-600 hover:text-slate-900 underline underline-offset-2"
+                    >
+                      해제
+                    </button>
+                  </div>
+                </div>
+                <div className="max-h-64 overflow-y-auto divide-y divide-slate-100">
+                  {sortedVocabSets.map(renderVocabRow)}
+                  {/* 소유자 없는 옛 시험지는 따로 묶어 둔다 — 다른 학생 것은 아니다 */}
+                  {sortedLegacyVocabSets.length > 0 && (
+                    <>
+                      <p className="px-3 py-1.5 text-[11px] font-medium text-slate-500 bg-slate-50">
+                        공용 (소유 학생 없음)
+                      </p>
+                      {sortedLegacyVocabSets.map(renderVocabRow)}
+                    </>
+                  )}
+                </div>
+              </div>
             ) : (
               <select
                 value={assignRefId}
@@ -621,34 +801,26 @@ export function AdminStudentDetail() {
                 className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               >
                 <option value="">— 선택 —</option>
-                {assignOptions.map((o) => {
-                  const m = assignType === 'korean_mock' ? (o as KoreanMock) : null
-                  const prefix = m
-                    ? `[${MOCK_SUBJECT_LABEL[(m.subject ?? 'korean') as MockSubject]}] `
-                    : ''
-                  return (
-                    <option key={o.id} value={o.id}>
-                      {prefix}
-                      {o.title}
-                    </option>
-                  )
-                })}
-                {/* 소유자 없는 옛 시험지는 따로 묶어 둔다 — 다른 학생 것은 아니다 */}
-                {assignType === 'vocab' && legacyVocabSets.length > 0 && (
-                  <optgroup label="공용 (소유 학생 없음)">
-                    {legacyVocabSets.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.title}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
+                {koreanMocks.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    [{MOCK_SUBJECT_LABEL[(o.subject ?? 'korean') as MockSubject]}]{' '}
+                    {o.title}
+                  </option>
+                ))}
               </select>
             )}
-            {assignType === 'vocab' && assignOptions.length === 0 && (
-              <p className="text-[11px] text-slate-500 mt-1.5">
-                이 학생의 단어 시험지가 아직 없습니다. 교재에서 DAY 시험지를 먼저
-                만드세요.
+            {assignType === 'vocab' &&
+              sortedVocabSets.length === 0 &&
+              sortedLegacyVocabSets.length === 0 && (
+                <p className="text-[11px] text-slate-500 mt-1.5">
+                  이 학생의 단어 시험지가 아직 없습니다. 교재에서 DAY 시험지를 먼저
+                  만드세요.
+                </p>
+              )}
+            {reassignCount > 0 && (
+              <p className="text-[11px] text-amber-700 mt-1.5">
+                고른 것 중 {reassignCount}개는 이미 부여한 시험지입니다. 그대로 두면
+                같은 시험지 과제가 하나 더 생깁니다.
               </p>
             )}
           </div>
@@ -716,7 +888,7 @@ export function AdminStudentDetail() {
                 <label className="block text-xs font-medium text-slate-600 mb-1">
                   완료 기준{' '}
                   <span className="text-slate-400 font-normal">
-                    (최소 정답 수, 선택)
+                    (최소 정답 수 · 비우면 제한 없음)
                   </span>
                 </label>
                 <input
@@ -724,9 +896,15 @@ export function AdminStudentDetail() {
                   min={1}
                   value={assignMinCorrect}
                   onChange={(e) => setAssignMinCorrect(e.target.value)}
-                  placeholder="예: 25"
+                  placeholder="비우면 응시만 하면 완료"
                   className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
+                {cappedCount > 0 && (
+                  <p className="text-[11px] text-slate-500 mt-1.5">
+                    고른 것 중 {cappedCount}개는 단어가 {minCorrectNum}개보다 적어, 그
+                    시험지의 단어 수를 기준으로 부여합니다.
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -749,7 +927,11 @@ export function AdminStudentDetail() {
               disabled={assigning}
               className="rounded-md bg-slate-900 text-white text-sm font-semibold px-5 py-2 touch:py-2.5 hover:bg-slate-800 disabled:opacity-50"
             >
-              {assigning ? '부여 중…' : '과제 부여'}
+              {assigning
+                ? '부여 중…'
+                : assignType === 'vocab' && vocabIds.length > 1
+                  ? `과제 ${vocabIds.length}건 부여`
+                  : '과제 부여'}
             </button>
           </div>
         </form>
