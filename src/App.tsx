@@ -6,6 +6,8 @@ import { Login } from './pages/Login'
 import { Signup } from './pages/Signup'
 import { Dashboard } from './pages/Dashboard'
 import { VocabList } from './pages/VocabList'
+import { VocabHome } from './pages/VocabHome'
+import { AdminVocabStudent } from './pages/AdminVocabStudent'
 import { VocabDetail } from './pages/VocabDetail'
 import { VocabTake } from './pages/VocabTake'
 import { VocabSheet } from './pages/VocabSheet'
@@ -54,7 +56,7 @@ function App() {
             <Route element={<Layout />}>
               <Route path="/" element={<Dashboard />} />
 
-              <Route path="/vocab" element={<VocabList />} />
+              <Route path="/vocab" element={<VocabHome />} />
               <Route path="/vocab/:id" element={<VocabDetail />} />
               <Route path="/vocab/:id/take" element={<VocabTake />} />
               <Route path="/vocab/:id/sheet" element={<VocabSheet />} />
@@ -83,6 +85,8 @@ function App() {
 
           <Route element={<ProtectedRoute adminOnly />}>
             <Route element={<Layout />}>
+              {/* /vocab/:id 보다 세그먼트가 하나 많아 라우터가 이쪽을 먼저 고른다 */}
+              <Route path="/vocab/student/:uid" element={<AdminVocabStudent />} />
               <Route path="/vocab/corpora" element={<CorporaList />} />
               <Route path="/vocab/corpora/new" element={<CorpusNew />} />
               <Route path="/vocab/corpora/:id" element={<CorpusDetail />} />
