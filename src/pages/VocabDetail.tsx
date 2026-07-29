@@ -2,17 +2,15 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { BackLink } from '../components/BackLink'
 import { useAuth } from '../contexts/useAuth'
-import { listAccounts } from '../lib/account'
 import {
   deleteVocabSet,
   getVocabSet,
   listAttemptsForUser,
-  updateVocabSetOwner,
   updateVocabSetTitle,
 } from '../lib/firestore'
 import { MyAttemptsBox } from '../components/MyAttemptsBox'
 import { highlightHead } from '../lib/highlightWord'
-import type { Attempt, UserAccount, VocabSet } from '../lib/types'
+import type { Attempt, VocabSet } from '../lib/types'
 
 const renderExampleWithBoldWord = highlightHead
 
@@ -83,21 +81,6 @@ export function VocabDetail() {
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
   const [savingTitle, setSavingTitle] = useState(false)
-  const [assigningOwner, setAssigningOwner] = useState(false)
-  const [students, setStudents] = useState<UserAccount[]>([])
-  const [ownerDraft, setOwnerDraft] = useState('')
-  const [savingOwner, setSavingOwner] = useState(false)
-
-  useEffect(() => {
-    if (!isAdmin) return
-    listAccounts()
-      .then((all) =>
-        setStudents(
-          all.filter((a) => a.role === 'student' && a.status === 'active'),
-        ),
-      )
-      .catch(() => {})
-  }, [isAdmin])
 
   useEffect(() => {
     if (!id || !profile) return
@@ -140,30 +123,6 @@ export function VocabDetail() {
       setError(e instanceof Error ? e.message : '제목 저장 실패')
     } finally {
       setSavingTitle(false)
-    }
-  }
-
-  async function saveOwner() {
-    if (!set) return
-    if (!ownerDraft) {
-      setAssigningOwner(false)
-      return
-    }
-    const picked = students.find((s) => s.id === ownerDraft)
-    if (!picked) return
-    setSavingOwner(true)
-    try {
-      await updateVocabSetOwner(set.id, picked.id, picked.displayName)
-      setSet({
-        ...set,
-        studentUid: picked.id,
-        studentName: picked.displayName,
-      })
-      setAssigningOwner(false)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '학생 지정 실패')
-    } finally {
-      setSavingOwner(false)
     }
   }
 
@@ -246,66 +205,6 @@ export function VocabDetail() {
           <p className="text-xs text-slate-500 mt-1">
             {set.words.length}단어 · {set.createdByName}
           </p>
-          {isAdmin && (
-            <div className="mt-2">
-              {assigningOwner ? (
-                <div className="flex items-center gap-2 flex-wrap">
-                  <select
-                    value={ownerDraft}
-                    onChange={(e) => setOwnerDraft(e.target.value)}
-                    className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  >
-                    <option value="">— 학생 선택 —</option>
-                    {students.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.displayName}
-                        {s.school ? ` (${s.school})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={saveOwner}
-                    disabled={savingOwner || !ownerDraft}
-                    className="rounded-md bg-slate-900 text-white text-xs font-medium px-2.5 py-1 hover:bg-slate-800 disabled:opacity-50"
-                  >
-                    {savingOwner ? '저장 중…' : '저장'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAssigningOwner(false)}
-                    disabled={savingOwner}
-                    className="text-xs text-slate-500 hover:text-slate-900 px-1"
-                  >
-                    취소
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 flex-wrap text-xs">
-                  <span className="text-slate-500">소유 학생:</span>
-                  {set.studentName ? (
-                    <span className="text-brand-700 font-medium">
-                      {set.studentName}
-                    </span>
-                  ) : (
-                    <span className="text-amber-600 font-medium">
-                      공용(legacy)
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOwnerDraft(set.studentUid ?? '')
-                      setAssigningOwner(true)
-                    }}
-                    className="text-slate-500 hover:text-slate-900 px-1"
-                  >
-                    {set.studentUid ? '변경' : '지정'}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
         </div>
         {isAdmin && !editingTitle && (
           <button

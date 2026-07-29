@@ -113,19 +113,6 @@ export async function createVocabSet(input: {
   return ref.id
 }
 
-export async function listVocabSetsForStudent(
-  studentUid: string,
-): Promise<VocabSet[]> {
-  const snap = await getDocs(
-    query(
-      collection(db, 'vocabSets'),
-      where('studentUid', '==', studentUid),
-      orderBy('createdAt', 'desc'),
-    ),
-  )
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<VocabSet, 'id'>) }))
-}
-
 /** "{교재명} DAY 12" 에서 12 를 꺼낸다. 형식이 안 맞으면 null. */
 function dayNumberFromTitle(title: string, seriesTitle: string): number | null {
   const prefix = `${seriesTitle} DAY `
@@ -141,20 +128,38 @@ function dayNumberFromTitle(title: string, seriesTitle: string): number | null {
  */
 async function findSeriesForSet(
   set: Pick<VocabSet, 'title' | 'seriesId'>,
-): Promise<Pick<VocabSeries, 'id' | 'title' | 'studentProgress'> | null> {
+): Promise<Pick<VocabSeries, 'id' | 'title'> | null> {
   if (set.seriesId) {
     const snap = await getDoc(doc(db, 'vocabSeries', set.seriesId))
     if (!snap.exists()) return null
     const data = snap.data() as Omit<VocabSeries, 'id'>
-    return { id: snap.id, title: data.title, studentProgress: data.studentProgress }
+    return { id: snap.id, title: data.title }
   }
   let best: VocabSeries | null = null
   for (const s of await listVocabSeries()) {
     if (dayNumberFromTitle(set.title, s.title) === null) continue
     if (!best || s.title.length > best.title.length) best = s
   }
-  if (!best) return null
-  return { id: best.id, title: best.title, studentProgress: best.studentProgress }
+  return best ? { id: best.id, title: best.title } : null
+}
+
+/**
+ * 이 교재에서 만든 시험지를 DAY 번호와 함께 골라낸다.
+ *
+ * seriesId 가 붙어 있으면 그것만 믿는다 — 다른 교재의 시험지가 우연히 제목이
+ * 맞는 일을 막는다. seriesId 가 없는 옛 시험지는 제목으로 되짚는다.
+ */
+export function setsOfSeries(
+  series: Pick<VocabSeries, 'id' | 'title'>,
+  all: VocabSet[],
+): { day: number; set: VocabSet }[] {
+  const out: { day: number; set: VocabSet }[] = []
+  for (const s of all) {
+    if (s.seriesId && s.seriesId !== series.id) continue
+    const day = s.dayNumber ?? dayNumberFromTitle(s.title, series.title)
+    if (day !== null) out.push({ day, set: s })
+  }
+  return out.sort((a, b) => a.day - b.day)
 }
 
 export interface SeriesProgress {
@@ -171,24 +176,15 @@ export interface SeriesProgress {
  *
  * 중간 DAY 만 지운 경우(1~5 중 3번)는 커서를 되돌리지 않는다. 뒤쪽 DAY 가
  * 아직 그 뒤 단어를 쓰고 있어, 되돌리면 다음 생성이 같은 단어를 또 낸다.
- *
- * `sets` 는 한 학생의 시험지여야 한다 — 걸러내는 건 호출부 몫.
  */
 export function progressFromSets(
   series: Pick<VocabSeries, 'id' | 'title'>,
-  sets: VocabSet[],
+  all: VocabSet[],
 ): SeriesProgress {
-  const mine: { day: number; set: VocabSet }[] = []
-  for (const s of sets) {
-    // 다른 교재의 시험지가 우연히 제목이 맞는 일이 없도록, seriesId 가 붙어
-    // 있으면 그것만 믿는다.
-    if (s.seriesId && s.seriesId !== series.id) continue
-    const day = s.dayNumber ?? dayNumberFromTitle(s.title, series.title)
-    if (day !== null) mine.push({ day, set: s })
-  }
+  const mine = setsOfSeries(series, all)
   if (mine.length === 0) return { usedCount: 0, lastDayNumber: 0 }
 
-  const last = mine.reduce((a, b) => (b.day > a.day ? b : a))
+  const last = mine[mine.length - 1]
   return {
     lastDayNumber: last.day,
     usedCount:
@@ -209,79 +205,83 @@ export function progressDiffers(
   return s.usedCount !== actual.usedCount || s.lastDayNumber !== actual.lastDayNumber
 }
 
-/** 한 학생의 진행도를 남은 시험지 기준으로 계산한다. 저장하지 않는다. */
+/** 교재 진행도를 남은 시험지 기준으로 계산한다. 저장하지 않는다. */
 export async function computeVocabSeriesProgress(
   series: Pick<VocabSeries, 'id' | 'title'>,
-  studentUid: string,
 ): Promise<SeriesProgress> {
-  return progressFromSets(series, await listVocabSetsForStudent(studentUid))
+  return progressFromSets(series, await listVocabSets())
 }
 
-/** 한 학생의 진행도를 남은 시험지 기준으로 다시 계산해 저장한다. */
+/** 교재 진행도를 남은 시험지 기준으로 다시 계산해 저장한다. */
 export async function syncVocabSeriesProgress(
-  series: Pick<VocabSeries, 'id' | 'title' | 'studentProgress'>,
-  studentUid: string,
+  series: Pick<VocabSeries, 'id' | 'title'>,
 ): Promise<SeriesProgress> {
-  const prog = await computeVocabSeriesProgress(series, studentUid)
-  await updateVocabSeries(series.id, {
-    studentProgress: { ...(series.studentProgress ?? {}), [studentUid]: prog },
-  })
+  const prog = await computeVocabSeriesProgress(series)
+  await updateVocabSeries(series.id, prog)
   return prog
 }
 
 /**
- * 교재의 모든 학생 진행도를 남은 시험지 기준으로 다시 계산한다. 실제로 달라진
- * 학생만 반환하며, `apply` 가 false 면 계산만 하고 저장하지 않는다 (미리보기용).
- *
- * 이 기능이 없던 때 지운 시험지는 진행도에 그대로 남아 있다. 그걸 한 번에
- * 걷어내는 용도다.
+ * 시험지를 지우고, 교재에서 만든 DAY 시험지면 진행도도 다시 맞춘다 — 안 그러면
+ * 지운 DAY 가 진행도에 남아 다음 생성이 번호를 이어 붙인다.
  */
-export async function syncAllVocabSeriesProgress(
-  series: Pick<VocabSeries, 'id' | 'title' | 'studentProgress'>,
-  apply = true,
-): Promise<{ studentUid: string; before: SeriesProgress; after: SeriesProgress }[]> {
-  // 학생마다 따로 질의하면 왕복이 학생 수만큼 늘어난다. 한 번에 읽고 나눈다.
-  const byStudent = new Map<string, VocabSet[]>()
-  for (const s of await listVocabSets()) {
-    if (!s.studentUid) continue
-    const cur = byStudent.get(s.studentUid)
-    if (cur) cur.push(s)
-    else byStudent.set(s.studentUid, [s])
-  }
-
-  const stored = series.studentProgress ?? {}
-  // 시험지가 하나도 안 남은 학생도 0 으로 되돌려야 하므로, 진행도에만 있는
-  // 학생까지 함께 훑는다.
-  const uids = new Set([...Object.keys(stored), ...byStudent.keys()])
-
-  const changed: { studentUid: string; before: SeriesProgress; after: SeriesProgress }[] = []
-  const next = { ...stored }
-  for (const uid of uids) {
-    const after = progressFromSets(series, byStudent.get(uid) ?? [])
-    const before = stored[uid] ?? { usedCount: 0, lastDayNumber: 0 }
-    if (!progressDiffers(stored[uid], after)) continue
-    // 진행도에 없고 시험지도 없어 0 → 0 인 학생은 위에서 이미 걸러진다
-    changed.push({ studentUid: uid, before, after })
-    next[uid] = after
-  }
-
-  if (apply && changed.length > 0) {
-    await updateVocabSeries(series.id, { studentProgress: next })
-  }
-  return changed
+export async function deleteVocabSet(
+  set: Pick<VocabSet, 'id' | 'title' | 'seriesId'>,
+): Promise<void> {
+  await deleteDoc(doc(db, 'vocabSets', set.id))
+  const series = await findSeriesForSet(set)
+  if (series) await syncVocabSeriesProgress(series)
 }
 
 /**
- * 시험지를 지운다. 교재에서 만든 DAY 시험지면 그 학생의 진행도도 다시 맞춘다
- * — 안 그러면 지운 DAY 가 진행도에 남아 다음 생성이 번호를 이어 붙인다.
+ * 어떤 컬렉션의 refId 를 다른 시험지로 옮긴다. 배치 상한(500)을 넘기지 않게
+ * 나눠서 커밋한다. 옮긴 문서 수를 반환.
  */
-export async function deleteVocabSet(
-  set: Pick<VocabSet, 'id' | 'title' | 'studentUid' | 'seriesId'>,
-): Promise<void> {
-  await deleteDoc(doc(db, 'vocabSets', set.id))
-  if (!set.studentUid) return
-  const series = await findSeriesForSet(set)
-  if (series) await syncVocabSeriesProgress(series, set.studentUid)
+async function remapRefId(
+  col: 'attempts' | 'assignments',
+  from: string,
+  to: string,
+): Promise<number> {
+  const snap = await getDocs(query(collection(db, col), where('refId', '==', from)))
+  const BATCH_LIMIT = 450
+  for (let i = 0; i < snap.docs.length; i += BATCH_LIMIT) {
+    const batch = writeBatch(db)
+    for (const d of snap.docs.slice(i, i + BATCH_LIMIT)) batch.update(d.ref, { refId: to })
+    await batch.commit()
+  }
+  return snap.docs.length
+}
+
+/**
+ * 학생마다 따로 만들어 두었던 같은 시험지들을 하나로 합친다.
+ *
+ * 남길 시험지를 빼고 나머지를 지우되, 지우기 전에 그 시험지를 가리키던 응시
+ * 기록과 과제의 refId 를 남는 쪽으로 옮긴다. 안 옮기면 학생 기록이 없는
+ * 문서를 가리켜 결과 화면이 깨진다.
+ *
+ * 남는 시험지에서는 소유 학생을 뗀다 — 이제 모두가 같은 것을 푼다.
+ */
+export async function mergeVocabSets(
+  survivor: Pick<VocabSet, 'id' | 'studentUid'>,
+  losers: Pick<VocabSet, 'id'>[],
+): Promise<{ attempts: number; assignments: number; deleted: number }> {
+  let attempts = 0
+  let assignments = 0
+  let deleted = 0
+  for (const loser of losers) {
+    if (loser.id === survivor.id) continue
+    attempts += await remapRefId('attempts', loser.id, survivor.id)
+    assignments += await remapRefId('assignments', loser.id, survivor.id)
+    await deleteDoc(doc(db, 'vocabSets', loser.id))
+    deleted++
+  }
+  if (survivor.studentUid) {
+    await updateDoc(doc(db, 'vocabSets', survivor.id), {
+      studentUid: deleteField(),
+      studentName: deleteField(),
+    })
+  }
+  return { attempts, assignments, deleted }
 }
 
 export async function updateVocabSetWords(
@@ -296,17 +296,6 @@ export async function updateVocabSetTitle(
   title: string,
 ): Promise<void> {
   await updateDoc(doc(db, 'vocabSets', id), { title })
-}
-
-export async function updateVocabSetOwner(
-  id: string,
-  studentUid: string,
-  studentName: string,
-): Promise<void> {
-  await updateDoc(doc(db, 'vocabSets', id), {
-    studentUid,
-    studentName,
-  })
 }
 
 /**

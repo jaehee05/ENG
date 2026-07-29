@@ -241,28 +241,17 @@ export function AdminStudentDetail() {
   )
 
   /**
-   * 이 학생의 단어 시험지. 시험지는 교재에서 학생마다 따로 만들어지므로,
-   * 과제 부여 목록도 진도 계산도 이 학생 것만 봐야 한다.
+   * 부여 후보 시험지. 시험지는 교재마다 하나씩이라 모든 학생이 같은 것을
+   * 푼다. 병합 전 옛 시험지는 아직 소유자가 붙어 있어, 다른 학생 것은
+   * 후보에서 뺀다.
    */
   const studentVocabSets = useMemo(
-    () => vocabSets.filter((s) => s.studentUid === id),
+    () => vocabSets.filter((s) => !s.studentUid || s.studentUid === id),
     [vocabSets, id],
-  )
-  /**
-   * 소유 학생이 없는 옛 공용 시험지. 누구 것도 아니라 "다른 학생 것"은
-   * 아니므로, 따로 묶어서 부여는 계속 할 수 있게 남긴다.
-   */
-  const legacyVocabSets = useMemo(
-    () => vocabSets.filter((s) => !s.studentUid),
-    [vocabSets],
   )
   const sortedVocabSets = useMemo(
     () => [...studentVocabSets].sort(byDay),
     [studentVocabSets],
-  )
-  const sortedLegacyVocabSets = useMemo(
-    () => [...legacyVocabSets].sort(byDay),
-    [legacyVocabSets],
   )
   /** 이미 부여한 시험지 — 여러 개 고를 때 중복 부여를 눈으로 걸러내라고 표시한다. */
   const assignedVocabIds = useMemo(
@@ -282,7 +271,7 @@ export function AdminStudentDetail() {
     )
     return {
       vocabDone: vocabDone.size,
-      // 전체 시험지 수를 쓰면 다른 학생 것까지 분모에 들어가 진도가 늘 낮게 나온다
+      // 시험지가 교재 공용이라 분모는 이 학생이 풀 수 있는 전체 시험지 수다
       vocabTotal: studentVocabSets.length,
       readingDone: readingDone.size,
       readingTotal: readings.length,
@@ -330,12 +319,11 @@ export function AdminStudentDetail() {
   /** 통과 기준보다 단어가 적어, 부여할 때 기준이 낮춰질 시험지 수. */
   const cappedCount = useMemo(() => {
     if (!Number.isFinite(minCorrectNum) || minCorrectNum <= 0) return 0
-    const candidates = [...studentVocabSets, ...legacyVocabSets]
     return vocabIds.filter((vid) => {
-      const w = candidates.find((s) => s.id === vid)?.words?.length ?? 0
+      const w = studentVocabSets.find((s) => s.id === vid)?.words?.length ?? 0
       return w > 0 && w < minCorrectNum
     }).length
-  }, [vocabIds, studentVocabSets, legacyVocabSets, minCorrectNum])
+  }, [vocabIds, studentVocabSets, minCorrectNum])
   /** 고른 것 중 이미 부여한 시험지 수. 막지는 않고 알려만 준다. */
   const reassignCount = vocabIds.filter((vid) => assignedVocabIds.has(vid)).length
 
@@ -448,10 +436,9 @@ export function AdminStudentDetail() {
     }
 
     if (assignType === 'vocab') {
-      // 이 학생 것과 공용만 후보다 — 목록에 없던 id 는 여기서 걸러진다
-      const candidates = [...studentVocabSets, ...legacyVocabSets]
+      // 목록에 없던 id 는 여기서 걸러진다
       const picked = vocabIds
-        .map((vid) => candidates.find((s) => s.id === vid))
+        .map((vid) => studentVocabSets.find((s) => s.id === vid))
         .filter((s): s is VocabSet => Boolean(s))
         .sort(byDay)
       if (picked.length === 0) {
@@ -614,12 +601,12 @@ export function AdminStudentDetail() {
 
   const contactActions = (
     <div className="flex flex-wrap items-center gap-1.5">
-      {/* 교재를 고르면 이 학생이 자동 선택된 채로 DAY 시험지를 만들 수 있다. */}
+      {/* 시험지는 교재마다 하나씩 만들고, 여기서는 그것을 과제로 부여한다. */}
       <Link
-        to={`/vocab/corpora?student=${account.id}`}
+        to="/vocab/corpora"
         className="rounded-md bg-slate-900 text-white text-xs font-medium px-3 py-2 touch:py-2.5 hover:bg-slate-800"
       >
-        + 단어 시험지
+        교재
       </Link>
       {tel && (
         <>
@@ -783,15 +770,6 @@ export function AdminStudentDetail() {
                 </div>
                 <div className="max-h-64 overflow-y-auto divide-y divide-slate-100">
                   {sortedVocabSets.map(renderVocabRow)}
-                  {/* 소유자 없는 옛 시험지는 따로 묶어 둔다 — 다른 학생 것은 아니다 */}
-                  {sortedLegacyVocabSets.length > 0 && (
-                    <>
-                      <p className="px-3 py-1.5 text-[11px] font-medium text-slate-500 bg-slate-50">
-                        공용 (소유 학생 없음)
-                      </p>
-                      {sortedLegacyVocabSets.map(renderVocabRow)}
-                    </>
-                  )}
                 </div>
               </div>
             ) : (
@@ -809,14 +787,11 @@ export function AdminStudentDetail() {
                 ))}
               </select>
             )}
-            {assignType === 'vocab' &&
-              sortedVocabSets.length === 0 &&
-              sortedLegacyVocabSets.length === 0 && (
-                <p className="text-[11px] text-slate-500 mt-1.5">
-                  이 학생의 단어 시험지가 아직 없습니다. 교재에서 DAY 시험지를 먼저
-                  만드세요.
-                </p>
-              )}
+            {assignType === 'vocab' && sortedVocabSets.length === 0 && (
+              <p className="text-[11px] text-slate-500 mt-1.5">
+                단어 시험지가 아직 없습니다. 교재에서 DAY 시험지를 먼저 만드세요.
+              </p>
+            )}
             {reassignCount > 0 && (
               <p className="text-[11px] text-amber-700 mt-1.5">
                 고른 것 중 {reassignCount}개는 이미 부여한 시험지입니다. 그대로 두면

@@ -164,14 +164,15 @@ function buildRows(
   sets: VocabSet[],
   attempts: Attempt[],
 ): { account: UserAccount; summary: VocabSummary }[] {
-  // 시험지와 응시를 학생별로 한 번씩만 나눈다 — 학생마다 전체를 훑으면
-  // 학생 수 × 시험지 수가 된다.
-  const setsBy = new Map<string, VocabSet[]>()
+  // 시험지는 교재 공용이라 모든 학생이 같은 목록을 푼다. 병합 전 옛 시험지만
+  // 소유자가 있어, 그건 그 학생 목록에만 더한다.
+  const shared = sets.filter((s) => !s.studentUid)
+  const ownedBy = new Map<string, VocabSet[]>()
   for (const s of sets) {
     if (!s.studentUid) continue
-    const cur = setsBy.get(s.studentUid)
+    const cur = ownedBy.get(s.studentUid)
     if (cur) cur.push(s)
-    else setsBy.set(s.studentUid, [s])
+    else ownedBy.set(s.studentUid, [s])
   }
   const attemptsBy = new Map<string, Attempt[]>()
   for (const a of attempts) {
@@ -187,7 +188,10 @@ function buildRows(
     .map((account) => ({
       account,
       summary: summarizeVocab(
-        sheetStatuses(setsBy.get(account.id) ?? [], attemptsBy.get(account.id) ?? []),
+        sheetStatuses(
+          [...shared, ...(ownedBy.get(account.id) ?? [])],
+          attemptsBy.get(account.id) ?? [],
+        ),
         VOCAB_PASS_THRESHOLD,
       ),
     }))

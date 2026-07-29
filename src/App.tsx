@@ -8,6 +8,7 @@ import { Dashboard } from './pages/Dashboard'
 import { VocabList } from './pages/VocabList'
 import { VocabHome } from './pages/VocabHome'
 import { AdminVocabStudent } from './pages/AdminVocabStudent'
+import { AdminVocabMerge } from './pages/AdminVocabMerge'
 import { VocabDetail } from './pages/VocabDetail'
 import { VocabTake } from './pages/VocabTake'
 import { VocabSheet } from './pages/VocabSheet'
@@ -92,6 +93,7 @@ function App() {
               <Route path="/vocab/corpora/:id" element={<CorpusDetail />} />
               <Route path="/admin" element={<AdminHub />} />
               <Route path="/admin/vocab" element={<VocabList manage />} />
+              <Route path="/admin/vocab/merge" element={<AdminVocabMerge />} />
               <Route path="/admin/korean-mocks" element={<KoreanMockList manage />} />
               <Route path="/admin/korean-mocks/new" element={<KoreanMockNew />} />
               <Route path="/admin/students" element={<AdminStudents />} />

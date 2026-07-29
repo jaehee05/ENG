@@ -100,7 +100,11 @@ export interface VocabSet {
   format?: VocabFormat
   /** format==='choice' 일 때만. 단어별 선지 — en 으로 words 와 맞춘다. */
   choiceSets?: VocabChoice[]
-  /** 소유 학생 UID. 없으면 legacy(공용) 시험지 — 학생 뷰 미노출, 관리자만 표시. */
+  /**
+   * @deprecated 시험지를 학생마다 따로 만들던 시절의 소유자. 지금은 교재마다
+   * 하나씩 만들어 모든 학생이 같은 시험지를 푼다. 병합 전 옛 문서에만 남아
+   * 있고, 새로 만드는 시험지에는 넣지 않는다.
+   */
   studentUid?: string
   studentName?: string
   /**
@@ -139,8 +143,9 @@ export interface VocabSeries {
   /** How many words have already been used in DAY tests (cursor). 레거시 공용 커서. */
   usedCount?: number
   /**
-   * 학생별 DAY 진행도. 같은 교재(공용 단어은행)로 학생마다 독립적으로
-   * DAY 시험지를 생성한다. 키 = studentUid.
+   * @deprecated 학생별로 DAY 시험지를 따로 만들던 시절의 진행도. 지금은
+   * 시험지가 교재마다 하나라 위의 usedCount/lastDayNumber 만 쓴다. 옛 문서에
+   * 남아 있을 수 있어 타입만 남겨 둔다.
    */
   studentProgress?: Record<
     string,

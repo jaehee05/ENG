@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import {
   computeVocabSeriesProgress,
@@ -8,15 +8,12 @@ import {
   getVocabSeries,
   progressDiffers,
   renameVocabSeriesSheets,
-  syncAllVocabSeriesProgress,
   syncVocabSeriesProgress,
   updateVocabSeries,
   type SeriesProgress,
 } from '../lib/firestore'
-import { listAccounts } from '../lib/account'
 import {
   parseWordList,
-  type UserAccount,
   type VocabFormat,
   type VocabSense,
   type VocabSeries,
@@ -43,20 +40,12 @@ export function CorpusDetail() {
   // AI 오답 생성이 일부라도 실패했는지 — 교재 내 뜻으로 채워지므로 생성은 성공한다
   const [choiceWarning, setChoiceWarning] = useState(false)
   const [maxAttemptsRaw, setMaxAttemptsRaw] = useState('')
-  const [students, setStudents] = useState<UserAccount[]>([])
-  // 학생 상세에서 ?student= 로 넘어오면 그 학생을 미리 골라둔다
-  const [search] = useSearchParams()
-  const [genUid, setGenUid] = useState(search.get('student') ?? '')
   const [appendText, setAppendText] = useState('')
   /**
-   * 선택 학생의 "남은 시험지 기준" 진행도. 저장된 값과 다르면 지운 시험지가
-   * 진행도에 남아 있다는 뜻이라 맞출 수 있게 알린다. uid 를 같이 들고 있는
-   * 이유는 학생을 바꾼 직후 옛 결과를 그대로 보여주지 않기 위해서다.
+   * "남은 시험지 기준" 진행도. 저장된 값과 다르면 지운 시험지가 진행도에
+   * 남아 있다는 뜻이라 맞출 수 있게 알린다.
    */
-  const [actualProg, setActualProg] = useState<{
-    uid: string
-    prog: SeriesProgress
-  } | null>(null)
+  const [actualProg, setActualProg] = useState<SeriesProgress | null>(null)
   const [fixingProg, setFixingProg] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [appending, setAppending] = useState(false)
@@ -89,27 +78,14 @@ export function CorpusDetail() {
       .finally(() => setLoading(false))
   }, [id])
 
-  useEffect(() => {
-    listAccounts()
-      .then((accs) =>
-        setStudents(
-          accs
-            .filter((a) => a.role === 'student' && a.status === 'active')
-            .sort((a, b) => a.displayName.localeCompare(b.displayName, 'ko')),
-        ),
-      )
-      .catch(() => {})
-  }, [])
-
-  // 학생을 고르면 남은 시험지에서 진행도를 계산해 저장된 값과 견줘 본다.
-  // 읽기만 한다 — 화면을 열었다고 진행도를 말없이 고쳐 쓰지는 않는다.
+  // 남은 시험지에서 진행도를 계산해 저장된 값과 견줘 본다. 읽기만 한다 —
+  // 화면을 열었다고 진행도를 말없이 고쳐 쓰지는 않는다.
   useEffect(() => {
     let cancelled = false
     const run = async () => {
-      if (!series || !genUid) return null
+      if (!series) return null
       try {
-        const prog = await computeVocabSeriesProgress(series, genUid)
-        return { uid: genUid, prog }
+        return await computeVocabSeriesProgress(series)
       } catch {
         return null
       }
@@ -120,7 +96,7 @@ export function CorpusDetail() {
     return () => {
       cancelled = true
     }
-  }, [series, genUid])
+  }, [series])
 
   const appendIsTextbook = useMemo(
     () => looksLikeTextbookVocab(appendText),
@@ -132,10 +108,10 @@ export function CorpusDetail() {
   }, [appendText, appendIsTextbook])
 
   const total = series?.words?.length ?? 0
-  // 선택 학생의 진행도 기준 (학생마다 독립적으로 DAY 생성).
-  const genProg = (genUid && series?.studentProgress?.[genUid]) || {
-    usedCount: 0,
-    lastDayNumber: 0,
+  // 시험지는 교재마다 하나씩 만든다 — 학생이 누구든 같은 DAY 는 같은 시험지다.
+  const genProg: SeriesProgress = {
+    usedCount: series?.usedCount ?? 0,
+    lastDayNumber: series?.lastDayNumber ?? 0,
   }
   const used = genProg.usedCount
   const remaining = Math.max(0, total - used)
@@ -146,31 +122,24 @@ export function CorpusDetail() {
   const plannedDays = Math.min(requestedDays, Math.ceil(remaining / perDayNum))
   // 저장된 진행도가 남은 시험지와 어긋난 경우에만 값이 들어온다
   const staleProg =
-    actualProg && actualProg.uid === genUid && progressDiffers(genProg, actualProg.prog)
-      ? actualProg.prog
-      : null
+    actualProg && progressDiffers(genProg, actualProg) ? actualProg : null
 
   /** 진행도를 로컬 상태에도 반영한다 — 단어 청크를 다시 읽지 않기 위해. */
-  function applyProgLocally(patch: Record<string, SeriesProgress>) {
-    setSeries((prev) =>
-      prev
-        ? { ...prev, studentProgress: { ...(prev.studentProgress ?? {}), ...patch } }
-        : prev,
-    )
+  function applyProgLocally(prog: SeriesProgress) {
+    setSeries((prev) => (prev ? { ...prev, ...prog } : prev))
   }
 
-  /** 선택 학생의 진행도를 남은 시험지 기준으로 맞춘다. */
+  /** 진행도를 남은 시험지 기준으로 맞춘다. */
   async function handleFixProgress() {
-    if (!series || !genUid) return
+    if (!series) return
     setFixingProg(true)
     setNotice(null)
     try {
-      const p = await syncVocabSeriesProgress(series, genUid)
-      applyProgLocally({ [genUid]: p })
-      setActualProg({ uid: genUid, prog: p })
-      const name = students.find((s) => s.id === genUid)?.displayName ?? '학생'
+      const p = await syncVocabSeriesProgress(series)
+      applyProgLocally(p)
+      setActualProg(p)
       setNotice(
-        `${name} 진행도를 남은 시험지에 맞췄습니다. ` +
+        '진행도를 남은 시험지에 맞췄습니다. ' +
           (p.lastDayNumber === 0
             ? 'DAY 1 부터 다시 만들 수 있습니다.'
             : `다음은 DAY ${p.lastDayNumber + 1} · ${p.usedCount}단어까지 사용.`),
@@ -182,45 +151,8 @@ export function CorpusDetail() {
     }
   }
 
-  /** 이 교재를 쓰는 모든 학생의 진행도를 한 번에 맞춘다. */
-  async function handleFixAllProgress() {
-    if (!series) return
-    if (
-      !window.confirm(
-        '모든 학생의 DAY 진행도를 남아 있는 시험지 기준으로 다시 계산합니다.\n지운 DAY 는 진행도에서 빠지고, 그 단어를 다시 낼 수 있게 됩니다.\n시험지와 응시 기록은 건드리지 않습니다. 계속할까요?',
-      )
-    )
-      return
-    setFixingProg(true)
-    setNotice(null)
-    try {
-      const changed = await syncAllVocabSeriesProgress(series)
-      if (changed.length === 0) {
-        setNotice('모든 학생 진행도가 이미 남은 시험지와 맞습니다.')
-        return
-      }
-      applyProgLocally(Object.fromEntries(changed.map((c) => [c.studentUid, c.after])))
-      const detail = changed
-        .map((c) => {
-          const name = students.find((s) => s.id === c.studentUid)?.displayName ?? '(퇴원/미상)'
-          return `${name} DAY ${c.before.lastDayNumber}→${c.after.lastDayNumber}`
-        })
-        .join(', ')
-      setNotice(`${changed.length}명 진행도를 맞췄습니다. ${detail}`)
-    } catch (err) {
-      setNotice(err instanceof Error ? err.message : '진행도 맞추기 실패')
-    } finally {
-      setFixingProg(false)
-    }
-  }
-
   async function handleGenerate() {
     if (!series || !profile) return
-    if (!genUid) {
-      setNotice('시험지를 만들 학생을 선택하세요.')
-      return
-    }
-    const student = students.find((s) => s.id === genUid)
     const perDay = Number.parseInt(perDayRaw, 10)
     if (!Number.isFinite(perDay) || perDay <= 0) {
       setNotice('DAY당 단어 수는 양의 정수여야 합니다.')
@@ -233,7 +165,7 @@ export function CorpusDetail() {
     }
     const allWords = series.words ?? []
     if (remaining <= 0) {
-      setNotice('이 학생은 교재 단어를 모두 사용했습니다. 단어를 추가하세요.')
+      setNotice('교재 단어를 모두 사용했습니다. 단어를 추가하세요.')
       return
     }
     let maxAttempts: number | undefined
@@ -277,8 +209,6 @@ export function CorpusDetail() {
           title: `${series.title} DAY ${day}`,
           words: slice,
           maxAttempts,
-          studentUid: genUid,
-          studentName: student?.displayName ?? '',
           format,
           choiceSets,
           // 삭제할 때 진행도를 되돌리려면 어느 교재의 몇 번째 DAY 가
@@ -295,10 +225,8 @@ export function CorpusDetail() {
         madeWords += slice.length
         madeDays++
         await updateVocabSeries(series.id, {
-          studentProgress: {
-            ...(series.studentProgress ?? {}),
-            [genUid]: { usedCount: cursor, lastDayNumber: day },
-          },
+          usedCount: cursor,
+          lastDayNumber: day,
           perDay,
           maxAttempts,
         })
@@ -310,7 +238,7 @@ export function CorpusDetail() {
       const range =
         madeDays === 1 ? `DAY ${nextDay}` : `DAY ${nextDay}~${nextDay + madeDays - 1}`
       setNotice(
-        `${student?.displayName} · "${series.title}" ${range} ${madeDays}개 · ${madeWords}단어 생성 완료.` +
+        `"${series.title}" ${range} ${madeDays}개 · ${madeWords}단어 생성 완료.` +
           (madeDays < requested ? ' (남은 단어만큼만 만들었습니다)' : ''),
       )
     } catch (err) {
@@ -618,7 +546,8 @@ export function CorpusDetail() {
             </div>
           )}
           <p className="text-sm text-slate-500 mt-1">
-            교재 전체 {total}단어 · 학생마다 DAY 시험지를 따로 생성
+            교재 전체 {total}단어 · DAY 시험지는 교재마다 하나씩, 모든 학생이 같은
+            것을 푼다
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -632,7 +561,7 @@ export function CorpusDetail() {
           </button>
           <button
             type="button"
-            onClick={handleFixAllProgress}
+            onClick={handleFixProgress}
             disabled={fixingProg}
             className="rounded-md border border-slate-300 text-slate-700 text-sm font-medium px-3 py-1.5 hover:bg-slate-100 disabled:opacity-50"
             title="예전에 지운 DAY 시험지가 진행도에 남아 있으면 걷어낸다"
@@ -662,57 +591,33 @@ export function CorpusDetail() {
       )}
 
       <section className="rounded-lg border border-brand-200 bg-brand-50/40 p-4 space-y-3">
-        <h2 className="text-sm font-semibold text-brand-700">
-          학생 DAY 시험지 만들기
-        </h2>
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">
-            학생 <span className="text-red-500">*</span>
-          </label>
-          <select
-            value={genUid}
-            onChange={(e) => setGenUid(e.target.value)}
-            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-          >
-            <option value="">— 학생 선택 —</option>
-            {students.map((s) => {
-              const p = series.studentProgress?.[s.id]
-              return (
-                <option key={s.id} value={s.id}>
-                  {s.displayName}
-                  {s.school ? ` (${s.school})` : ''}
-                  {p ? ` · DAY ${p.lastDayNumber}까지` : ''}
-                </option>
-              )
-            })}
-          </select>
-          {staleProg && (
-            <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 space-y-1.5">
-              <p className="text-xs text-amber-800">
-                {staleProg.lastDayNumber < genProg.lastDayNumber
-                  ? '지운 DAY 시험지가 진행도에 남아 있습니다.'
-                  : '진행도가 남아 있는 시험지보다 뒤처져 있습니다.'}{' '}
-                저장된 값은{' '}
-                <strong>DAY {genProg.lastDayNumber}까지 · {genProg.usedCount}단어</strong>
-                인데, 남아 있는 시험지는{' '}
-                <strong>
-                  {staleProg.lastDayNumber === 0
-                    ? '없습니다'
-                    : `DAY ${staleProg.lastDayNumber}까지 · ${staleProg.usedCount}단어`}
-                </strong>
-                . 맞추면 다음 시험지는 DAY {staleProg.lastDayNumber + 1} 부터 만들어집니다.
-              </p>
-              <button
-                type="button"
-                onClick={handleFixProgress}
-                disabled={fixingProg}
-                className="rounded-md border border-amber-300 bg-white text-amber-800 text-xs font-medium px-2.5 py-1.5 hover:bg-amber-100 disabled:opacity-50"
-              >
-                {fixingProg ? '맞추는 중…' : '이 학생 진행도 맞추기'}
-              </button>
-            </div>
-          )}
-        </div>
+        <h2 className="text-sm font-semibold text-brand-700">DAY 시험지 만들기</h2>
+        {staleProg && (
+          <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 space-y-1.5">
+            <p className="text-xs text-amber-800">
+              {staleProg.lastDayNumber < genProg.lastDayNumber
+                ? '지운 DAY 시험지가 진행도에 남아 있습니다.'
+                : '진행도가 남아 있는 시험지보다 뒤처져 있습니다.'}{' '}
+              저장된 값은{' '}
+              <strong>DAY {genProg.lastDayNumber}까지 · {genProg.usedCount}단어</strong>
+              인데, 남아 있는 시험지는{' '}
+              <strong>
+                {staleProg.lastDayNumber === 0
+                  ? '없습니다'
+                  : `DAY ${staleProg.lastDayNumber}까지 · ${staleProg.usedCount}단어`}
+              </strong>
+              . 맞추면 다음 시험지는 DAY {staleProg.lastDayNumber + 1} 부터 만들어집니다.
+            </p>
+            <button
+              type="button"
+              onClick={handleFixProgress}
+              disabled={fixingProg}
+              className="rounded-md border border-amber-300 bg-white text-amber-800 text-xs font-medium px-2.5 py-1.5 hover:bg-amber-100 disabled:opacity-50"
+            >
+              {fixingProg ? '맞추는 중…' : '진행도 맞추기'}
+            </button>
+          </div>
+        )}
         <div>
           <p className="block text-xs font-medium text-slate-600 mb-1.5">시험 형식</p>
           <div className="grid grid-cols-2 gap-1 rounded-md border border-slate-200 bg-white p-1 max-w-xs">
@@ -784,10 +689,9 @@ export function CorpusDetail() {
             />
           </div>
         </div>
-        {genUid && (
-          <p className="text-xs text-slate-600">
-            이 학생: 사용 {used} · 남은 {remaining} ·{' '}
-            {plannedDays <= 1 ? (
+        <p className="text-xs text-slate-600">
+          사용 {used} · 남은 {remaining} ·{' '}
+          {plannedDays <= 1 ? (
               <>
                 다음 제목 <strong>{series.title} DAY {nextDay}</strong>
               </>
@@ -800,13 +704,12 @@ export function CorpusDetail() {
                 ({plannedDays}개)
               </>
             )}
-            {plannedDays < requestedDays && (
-              <span className="ml-2 text-amber-700">
-                남은 단어로는 {plannedDays}개까지만 가능합니다
-              </span>
-            )}
-          </p>
-        )}
+          {plannedDays < requestedDays && (
+            <span className="ml-2 text-amber-700">
+              남은 단어로는 {plannedDays}개까지만 가능합니다
+            </span>
+          )}
+        </p>
         {format === 'choice' && plannedDays > 1 && (
           <p className="text-[11px] text-amber-700">
             5지선다는 DAY마다 선지를 생성하므로 {plannedDays}개를 만들면
@@ -816,16 +719,14 @@ export function CorpusDetail() {
         <button
           type="button"
           onClick={handleGenerate}
-          disabled={generating || !genUid || remaining <= 0}
+          disabled={generating || remaining <= 0}
           className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 touch:py-2.5 hover:bg-brand-700 disabled:opacity-50"
         >
           {generating
             ? '생성 중...'
-            : !genUid
-              ? '학생을 선택하세요'
-              : plannedDays <= 1
-                ? `DAY ${nextDay} 시험지 생성`
-                : `DAY ${nextDay}~${nextDay + plannedDays - 1} 시험지 ${plannedDays}개 생성`}
+            : plannedDays <= 1
+              ? `DAY ${nextDay} 시험지 생성`
+              : `DAY ${nextDay}~${nextDay + plannedDays - 1} 시험지 ${plannedDays}개 생성`}
         </button>
       </section>
 
