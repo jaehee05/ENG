@@ -25,7 +25,8 @@ export function VocabList({ manage = false }: { manage?: boolean }) {
 
   useEffect(() => {
     if (!profile) return
-    // 학생: 자기 시험지만. 관리자 관리 뷰: 전체. 관리자 학습 뷰: 자기 시험지(admin도 학생 데이터 검토 시 쓸 수 있게).
+    // 관리 뷰(/admin/vocab): 전체 시험지. 그 밖(학생 /vocab): 자기 시험지만.
+    // 관리자는 /vocab 에서 VocabHome 이 학생 목록으로 보내므로 여기 안 온다.
     const p =
       canManage
         ? listVocabSets()
