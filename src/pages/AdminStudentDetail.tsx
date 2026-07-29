@@ -208,6 +208,23 @@ export function AdminStudentDetail() {
     [attempts, typeFilter],
   )
 
+  /**
+   * 이 학생의 단어 시험지. 시험지는 교재에서 학생마다 따로 만들어지므로,
+   * 과제 부여 목록도 진도 계산도 이 학생 것만 봐야 한다.
+   */
+  const studentVocabSets = useMemo(
+    () => vocabSets.filter((s) => s.studentUid === id),
+    [vocabSets, id],
+  )
+  /**
+   * 소유 학생이 없는 옛 공용 시험지. 누구 것도 아니라 "다른 학생 것"은
+   * 아니므로, 따로 묶어서 부여는 계속 할 수 있게 남긴다.
+   */
+  const legacyVocabSets = useMemo(
+    () => vocabSets.filter((s) => !s.studentUid),
+    [vocabSets],
+  )
+
   const progress = useMemo(() => {
     const vocabDone = new Set(
       attempts.filter((a) => a.type === 'vocab' && a.refId).map((a) => a.refId),
@@ -217,11 +234,12 @@ export function AdminStudentDetail() {
     )
     return {
       vocabDone: vocabDone.size,
-      vocabTotal: vocabSets.length,
+      // 전체 시험지 수를 쓰면 다른 학생 것까지 분모에 들어가 진도가 늘 낮게 나온다
+      vocabTotal: studentVocabSets.length,
       readingDone: readingDone.size,
       readingTotal: readings.length,
     }
-  }, [attempts, vocabSets, readings])
+  }, [attempts, studentVocabSets, readings])
 
   /**
    * 진행 중(미완료) — D-day 오름차순(지난 것 가장 위) → 마감 없음은 맨 뒤
@@ -254,7 +272,7 @@ export function AdminStudentDetail() {
     return { pending, done }
   }, [assignments, attempts])
 
-  const assignOptions = assignType === 'vocab' ? vocabSets : koreanMocks
+  const assignOptions = assignType === 'vocab' ? studentVocabSets : koreanMocks
   const [customTitle, setCustomTitle] = useState('')
   const [pushOnAssign, setPushOnAssign] = useState(true)
 
@@ -338,9 +356,10 @@ export function AdminStudentDetail() {
       setAssignError('과제로 부여할 항목을 선택하세요.')
       return
     }
+    // 단어는 이 학생 것과 공용만 후보다 — 목록에 없던 id 가 들어오면 여기서 걸린다
     const source =
       assignType === 'vocab'
-        ? vocabSets
+        ? [...studentVocabSets, ...legacyVocabSets]
         : assignType === 'korean_mock'
           ? koreanMocks
           : readings
@@ -614,7 +633,23 @@ export function AdminStudentDetail() {
                     </option>
                   )
                 })}
+                {/* 소유자 없는 옛 시험지는 따로 묶어 둔다 — 다른 학생 것은 아니다 */}
+                {assignType === 'vocab' && legacyVocabSets.length > 0 && (
+                  <optgroup label="공용 (소유 학생 없음)">
+                    {legacyVocabSets.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.title}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
+            )}
+            {assignType === 'vocab' && assignOptions.length === 0 && (
+              <p className="text-[11px] text-slate-500 mt-1.5">
+                이 학생의 단어 시험지가 아직 없습니다. 교재에서 DAY 시험지를 먼저
+                만드세요.
+              </p>
             )}
           </div>
 
