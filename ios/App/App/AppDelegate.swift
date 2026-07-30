@@ -78,32 +78,48 @@ public class ScreenGuardPlugin: CAPPlugin, CAPBridgedPlugin {
         field.isUserInteractionEnabled = false
         return field
     }()
-    /// 레이어를 창 안으로 끼워 넣었는지. 실패하면 false 로 남겨 다음에 다시 시도한다.
-    private var installed = false
+    /// 창 레이어의 원래 부모. 끌 때 여기로 돌려놓는다.
+    private weak var originalSuperlayer: CALayer?
+    private weak var guardedWindow: UIWindow?
 
     @objc func enable(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
+            guard self.guardedWindow == nil else {
+                self.secureField.isSecureTextEntry = true
+                call.resolve(["applied": true])
+                return
+            }
             guard let window = self.keyWindow() else {
                 call.resolve(["applied": false, "reason": "window-not-found"])
                 return
             }
-            if !self.installed {
-                window.addSubview(self.secureField)
-                NSLayoutConstraint.activate([
-                    self.secureField.centerXAnchor.constraint(equalTo: window.centerXAnchor),
-                    self.secureField.centerYAnchor.constraint(equalTo: window.centerYAnchor),
-                ])
-                // 보안 레이어는 필드를 화면에 붙여야 생긴다. 없으면 이 iOS 버전에서는
-                // 안 통하는 것이므로 원래 계층을 그대로 두고 물러난다.
-                guard let secureLayer = self.secureField.layer.sublayers?.last else {
-                    self.secureField.removeFromSuperview()
-                    call.resolve(["applied": false, "reason": "no-secure-layer"])
-                    return
-                }
-                window.layer.superlayer?.addSublayer(self.secureField.layer)
-                secureLayer.addSublayer(window.layer)
-                self.installed = true
+
+            // 필드를 창 전체에 맞춘다. 가운데에 두면 창 레이어가 그 원점을 물려받아
+            // 화면이 통째로 오른쪽 아래로 밀린다.
+            window.addSubview(self.secureField)
+            NSLayoutConstraint.activate([
+                self.secureField.leadingAnchor.constraint(equalTo: window.leadingAnchor),
+                self.secureField.trailingAnchor.constraint(equalTo: window.trailingAnchor),
+                self.secureField.topAnchor.constraint(equalTo: window.topAnchor),
+                self.secureField.bottomAnchor.constraint(equalTo: window.bottomAnchor),
+            ])
+            window.layoutIfNeeded()
+
+            // 보안 레이어는 필드를 화면에 붙여야 생긴다. 없으면 이 iOS 버전에서는
+            // 안 통하는 것이므로 원래 계층을 그대로 두고 물러난다.
+            guard let secureLayer = self.secureField.layer.sublayers?.last else {
+                self.secureField.removeFromSuperview()
+                call.resolve(["applied": false, "reason": "no-secure-layer"])
+                return
             }
+
+            self.originalSuperlayer = window.layer.superlayer
+            window.layer.superlayer?.addSublayer(self.secureField.layer)
+            secureLayer.addSublayer(window.layer)
+            // 부모가 바뀌면 좌표계도 바뀐다. 창을 원래 자리·크기로 다시 앉힌다.
+            window.layer.frame = window.bounds
+
+            self.guardedWindow = window
             self.secureField.isSecureTextEntry = true
             call.resolve(["applied": true])
         }
@@ -111,8 +127,17 @@ public class ScreenGuardPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func disable(_ call: CAPPluginCall) {
         DispatchQueue.main.async {
-            // 레이어는 그대로 두고 보안만 끈다
             self.secureField.isSecureTextEntry = false
+            // 옮긴 것을 되돌린다. 그대로 두면 이 화면을 한 번 지난 뒤 앱 전체가
+            // 보안 레이어 안에 남아, 어긋난 것이 있어도 앱 전체에 계속 남는다.
+            if let window = self.guardedWindow {
+                self.originalSuperlayer?.addSublayer(window.layer)
+                window.layer.frame = window.bounds
+                self.secureField.layer.removeFromSuperlayer()
+                self.secureField.removeFromSuperview()
+                self.guardedWindow = nil
+                self.originalSuperlayer = nil
+            }
             call.resolve()
         }
     }
