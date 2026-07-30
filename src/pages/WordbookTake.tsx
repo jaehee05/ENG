@@ -74,7 +74,8 @@ export function WordbookTake() {
   }
 
   return (
-    <div className="space-y-5 max-w-3xl mx-auto">
+    // 단어 시험지와 같은 이유로 글자를 못 집게 한다 (사전 띄우기 방지).
+    <div className="space-y-5 max-w-3xl mx-auto exam-noselect">
       <BackLink
         to="/wordbook"
         label="내 단어장"
