@@ -43,6 +43,25 @@ html.native-app, html.native-app body {
   padding-right: env(safe-area-inset-right);
 }
 
+/*
+ * 시험 화면처럼 글자를 집어 사전을 띄우면 안 되는 곳.
+ *
+ * iOS 는 길게 누르면 "찾아보기/번역" 메뉴가 뜨는데 touch-callout 으로 막고,
+ * 드래그 선택은 user-select 로 막는다. 답 입력칸은 도로 켠다 — 안 그러면
+ * 학생이 오타를 고치려고 글자를 짚을 수 없다.
+ */
+.exam-noselect {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.exam-noselect input,
+.exam-noselect textarea {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
 
 body {
   font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', system-ui, sans-serif;

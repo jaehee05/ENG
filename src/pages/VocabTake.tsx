@@ -202,7 +202,9 @@ export function VocabTake() {
   }
 
   return (
-    <div className="space-y-5 max-w-3xl mx-auto">
+    // 문제 글자를 못 집게 한다 — 길게 눌러 사전을 띄우면 시험이 아니다.
+    // 답 입력칸은 index.css 에서 도로 켜 둔다.
+    <div className="space-y-5 max-w-3xl mx-auto exam-noselect">
       <BackLink
         to={`/vocab/${set.id}`}
         label="시험지"
