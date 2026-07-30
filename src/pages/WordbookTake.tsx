@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/useAuth'
 import { createWordbookAttempt } from '../lib/firestore'
 import { gradeVocabAnswers } from '../lib/grading'
 import { listMyWordbook } from '../lib/wordbook'
+import { useScreenGuard } from '../lib/screenGuard'
 import type { WordEntry } from '../lib/types'
 
 export function WordbookTake() {
@@ -15,6 +16,9 @@ export function WordbookTake() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // 시험 보는 동안 스크린샷·녹화에 문제가 남지 않게 (iOS 앱만)
+  useScreenGuard()
 
   useEffect(() => {
     if (!profile) return

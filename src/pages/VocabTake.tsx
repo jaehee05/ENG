@@ -8,6 +8,7 @@ import {
 } from '../lib/firestore'
 import { gradeVocabAnswers } from '../lib/grading'
 import { reshuffleChoices } from '../lib/vocabChoices'
+import { useScreenGuard } from '../lib/screenGuard'
 import { BackLink } from '../components/BackLink'
 import { highlightHead } from '../lib/highlightWord'
 import {
@@ -60,6 +61,9 @@ export function VocabTake() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showHints, setShowHints] = useState(true)
+
+  // 시험 보는 동안 스크린샷·녹화에 문제가 남지 않게 (iOS 앱만)
+  useScreenGuard()
 
   const isChoice = set ? getVocabFormat(set) === 'choice' : false
   /**
