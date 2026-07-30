@@ -47,6 +47,38 @@ const SUBJECT_BADGE_CLASS: Record<MockSubject, string> = {
   english: 'bg-sky-50 text-sky-700 border-sky-200',
 }
 
+/** 지금 시각 'HH:MM:SS' — 저장됐는지 눈으로 확인하는 용도. */
+function nowClock(): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).format(new Date())
+}
+
+/**
+ * 저장할 선지 해설만 남긴다. 빈 값과 정답 번호는 넣지 않는다
+ * (Firestore 는 undefined 를 거부하고, 정답에는 오답 해설이 없다).
+ */
+function normalizeChoiceDraft(
+  draft: Record<string, string>,
+  answer: number,
+): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const [k, html] of Object.entries(draft)) {
+    if (Number(k) === answer) continue
+    if (html && html.trim()) out[k] = html.trim()
+  }
+  return out
+}
+
+/** 키 순서에 흔들리지 않게 비교용 문자열로 만든다. */
+function choiceCompareKey(m: Record<string, string> | undefined): string {
+  return JSON.stringify(
+    Object.entries(m ?? {}).sort(([a], [b]) => a.localeCompare(b)),
+  )
+}
+
 export function KoreanMockDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -79,6 +111,8 @@ export function KoreanMockDetail() {
   // 선지별 오답 해설 초안. 키는 선택지 번호('1'~'5').
   const [explChoiceDraft, setExplChoiceDraft] = useState<Record<string, string>>({})
   const [explSaving, setExplSaving] = useState(false)
+  /** Ctrl+S 로 창을 닫지 않고 저장했을 때 그 시각. 저장됐는지 눈으로 확인용. */
+  const [explSavedAt, setExplSavedAt] = useState<string | null>(null)
   const [explStyles, setExplStylesState] = useState<ExplStyle[]>([])
   // 같은 모달 안에서 해설 / 오답 리뷰 지문을 탭으로 전환
   const [explTab, setExplTab] = useState<'expl' | 'passage'>('expl')
@@ -247,6 +281,7 @@ export function KoreanMockDetail() {
     setGlossDraft(q?.glossary ?? [])
     setExplTab('expl')
     setAiError(null)
+    setExplSavedAt(null)
     setExplTarget({ group, qIdx })
   }
 
@@ -257,6 +292,8 @@ export function KoreanMockDetail() {
   async function saveQuestionPatch(
     transform: (q: KoreanMockQuestion) => KoreanMockQuestion,
     failMessage: string,
+    /** false 면 저장만 하고 모달을 열어 둔다 (Ctrl+S). */
+    close = true,
   ) {
     if (!mock || !explTarget) return
     setExplSaving(true)
@@ -282,7 +319,8 @@ export function KoreanMockDetail() {
         await updateKoreanMock(mock.id, { electives: ne })
         setMock({ ...mock, electives: ne })
       }
-      setExplTarget(null)
+      if (close) setExplTarget(null)
+      else setExplSavedAt(nowClock())
     } catch (e) {
       setError(e instanceof Error ? e.message : failMessage)
     } finally {
@@ -291,32 +329,25 @@ export function KoreanMockDetail() {
   }
 
   /** 정답 해설 + 선지별 오답 해설을 함께 저장. clear=true 면 모두 삭제. */
-  async function applyExpl(clear = false) {
+  async function applyExpl(clear = false, close = true) {
     const correct = clear ? '' : explDraft.trim()
     await saveQuestionPatch((q) => {
       const next = { ...q }
       if (correct) next.explanation = correct
       else delete next.explanation
 
-      // 빈 값과 정답 번호는 저장하지 않는다 (Firestore는 undefined도 거부)
-      const choices: Record<string, string> = {}
-      if (!clear) {
-        for (const [k, html] of Object.entries(explChoiceDraft)) {
-          if (Number(k) === q.answer) continue
-          if (html && html.trim()) choices[k] = html.trim()
-        }
-      }
+      const choices = clear ? {} : normalizeChoiceDraft(explChoiceDraft, q.answer)
       if (Object.keys(choices).length) next.explanationChoices = choices
       else delete next.explanationChoices
 
       // 구버전 통짜 오답 해설은 선지별로 갈아탄 시점에 정리한다
       if (clear || Object.keys(choices).length) delete next.explanationWrong
       return next
-    }, '해설 저장 실패')
+    }, '해설 저장 실패', close)
   }
 
   /** 지문·해석·어휘를 한 번에 저장. 빈 값은 키를 지워 Firestore undefined 오류를 피한다. */
-  async function applyPassage(clear = false) {
+  async function applyPassage(clear = false, close = true) {
     const passage = clear ? '' : passageDraft.trim()
     const passageKo = clear ? '' : passageKoDraft.trim()
     const glossary = clear ? [] : glossDraft.filter((w) => w.en.trim() && w.ko.trim())
@@ -329,7 +360,7 @@ export function KoreanMockDetail() {
       if (passage && glossary.length) next.glossary = glossary
       else delete next.glossary
       return next
-    }, '지문 저장 실패')
+    }, '지문 저장 실패', close)
   }
 
   async function runTranslate() {
@@ -451,13 +482,40 @@ export function KoreanMockDetail() {
       : undefined
   const explDirty = explTargetQuestion
     ? explDraft.trim() !== (explTargetQuestion.explanation ?? '').trim() ||
-      JSON.stringify(explChoiceDraft) !==
-        JSON.stringify(explTargetQuestion.explanationChoices ?? {}) ||
+      // 저장되는 형태로 맞춰 비교한다. 비운 칸이 초안에 ''로 남아 있으면
+      // 방금 저장했는데도 "저장되지 않습니다" 가 뜬다.
+      choiceCompareKey(
+        normalizeChoiceDraft(explChoiceDraft, explTargetQuestion.answer),
+      ) !== choiceCompareKey(explTargetQuestion.explanationChoices) ||
       passageDraft.trim() !== (explTargetQuestion.passage ?? '').trim() ||
       passageKoDraft.trim() !== (explTargetQuestion.passageKo ?? '').trim() ||
       JSON.stringify(glossDraft) !==
         JSON.stringify(explTargetQuestion.glossary ?? [])
     : false
+  /**
+   * Ctrl/Cmd+S — 창을 닫지 않고 지금 탭을 저장한다. 선지 하나 쓸 때마다
+   * 저장하고 이어서 쓰는 흐름이라, 저장하면서 닫으면 매번 다시 열어야 한다.
+   *
+   * window 에 거는 이유: 본문 에디터가 contentEditable 이고 포커스가 모달 밖에
+   * 있을 수도 있어, 패널에만 걸면 브라우저 기본 "페이지 저장" 이 뜬다.
+   * 렌더마다 최신 핸들러를 ref 에 담아 리스너는 한 번만 붙인다.
+   */
+  const explHotkeyRef = useRef<(e: KeyboardEvent) => void>(() => {})
+  useEffect(() => {
+    explHotkeyRef.current = (e) => {
+      if (e.key.toLowerCase() !== 's' || !(e.metaKey || e.ctrlKey) || e.altKey) return
+      e.preventDefault()
+      if (explSaving || aiBusy !== null) return
+      void (explTab === 'expl' ? applyExpl(false, false) : applyPassage(false, false))
+    }
+  })
+  useEffect(() => {
+    if (explTarget == null) return
+    const onKey = (e: KeyboardEvent) => explHotkeyRef.current(e)
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [explTarget])
+
   const explBackdrop = useBackdropDismiss({
     open: explTarget != null,
     onDismiss: () => setExplTarget(null),
@@ -793,7 +851,8 @@ export function KoreanMockDetail() {
 
                 <p className="text-[11px] text-slate-400">
                   둘 중 하나만 입력해도 됩니다. 비워둔 쪽은 학생 화면에 나오지
-                  않습니다.
+                  않습니다. <b className="font-semibold">Ctrl+S</b> (Mac ⌘S) 로 창을
+                  닫지 않고 저장할 수 있습니다.
                 </p>
 
                 <div className="flex items-center justify-between gap-2">
@@ -806,6 +865,11 @@ export function KoreanMockDetail() {
                     해설 삭제
                   </button>
                   <div className="flex items-center gap-2">
+                    {explSavedAt && (
+                      <span className="text-[11px] text-brand-700">
+                        저장됨 {explSavedAt}
+                      </span>
+                    )}
                     <button
                       type="button"
                       onClick={() => setExplTarget(null)}
@@ -956,6 +1020,11 @@ export function KoreanMockDetail() {
                     지문 삭제
                   </button>
                   <div className="flex items-center gap-2">
+                    {explSavedAt && (
+                      <span className="text-[11px] text-brand-700">
+                        저장됨 {explSavedAt}
+                      </span>
+                    )}
                     <button
                       type="button"
                       onClick={() => setExplTarget(null)}
