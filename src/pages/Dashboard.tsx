@@ -13,7 +13,11 @@ import {
   listPaymentsForStudent,
   setDDay,
 } from '../lib/firestore'
-import { accountSubjects, isAssignmentVisibleToStudent } from '../lib/types'
+import {
+  accountSubjects,
+  isAssignmentOverdue as isOverdue,
+  isAssignmentVisibleToStudent,
+} from '../lib/types'
 import { useBackdropDismiss } from '../lib/useBackdropDismiss'
 import { computeStudentBalance, fmtDateLabel, todayISO } from '../lib/payments'
 import type {
@@ -102,11 +106,6 @@ function assignmentLabel(a: Assignment): string {
   if (a.type === 'vocab') return '단어 시험지'
   if (a.type === 'reading') return '지문'
   return '외부 과제'
-}
-
-function isOverdue(a: Assignment): boolean {
-  if (!a.dueAt) return false
-  return a.dueAt.toMillis() < Date.now()
 }
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
@@ -552,7 +551,7 @@ export function Dashboard() {
               }
               // group
               const isOpen = expanded.has(item.category)
-              const overdueCount = item.items.filter(isOverdue).length
+              const overdueCount = item.items.filter((a) => isOverdue(a)).length
               const earliest = item.items
                 .filter((a) => a.dueAt)
                 .sort((a, b) => (a.dueAt!.toMillis() - b.dueAt!.toMillis()))[0]

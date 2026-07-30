@@ -31,6 +31,7 @@ import { buildWeeklyReportVars } from '../lib/weeklyReport'
 import { listMyWordbook } from '../lib/wordbook'
 import {
   accountSubjects,
+  dueDateFromInput,
   getAssignmentStatusView,
   getDDay,
   type Assignment,
@@ -357,11 +358,9 @@ export function AdminStudentDetail() {
     if (!pushOnAssign || !id) return
     try {
       let dueText = ''
-      if (assignDue) {
-        const d = new Date(assignDue)
-        if (!Number.isNaN(d.getTime())) {
-          dueText = ` (마감 ${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')})`
-        }
+      const d = dueDateFromInput(assignDue)
+      if (d) {
+        dueText = ` (마감 ${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')})`
       }
       const body =
         titles.length === 1
@@ -382,8 +381,9 @@ export function AdminStudentDetail() {
     e.preventDefault()
     setAssignError(null)
     if (!id || !account || !profile) return
-    const dueDate = assignDue ? new Date(assignDue) : null
-    if (dueDate && Number.isNaN(dueDate.getTime())) {
+    // 마감일은 그 날 23:59 까지가 기한이다
+    const dueDate = dueDateFromInput(assignDue)
+    if (assignDue && !dueDate) {
       setAssignError('마감일이 올바르지 않습니다.')
       return
     }
@@ -1409,7 +1409,7 @@ function AssignmentRow({
         note: eNote,
       }
       input.startAt = eStart ? new Date(`${eStart}T00:00`) : null
-      input.dueAt = eDue ? new Date(`${eDue}T00:00`) : null
+      input.dueAt = dueDateFromInput(eDue)
       if (a.type === 'vocab') {
         const n = Number.parseInt(eMinCorrect, 10)
         input.minCorrect = Number.isFinite(n) && n > 0 ? n : null
