@@ -703,6 +703,33 @@ export function getDDay(
   return { days, label: `D-${days}`, tone: 'normal' }
 }
 
+/**
+ * 마감이 지났는지. 마감일은 그 날이 끝날 때까지가 기한이므로 시각이 아니라
+ * 날짜로 견준다.
+ *
+ * dueAt.toMillis() < now 로 재면 안 된다. 마감일 입력은 날짜뿐이라 그날의
+ * 어떤 시각으로 저장되는데(예전에 만든 과제는 브라우저가 UTC 자정으로
+ * 파싱해 KST 오전 9시), 시각끼리 견주면 마감일 당일 낮에 이미 "지남"이 된다.
+ */
+export function isAssignmentOverdue(
+  a: Pick<Assignment, 'dueAt'>,
+  now: Date = new Date(),
+): boolean {
+  const { days } = getDDay(a.dueAt, now)
+  return days !== null && days < 0
+}
+
+/**
+ * 날짜 입력("2026-07-30")을 그 날의 마지막 순간으로 바꾼다. 마감일은 그 날
+ * 23:59 까지가 기한이라, 날짜 문자열을 그대로 new Date 에 넣으면(= UTC 자정)
+ * 기한이 하루 가까이 짧아진다.
+ */
+export function dueDateFromInput(iso: string): Date | null {
+  if (!iso) return null
+  const d = new Date(`${iso}T23:59:59.999`)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
 export interface ReadingRef {
   id: string
   title: string

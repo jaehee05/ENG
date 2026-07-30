@@ -18,6 +18,7 @@ import {
 import {
   assignmentCategory,
   getMockSubject,
+  isAssignmentOverdue as isOverdue,
   isAssignmentVisibleToStudent,
   MOCK_SUBJECT_LABEL,
   type Assignment,
@@ -38,11 +39,6 @@ function assignmentPath(a: Assignment): string | null {
   if (a.type === 'reading') return `/reading/${a.refId}`
   if (a.type === 'korean_mock') return `/korean-mocks/${a.refId}`
   return null
-}
-
-function isOverdue(a: Assignment): boolean {
-  if (!a.dueAt) return false
-  return a.dueAt.toMillis() < Date.now()
 }
 
 // ───── 과제 캘린더 헬퍼 ─────
