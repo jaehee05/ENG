@@ -5,8 +5,8 @@ import { GlossedPassage } from '../components/GlossedPassage'
 import { BackLink } from '../components/BackLink'
 import {
   getAttempt,
-  getKoreanMock,
   updateKoreanMockAttemptAnswers,
+  watchKoreanMock,
 } from '../lib/firestore'
 import {
   choiceMark,
@@ -155,9 +155,11 @@ export function KoreanMockResult() {
       .finally(() => setLoading(false))
   }, [attemptId])
 
+  // 한 번 읽고 끝내지 않고 계속 듣는다. 관리자가 해설을 저장하면 이 화면이
+  // 바로 따라온다 — 못 누르던 번호가 눌리고, 열어 둔 해설도 그 자리에서 바뀐다.
   useEffect(() => {
     if (!id) return
-    getKoreanMock(id).then(setMock).catch(() => {})
+    return watchKoreanMock(id, setMock)
   }, [id])
 
   // 문항 번호 → 배점 (공통 + 선택과목 전체에서 조회, 없으면 2점).
@@ -435,6 +437,13 @@ export function KoreanMockResult() {
                 >
                   <td className="px-3 py-2.5 font-semibold text-slate-800">
                     {r.number}번
+                    {/* 눌러서 볼 수 있는 줄임을 표시한다. 해설이 나중에 올라오면
+                        새로고침 없이 이 표시가 붙고 그때부터 눌린다. */}
+                    {hasExpl && (
+                      <span className="ml-1.5 inline-block rounded bg-slate-100 text-slate-600 px-1.5 py-0.5 text-[10px] font-medium align-middle">
+                        해설
+                      </span>
+                    )}
                     {showPassage && (
                       <span className="ml-1.5 inline-block rounded bg-brand-50 text-brand-700 px-1.5 py-0.5 text-[10px] font-medium align-middle">
                         지문
