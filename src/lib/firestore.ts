@@ -7,6 +7,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  onSnapshot,
   orderBy,
   query,
   serverTimestamp,
@@ -780,6 +781,31 @@ export async function getKoreanMock(id: string): Promise<KoreanMock | null> {
   const snap = await getDoc(doc(db, 'koreanMocks', id))
   if (!snap.exists()) return null
   return { id: snap.id, ...(snap.data() as Omit<KoreanMock, 'id'>) }
+}
+
+/**
+ * 모의고사 문서를 실시간으로 구독한다. 구독을 끊는 함수를 반환.
+ *
+ * 관리자가 해설을 저장하면 학생 결과 화면이 새로고침 없이 따라온다 — 해설이
+ * 없어 못 누르던 번호가 눌리게 되고, 열어 둔 해설도 그 자리에서 갱신된다.
+ * 문서 하나만 듣기 때문에 학생 화면에 붙는 연결도 하나다.
+ */
+export function watchKoreanMock(
+  id: string,
+  onChange: (mock: KoreanMock | null) => void,
+  onError?: (e: Error) => void,
+): () => void {
+  return onSnapshot(
+    doc(db, 'koreanMocks', id),
+    (snap) => {
+      onChange(
+        snap.exists()
+          ? { id: snap.id, ...(snap.data() as Omit<KoreanMock, 'id'>) }
+          : null,
+      )
+    },
+    (e) => onError?.(e),
+  )
 }
 
 export async function createKoreanMock(input: {
