@@ -25,6 +25,8 @@ import {
   parseSenseBody,
   parseTextbookVocab,
 } from '../lib/parseTextbookVocab'
+import { enrichWordList, needsEnrich } from '../lib/vocabEnrich'
+import { enrichVocabBatch } from '../lib/api'
 
 export function CorpusDetail() {
   const { id } = useParams<{ id: string }>()
@@ -41,6 +43,12 @@ export function CorpusDetail() {
   const [choiceWarning, setChoiceWarning] = useState(false)
   const [maxAttemptsRaw, setMaxAttemptsRaw] = useState('')
   const [appendText, setAppendText] = useState('')
+  /** 단어를 붙일 때 빈 칸을 AI 로 채울지. 기본 켜짐. */
+  const [appendUseAi, setAppendUseAi] = useState(true)
+  /** 교재 전체 빈 칸 채우기가 도는 중인지. */
+  const [enriching, setEnriching] = useState(false)
+  /** 수정 폼에서 이 단어 하나를 AI 로 채우는 중인지. */
+  const [enrichingOne, setEnrichingOne] = useState(false)
   /**
    * "남은 시험지 기준" 진행도. 저장된 값과 다르면 지운 시험지가 진행도에
    * 남아 있다는 뜻이라 맞출 수 있게 알린다.
@@ -106,6 +114,15 @@ export function CorpusDetail() {
     if (!appendText.trim()) return []
     return appendIsTextbook ? parseTextbookVocab(appendText) : parseWordList(appendText)
   }, [appendText, appendIsTextbook])
+  const appendNeedAi = useMemo(
+    () => appendWords.filter(needsEnrich).length,
+    [appendWords],
+  )
+  /** 교재에서 발음기호·예문 등이 빠져 있는 단어 수. */
+  const missingCount = useMemo(
+    () => (series?.words ?? []).filter(needsEnrich).length,
+    [series],
+  )
 
   const total = series?.words?.length ?? 0
   // 시험지는 교재마다 하나씩 만든다 — 학생이 누구든 같은 DAY 는 같은 시험지다.
@@ -261,16 +278,98 @@ export function CorpusDetail() {
     setAppending(true)
     setNotice(null)
     try {
-      const merged = [...(series.words ?? []), ...appendWords]
+      let toAdd = appendWords
+      let aiFailed = false
+      if (appendUseAi) {
+        const r = await enrichWordList(toAdd, (done, total) =>
+          setNotice(`AI 보강 중… ${done}/${total}단어`),
+        )
+        toAdd = r.words
+        aiFailed = r.failed
+      }
+      const merged = [...(series.words ?? []), ...toAdd]
       await updateVocabSeries(series.id, { words: merged })
       const refreshed = await getVocabSeries(series.id)
       if (refreshed) setSeries(refreshed)
       setAppendText('')
-      setNotice(`${appendWords.length}단어를 교재에 추가했습니다.`)
+      setNotice(
+        `${toAdd.length}단어를 교재에 추가했습니다.` +
+          (aiFailed
+            ? ' 일부는 AI 보강에 실패했습니다 — 아래 "빠진 정보 채우기"로 다시 시도할 수 있습니다.'
+            : ''),
+      )
     } catch (err) {
       setNotice(err instanceof Error ? err.message : '추가 실패')
     } finally {
       setAppending(false)
+    }
+  }
+
+  /** 교재 전체에서 빈 칸이 있는 단어를 AI 로 채운다. 채워진 값은 건드리지 않는다. */
+  async function handleEnrichAll() {
+    if (!series) return
+    const all = series.words ?? []
+    if (missingCount === 0) {
+      setNotice('빠진 정보가 없습니다.')
+      return
+    }
+    if (
+      !window.confirm(
+        `발음기호·품사·예문 등이 빠진 ${missingCount}개 단어를 AI로 채웁니다.\n이미 채워진 칸은 그대로 둡니다. 계속하시겠습니까?`,
+      )
+    )
+      return
+    setEnriching(true)
+    setNotice(null)
+    try {
+      const r = await enrichWordList(all, (done, total) =>
+        setNotice(`AI 보강 중… ${done}/${total}단어`),
+      )
+      if (r.filled > 0) {
+        await updateVocabSeries(series.id, { words: r.words })
+        const refreshed = await getVocabSeries(series.id)
+        if (refreshed) setSeries(refreshed)
+      }
+      setNotice(
+        `${r.filled}/${r.attempted}단어를 채웠습니다.` +
+          (r.failed ? ' 일부는 실패했습니다 — 다시 누르면 남은 단어만 시도합니다.' : ''),
+      )
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : 'AI 보강 실패')
+    } finally {
+      setEnriching(false)
+    }
+  }
+
+  /** 수정 폼에서 지금 보고 있는 단어 하나만 AI 로 채운다. 저장은 사용자가 누른다. */
+  async function handleEnrichEditing() {
+    const en = editEn.trim()
+    const ko = editKo.trim()
+    if (!en || !ko) {
+      setNotice('영단어와 한국어 뜻을 먼저 입력하세요.')
+      return
+    }
+    setEnrichingOne(true)
+    setNotice(null)
+    try {
+      const [e] = await enrichVocabBatch([{ en, ko }])
+      if (!e) {
+        setNotice('AI 응답이 비어 있습니다.')
+        return
+      }
+      // 비어 있는 칸만 채운다 — 선생님이 적어 둔 값은 덮지 않는다.
+      if (!editIpa.trim() && e.ipa) setEditIpa(e.ipa)
+      if (!editPos.trim() && e.pos) setEditPos(e.pos)
+      if (!editSynonymsRaw.trim() && e.synonyms.length > 0)
+        setEditSynonymsRaw(e.synonyms.join(', '))
+      if (!editDefinitionEn.trim() && e.definitionEn) setEditDefinitionEn(e.definitionEn)
+      if (!editExample.trim() && e.example) setEditExample(e.example)
+      if (!editExampleKo.trim() && e.exampleKo) setEditExampleKo(e.exampleKo)
+      setNotice('AI가 빈 칸을 채웠습니다. 확인 후 저장하세요.')
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : 'AI 보강 실패')
+    } finally {
+      setEnrichingOne(false)
     }
   }
 
@@ -750,21 +849,53 @@ export function CorpusDetail() {
             </span>
           )}
         </p>
+        <label className="flex items-start gap-2 cursor-pointer rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5">
+          <input
+            type="checkbox"
+            checked={appendUseAi}
+            onChange={(e) => setAppendUseAi(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+          />
+          <span className="text-sm text-slate-700">
+            AI 로 예문·발음기호·품사 채우기
+            <span className="block text-xs text-slate-500 mt-0.5">
+              비어 있는 칸만 채웁니다. 붙여넣은 뜻·예문은 그대로 둡니다.
+              {appendWords.length > 0 && ` 이번엔 ${appendNeedAi}개가 대상입니다.`}
+            </span>
+          </span>
+        </label>
         <button
           type="button"
           onClick={handleAppend}
           disabled={appending || appendWords.length === 0}
           className="rounded-md bg-slate-900 text-white text-sm font-medium px-4 py-2 hover:bg-slate-800 disabled:opacity-50"
         >
-          {appending ? '추가 중...' : `교재에 ${appendWords.length}단어 추가`}
+          {appending
+            ? appendUseAi
+              ? 'AI 보강 후 추가 중...'
+              : '추가 중...'
+            : `교재에 ${appendWords.length}단어 추가`}
         </button>
       </section>
 
       {series.words && series.words.length > 0 && (
         <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-700 mb-2">
-            전체 단어 ({series.words.length}개)
-          </h2>
+          <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
+            <h2 className="text-sm font-semibold text-slate-700">
+              전체 단어 ({series.words.length}개)
+            </h2>
+            {missingCount > 0 && (
+              <button
+                type="button"
+                onClick={handleEnrichAll}
+                disabled={enriching}
+                className="rounded-md border border-brand-300 bg-brand-50 text-brand-700 text-xs font-medium px-3 py-1.5 hover:bg-brand-100 disabled:opacity-50"
+                title="발음기호·품사·유의어·예문·영영정의 중 빠진 칸만 AI로 채운다"
+              >
+                {enriching ? '채우는 중…' : `빠진 정보 AI로 채우기 (${missingCount}개)`}
+              </button>
+            )}
+          </div>
           <div className="max-h-[32rem] overflow-y-auto border border-slate-100 rounded">
             <ul className="divide-y divide-slate-100">
               {series.words.map((w, i) => {
@@ -880,6 +1011,15 @@ export function CorpusDetail() {
                           </div>
                         </div>
                         <div className="flex justify-end gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={handleEnrichEditing}
+                            disabled={enrichingOne}
+                            className="mr-auto text-xs text-brand-700 bg-brand-50 border border-brand-300 hover:bg-brand-100 rounded px-3 py-1.5 disabled:opacity-50"
+                            title="비어 있는 칸만 AI로 채운다. 저장은 직접 눌러야 한다"
+                          >
+                            {enrichingOne ? '채우는 중…' : 'AI로 빈 칸 채우기'}
+                          </button>
                           <button
                             type="button"
                             onClick={cancelEdit}

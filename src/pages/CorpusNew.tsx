@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/useAuth'
 import { createVocabSeries } from '../lib/firestore'
 import { parseWordList, type WordEntry } from '../lib/types'
 import { looksLikeTextbookVocab, parseTextbookVocab } from '../lib/parseTextbookVocab'
+import { enrichWordList, needsEnrich } from '../lib/vocabEnrich'
 
 function cleanWords(words: WordEntry[]): WordEntry[] {
   return words.map((w) => {
@@ -54,12 +55,17 @@ export function CorpusNew() {
   const [perDayRaw, setPerDayRaw] = useState('30')
   const [maxAttemptsRaw, setMaxAttemptsRaw] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [useAi, setUseAi] = useState(true)
+  const [progress, setProgress] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const isTextbook = useMemo(() => looksLikeTextbookVocab(raw), [raw])
   const words = useMemo(() => {
     return isTextbook ? parseTextbookVocab(raw) : parseWordList(raw)
   }, [raw, isTextbook])
+  // 교재 형식으로 붙여넣으면 이미 발음기호·예문이 들어 있는 단어가 많다.
+  // 실제로 AI 를 부를 단어만 세어 보여 준다.
+  const needAiCount = useMemo(() => words.filter(needsEnrich).length, [words])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -80,10 +86,21 @@ export function CorpusNew() {
       maxAttempts = n
     }
     setSubmitting(true)
+    setProgress(null)
     try {
+      let finalWords = cleanWords(words)
+      if (useAi) {
+        const r = await enrichWordList(finalWords, (done, total) =>
+          setProgress(`AI 보강 중… ${done}/${total}단어`),
+        )
+        finalWords = r.words
+        // 실패해도 교재는 그대로 저장한다. 못 채운 단어는 교재 화면의
+        // "빠진 정보 채우기" 로 다시 시도할 수 있다.
+        setProgress(r.failed ? '일부 단어는 채우지 못했습니다. 저장 중…' : '저장 중…')
+      }
       const id = await createVocabSeries({
         title: title.trim(),
-        words: cleanWords(words),
+        words: finalWords,
         perDay,
         maxAttempts,
         createdBy: profile.id,
@@ -94,6 +111,7 @@ export function CorpusNew() {
       setError(err instanceof Error ? err.message : '저장에 실패했습니다.')
     } finally {
       setSubmitting(false)
+      setProgress(null)
     }
   }
 
@@ -171,7 +189,27 @@ export function CorpusNew() {
           </p>
         </div>
 
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5">
+          <label className="flex items-start gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={useAi}
+              onChange={(e) => setUseAi(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+            />
+            <span className="text-sm text-slate-700">
+              AI 로 예문·발음기호·품사 채우기
+              <span className="block text-xs text-slate-500 mt-0.5">
+                비어 있는 칸만 채웁니다. 붙여넣은 뜻·예문은 그대로 둡니다.
+                {words.length > 0 &&
+                  ` 지금 입력한 ${words.length}단어 중 ${needAiCount}개가 대상입니다.`}
+              </span>
+            </span>
+          </label>
+        </div>
+
         {error && <p className="text-sm text-red-600">{error}</p>}
+        {progress && <p className="text-sm text-brand-700">{progress}</p>}
 
         <div className="flex gap-2">
           <button
