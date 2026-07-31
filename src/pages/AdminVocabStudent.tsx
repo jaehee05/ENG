@@ -9,7 +9,12 @@ import {
   listVocabSets,
 } from '../lib/firestore'
 import { sheetStatuses, summarizeVocab } from '../lib/vocabStatus'
-import type { Attempt, UserAccount, VocabSet } from '../lib/types'
+import {
+  isVisibleToStudent,
+  type Attempt,
+  type UserAccount,
+  type VocabSet,
+} from '../lib/types'
 
 /** 통과로 볼 최소 정답 수. 과제 부여 기본값과 같게 맞춘다. */
 const VOCAB_PASS_THRESHOLD = 25
@@ -42,8 +47,12 @@ export function AdminVocabStudent() {
           setError('학생을 찾을 수 없습니다.')
           return
         }
-        // 시험지는 교재 공용이다. 병합 전 옛 시험지만 소유자가 있어 남의 것은 뺀다.
-        const sets = all.filter((s) => !s.studentUid || s.studentUid === uid)
+        // 시험지는 교재 공용이다. 병합 전 옛 시험지의 소유자와, 교재에서
+        // 지정한 공개 대상만 걸러 이 학생이 실제로 보는 목록을 만든다.
+        const sets = all.filter(
+          (s) =>
+            (!s.studentUid || s.studentUid === uid) && isVisibleToStudent(s, uid),
+        )
         // DAY 번호 순. 만든 순서로 두면 DAY 10 이 DAY 2 앞에 온다.
         const sorted = [...sets].sort((a, b) =>
           a.title.localeCompare(b.title, 'ko', { numeric: true }),

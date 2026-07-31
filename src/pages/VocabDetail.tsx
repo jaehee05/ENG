@@ -13,7 +13,7 @@ import {
 } from '../lib/firestore'
 import { MyAttemptsBox } from '../components/MyAttemptsBox'
 import { highlightHead } from '../lib/highlightWord'
-import type { Attempt, VocabSet } from '../lib/types'
+import { isVisibleToStudent, type Attempt, type VocabSet } from '../lib/types'
 
 const renderExampleWithBoldWord = highlightHead
 
@@ -93,14 +93,18 @@ export function VocabDetail() {
     Promise.all([getVocabSet(id), listAttemptsForUser(profile.id)])
       .then(([s, atts]) => {
         if (!s) setError('시험지를 찾을 수 없습니다.')
-        else {
+        // 교재에서 공개 대상을 지정했으면 목록에서 걸러지지만, 링크를 직접
+        // 열면 여기까지 온다. 관리자는 언제나 열 수 있다.
+        else if (!isAdmin && !isVisibleToStudent(s, profile.id)) {
+          setError('이 시험지는 배정되지 않았습니다.')
+        } else {
           setSet(s)
           setAttempts(atts)
         }
       })
       .catch((e) => setError(e.message ?? '불러오기 실패'))
       .finally(() => setLoading(false))
-  }, [id, profile])
+  }, [id, profile, isAdmin])
 
   // 시험지가 학생 공용이라, 관리자는 이 시험지를 푼 모두의 기록을 본다.
   useEffect(() => {

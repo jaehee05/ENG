@@ -48,6 +48,7 @@ import {
   type UserAccount,
   type VocabSet,
   type WordLookup,
+  isVisibleToStudent,
 } from '../lib/types'
 
 /**
@@ -243,11 +244,17 @@ export function AdminStudentDetail() {
 
   /**
    * 부여 후보 시험지. 시험지는 교재마다 하나씩이라 모든 학생이 같은 것을
-   * 푼다. 병합 전 옛 시험지는 아직 소유자가 붙어 있어, 다른 학생 것은
-   * 후보에서 뺀다.
+   * 푼다. 병합 전 옛 시험지는 아직 소유자가 붙어 있어 다른 학생 것은 빼고,
+   * 교재에서 공개 대상을 지정한 시험지도 이 학생이 볼 수 있는 것만 남긴다 —
+   * 못 보는 시험지를 과제로 부여하면 학생 화면에서 열리지 않는다.
    */
   const studentVocabSets = useMemo(
-    () => vocabSets.filter((s) => !s.studentUid || s.studentUid === id),
+    () =>
+      vocabSets.filter(
+        (s) =>
+          (!s.studentUid || s.studentUid === id) &&
+          (!id || isVisibleToStudent(s, id)),
+      ),
     [vocabSets, id],
   )
   const sortedVocabSets = useMemo(

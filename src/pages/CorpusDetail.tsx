@@ -10,8 +10,11 @@ import {
   renameVocabSeriesSheets,
   syncVocabSeriesProgress,
   updateVocabSeries,
+  updateVocabSeriesSheetsAudience,
   type SeriesProgress,
 } from '../lib/firestore'
+import { listAccounts } from '../lib/account'
+import type { UserAccount } from '../lib/types'
 import {
   parseWordList,
   type VocabFormat,
@@ -49,6 +52,11 @@ export function CorpusDetail() {
   const [enriching, setEnriching] = useState(false)
   /** 수정 폼에서 이 단어 하나를 AI 로 채우는 중인지. */
   const [enrichingOne, setEnrichingOne] = useState(false)
+  /** 공개 대상 지정용 학생 목록 (활성 계정만). */
+  const [students, setStudents] = useState<UserAccount[]>([])
+  /** 편집 중인 공개 대상. 빈 배열 = 전체 공개. */
+  const [audience, setAudience] = useState<string[]>([])
+  const [savingAudience, setSavingAudience] = useState(false)
   /**
    * "남은 시험지 기준" 진행도. 저장된 값과 다르면 지운 시험지가 진행도에
    * 남아 있다는 뜻이라 맞출 수 있게 알린다.
@@ -80,11 +88,21 @@ export function CorpusDetail() {
           setSeries(s)
           if (s.perDay) setPerDayRaw(String(s.perDay))
           if (s.maxAttempts) setMaxAttemptsRaw(String(s.maxAttempts))
+          setAudience(s.studentUids ?? [])
         }
       })
       .catch((e) => setError(e.message ?? '불러오기 실패'))
       .finally(() => setLoading(false))
   }, [id])
+
+  // 공개 대상으로 고를 학생 목록. 실패해도 나머지 화면은 그대로 쓴다.
+  useEffect(() => {
+    listAccounts()
+      .then((all) =>
+        setStudents(all.filter((a) => a.role === 'student' && a.status === 'active')),
+      )
+      .catch(() => setStudents([]))
+  }, [])
 
   // 남은 시험지에서 진행도를 계산해 저장된 값과 견줘 본다. 읽기만 한다 —
   // 화면을 열었다고 진행도를 말없이 고쳐 쓰지는 않는다.
@@ -123,6 +141,13 @@ export function CorpusDetail() {
     () => (series?.words ?? []).filter(needsEnrich).length,
     [series],
   )
+  /** 저장돼 있는 공개 대상. 화면의 audience 와 견줘 저장 버튼을 켠다. */
+  const savedAudience = useMemo(() => series?.studentUids ?? [], [series])
+  const audienceDirty = useMemo(() => {
+    if (savedAudience.length !== audience.length) return true
+    const saved = new Set(savedAudience)
+    return audience.some((uid) => !saved.has(uid))
+  }, [savedAudience, audience])
 
   const total = series?.words?.length ?? 0
   // 시험지는 교재마다 하나씩 만든다 — 학생이 누구든 같은 DAY 는 같은 시험지다.
@@ -230,6 +255,9 @@ export function CorpusDetail() {
           choiceSets,
           // 삭제할 때 진행도를 되돌리려면 어느 교재의 몇 번째 DAY 가
           // 어느 구간을 썼는지 시험지에 남아 있어야 한다.
+          // 공개 대상은 교재에서 그대로 물려받는다. 학생이 보는 것은 교재가
+          // 아니라 이 시험지라, 여기 안 넣으면 지정이 소용없다.
+          studentUids: series.studentUids,
           seriesId: series.id,
           dayNumber: day,
           wordStart: cursor,
@@ -302,6 +330,38 @@ export function CorpusDetail() {
       setNotice(err instanceof Error ? err.message : '추가 실패')
     } finally {
       setAppending(false)
+    }
+  }
+
+  function toggleAudience(uid: string) {
+    setAudience((prev) =>
+      prev.includes(uid) ? prev.filter((x) => x !== uid) : [...prev, uid],
+    )
+  }
+
+  /**
+   * 공개 대상을 저장한다. 교재 문서만이 아니라 이미 만들어 둔 DAY 시험지도
+   * 함께 고친다 — 학생 화면에 뜨는 것은 시험지 쪽이다.
+   */
+  async function handleSaveAudience() {
+    if (!series) return
+    setSavingAudience(true)
+    setNotice(null)
+    try {
+      await updateVocabSeries(series.id, { studentUids: audience })
+      const touched = await updateVocabSeriesSheetsAudience(series, audience)
+      const refreshed = await getVocabSeries(series.id)
+      if (refreshed) setSeries(refreshed)
+      const who =
+        audience.length === 0 ? '전체 공개' : `지정 학생 ${audience.length}명에게만 공개`
+      setNotice(
+        `${who}로 저장했습니다.` +
+          (touched > 0 ? ` 이미 만든 DAY 시험지 ${touched}개에도 반영됨.` : ''),
+      )
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : '공개 대상 저장 실패')
+    } finally {
+      setSavingAudience(false)
     }
   }
 
@@ -826,6 +886,80 @@ export function CorpusDetail() {
             : plannedDays <= 1
               ? `DAY ${nextDay} 시험지 생성`
               : `DAY ${nextDay}~${nextDay + plannedDays - 1} 시험지 ${plannedDays}개 생성`}
+        </button>
+      </section>
+
+      <section className="rounded-lg border border-slate-200 bg-white p-4 space-y-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h2 className="text-sm font-semibold text-slate-700">공개 대상</h2>
+          <span
+            className={`text-xs font-medium px-2 py-0.5 rounded ${
+              savedAudience.length === 0
+                ? 'bg-slate-100 text-slate-600'
+                : 'bg-brand-100 text-brand-700'
+            }`}
+          >
+            {savedAudience.length === 0
+              ? '전체 공개'
+              : `지정 학생 ${savedAudience.length}명`}
+          </span>
+        </div>
+        <p className="text-xs text-slate-500">
+          선택한 학생에게만 이 교재의 DAY 시험지가 보입니다. 아무도 선택하지 않으면
+          전체 공개입니다. 이미 만들어 둔 DAY 시험지에도 함께 반영됩니다.
+        </p>
+        {students.length === 0 ? (
+          <p className="text-xs text-slate-400">활성 학생 계정이 없습니다.</p>
+        ) : (
+          <>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setAudience(students.map((s) => s.id))}
+                className="text-xs text-slate-600 hover:text-slate-900 underline underline-offset-2"
+              >
+                전체 선택
+              </button>
+              <button
+                type="button"
+                onClick={() => setAudience([])}
+                className="text-xs text-slate-600 hover:text-slate-900 underline underline-offset-2"
+              >
+                선택 해제 (전체 공개)
+              </button>
+            </div>
+            <div className="max-h-56 overflow-y-auto rounded border border-slate-200 divide-y divide-slate-100">
+              {students.map((s) => (
+                <label
+                  key={s.id}
+                  className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-slate-50"
+                >
+                  <input
+                    type="checkbox"
+                    checked={audience.includes(s.id)}
+                    onChange={() => toggleAudience(s.id)}
+                    className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                  />
+                  <span className="text-slate-800">{s.displayName}</span>
+                  {s.school && (
+                    <span className="text-xs text-slate-400">{s.school}</span>
+                  )}
+                </label>
+              ))}
+            </div>
+          </>
+        )}
+        <button
+          type="button"
+          onClick={handleSaveAudience}
+          disabled={savingAudience || !audienceDirty}
+          className="rounded-md bg-slate-900 text-white text-sm font-medium px-4 py-2 hover:bg-slate-800 disabled:opacity-50"
+        >
+          {savingAudience
+            ? '저장 중…'
+            : audience.length === 0
+              ? '전체 공개로 저장'
+              : `${audience.length}명에게만 공개로 저장`}
         </button>
       </section>
 

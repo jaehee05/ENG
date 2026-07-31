@@ -12,6 +12,7 @@ import { BackLink } from '../components/BackLink'
 import { highlightHead } from '../lib/highlightWord'
 import {
   getVocabFormat,
+  isVisibleToStudent,
   type VocabChoice,
   type VocabSet,
   type WordEntry,
@@ -84,6 +85,12 @@ export function VocabTake() {
           setError('시험지를 찾을 수 없습니다.')
           return
         }
+        // 교재에서 공개 대상을 지정했으면 목록에서 걸러지지만, 링크를 직접
+        // 열면 여기까지 온다. 관리자는 언제나 열 수 있다.
+        if (!isAdmin && !isVisibleToStudent(s, profile.id)) {
+          setError('이 시험지는 배정되지 않았습니다.')
+          return
+        }
         setSet(s)
         setUsedAttempts(
           atts.filter((a) => a.type === 'vocab' && a.refId === id && !a.practice)
@@ -107,7 +114,7 @@ export function VocabTake() {
       })
       .catch((e) => setError(e.message ?? '불러오기 실패'))
       .finally(() => setLoading(false))
-  }, [id, profile, fromRaw, toRaw])
+  }, [id, profile, isAdmin, fromRaw, toRaw])
 
   const blocked =
     !!set?.maxAttempts && !isAdmin && usedAttempts >= (set.maxAttempts ?? 0)

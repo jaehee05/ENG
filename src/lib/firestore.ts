@@ -73,6 +73,8 @@ export async function createVocabSet(input: {
   maxAttempts?: number
   studentUid?: string
   studentName?: string
+  /** 이 시험지를 볼 학생들. 비었거나 없으면 전체 공개. */
+  studentUids?: string[]
   /** 'choice' 면 5지선다. 미지정이면 기존 주관식. */
   format?: VocabFormat
   /** format==='choice' 일 때 단어별 선지. */
@@ -103,6 +105,11 @@ export async function createVocabSet(input: {
   if (input.studentUid) {
     payload.studentUid = input.studentUid
     if (input.studentName) payload.studentName = input.studentName
+  }
+  // 전체 공개는 필드를 아예 넣지 않는다 — 빈 배열과 미설정이 같은 뜻이지만,
+  // 기존 시험지와 모양을 맞춰 두면 나중에 읽을 때 헷갈리지 않는다.
+  if (input.studentUids && input.studentUids.length > 0) {
+    payload.studentUids = [...new Set(input.studentUids)]
   }
   if (input.seriesId) {
     payload.seriesId = input.seriesId
@@ -445,6 +452,7 @@ export async function updateVocabSeries(
       | 'usedCount'
       | 'lastDayNumber'
       | 'studentProgress'
+      | 'studentUids'
     >
   >,
 ): Promise<void> {
@@ -452,7 +460,14 @@ export async function updateVocabSeries(
   for (const [k, v] of Object.entries(patch)) {
     // words 는 문서에 넣지 않고 청크로 따로 쓴다
     if (k === 'words') continue
-    if (v !== undefined) update[k] = v
+    if (v === undefined) continue
+    // 공개 대상을 비우면(=전체 공개) 필드를 지운다. 빈 배열로 남겨도 뜻은
+    // 같지만, 지정한 적 없는 교재와 모양을 맞춰 둔다.
+    if (k === 'studentUids' && Array.isArray(v) && v.length === 0) {
+      update[k] = deleteField()
+      continue
+    }
+    update[k] = v
   }
   if (Object.keys(update).length > 1) {
     await updateDoc(doc(db, 'vocabSeries', id), update)
@@ -495,6 +510,37 @@ export async function renameVocabSeriesSheets(
   }
   if (count > 0) await batch.commit()
   return count
+}
+
+/**
+ * 교재의 공개 대상을 이미 만들어 둔 DAY 시험지에도 반영한다.
+ *
+ * 학생이 보는 것은 교재가 아니라 DAY 시험지라, 교재 문서만 고치면 이미
+ * 나가 있는 시험지는 계속 전체에게 보인다. 교재명 변경
+ * (renameVocabSeriesSheets)과 같은 이유로 시험지까지 훑어 고친다.
+ *
+ * @returns 손댄 시험지 수
+ */
+export async function updateVocabSeriesSheetsAudience(
+  series: Pick<VocabSeries, 'id' | 'title'>,
+  studentUids: string[],
+): Promise<number> {
+  const mine = setsOfSeries(series, await listVocabSets())
+  if (mine.length === 0) return 0
+  const uids = [...new Set(studentUids)]
+  // 전체 공개로 되돌릴 때는 필드를 지운다. 빈 배열로 남겨도 뜻은 같지만
+  // 미설정과 모양을 맞춰 둔다.
+  const value = uids.length > 0 ? uids : deleteField()
+  // writeBatch 는 한 번에 500개까지다. DAY 가 그만큼 쌓인 교재는 드물지만
+  // 넘으면 조용히 실패하므로 잘라서 커밋한다.
+  for (let i = 0; i < mine.length; i += 400) {
+    const batch = writeBatch(db)
+    for (const { set } of mine.slice(i, i + 400)) {
+      batch.update(doc(db, 'vocabSets', set.id), { studentUids: value })
+    }
+    await batch.commit()
+  }
+  return mine.length
 }
 
 export async function listReadings(): Promise<Reading[]> {
