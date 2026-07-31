@@ -3,7 +3,12 @@ import { Link } from 'react-router-dom'
 import { listAccounts } from '../lib/account'
 import { formatDate, listAllAttempts, listVocabSets } from '../lib/firestore'
 import { sheetStatuses, summarizeVocab, type VocabSummary } from '../lib/vocabStatus'
-import type { Attempt, UserAccount, VocabSet } from '../lib/types'
+import {
+  isVisibleToStudent,
+  type Attempt,
+  type UserAccount,
+  type VocabSet,
+} from '../lib/types'
 
 /** 통과로 볼 최소 정답 수. 과제 부여 기본값과 같게 맞춘다. */
 const VOCAB_PASS_THRESHOLD = 25
@@ -164,8 +169,9 @@ function buildRows(
   sets: VocabSet[],
   attempts: Attempt[],
 ): { account: UserAccount; summary: VocabSummary }[] {
-  // 시험지는 교재 공용이라 모든 학생이 같은 목록을 푼다. 병합 전 옛 시험지만
-  // 소유자가 있어, 그건 그 학생 목록에만 더한다.
+  // 시험지는 교재 공용이라 기본적으로 모든 학생이 같은 목록을 푼다. 둘만
+  // 예외다 — 병합 전 옛 시험지의 소유자(아래 ownedBy)와, 교재에서 공개
+  // 대상을 지정한 시험지(학생마다 걸러낸다).
   const shared = sets.filter((s) => !s.studentUid)
   const ownedBy = new Map<string, VocabSet[]>()
   for (const s of sets) {
@@ -189,7 +195,10 @@ function buildRows(
       account,
       summary: summarizeVocab(
         sheetStatuses(
-          [...shared, ...(ownedBy.get(account.id) ?? [])],
+          [
+            ...shared.filter((s) => isVisibleToStudent(s, account.id)),
+            ...(ownedBy.get(account.id) ?? []),
+          ],
           attemptsBy.get(account.id) ?? [],
         ),
         VOCAB_PASS_THRESHOLD,

@@ -8,7 +8,7 @@ import {
   listVocabSets,
   updateVocabSetWords,
 } from '../lib/firestore'
-import type { VocabSense, VocabSet, WordEntry } from '../lib/types'
+import { isVisibleToStudent, type VocabSense, type VocabSet, type WordEntry } from '../lib/types'
 import { parseSenseBody } from '../lib/parseTextbookVocab'
 
 export function VocabList({ manage = false }: { manage?: boolean }) {
@@ -22,14 +22,20 @@ export function VocabList({ manage = false }: { manage?: boolean }) {
 
   useEffect(() => {
     if (!profile) return
-    // 시험지는 교재마다 하나씩이라 학생 구분이 없다. 다만 병합 전 옛 시험지는
-    // 아직 소유자가 붙어 있어, 남의 것은 걸러 준다. 관리 뷰는 전부 본다.
-    // (관리자는 /vocab 에서 VocabHome 이 학생 목록으로 보내므로 여기 안 온다.)
+    // 시험지는 교재마다 하나씩이라 기본은 모두에게 보인다. 두 가지만 걸러낸다.
+    // 1) 병합 전 옛 시험지에 남아 있는 소유자(studentUid)
+    // 2) 교재에서 지정한 공개 대상(studentUids) — 없으면 전체 공개
+    // 관리 뷰는 전부 본다. (관리자는 /vocab 에서 VocabHome 이 학생 목록으로
+    // 보내므로 여기 안 온다.)
     listVocabSets()
       .then((all) => {
         const mine = canManage
           ? all
-          : all.filter((s) => !s.studentUid || s.studentUid === profile.id)
+          : all.filter(
+              (s) =>
+                (!s.studentUid || s.studentUid === profile.id) &&
+                isVisibleToStudent(s, profile.id),
+            )
         setSets(
           [...mine].sort((a, b) =>
             a.title.localeCompare(b.title, 'ko', { numeric: true, sensitivity: 'base' }),

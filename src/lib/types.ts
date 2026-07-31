@@ -75,6 +75,25 @@ export interface WordEntry {
   senses?: VocabSense[]
 }
 
+/**
+ * 이 학생에게 보여도 되는 시험지/교재인가.
+ *
+ * studentUids 가 없거나 비어 있으면 전체 공개다 — 공개 대상 지정 기능이
+ * 생기기 전에 만든 시험지가 전부 여기 해당하므로, 없음을 "아무도 못 봄"으로
+ * 읽으면 기존 시험지가 통째로 사라진다.
+ *
+ * 참고: 이 앱은 Firebase Auth 를 쓰지 않아 규칙 층에서 막을 수 없다.
+ * 화면 노출을 가리는 것이지 데이터 접근 차단이 아니다.
+ */
+export function isVisibleToStudent(
+  target: { studentUids?: string[] },
+  uid: string,
+): boolean {
+  const list = target.studentUids
+  if (!list || list.length === 0) return true
+  return list.includes(uid)
+}
+
 /** 단어 시험 형식. 미설정=written(주관식) — 기존 시험지 호환. */
 export type VocabFormat = 'written' | 'choice'
 
@@ -107,6 +126,12 @@ export interface VocabSet {
    */
   studentUid?: string
   studentName?: string
+  /**
+   * 이 시험지를 볼 수 있는 학생 uid 목록. 교재에서 DAY 를 만들 때 교재의
+   * 공개 대상을 그대로 복사해 둔다. 없거나 비어 있으면 전체 공개 —
+   * 이 필드가 생기기 전 시험지는 전부 여기 해당한다.
+   */
+  studentUids?: string[]
   /**
    * 이 시험지를 만든 교재(VocabSeries) ID. 교재에서 DAY 생성으로 만든 것만 있다.
    * 삭제할 때 어느 교재의 진행도를 다시 계산할지 이걸로 찾는다. 이 필드가
@@ -142,6 +167,12 @@ export interface VocabSeries {
   perDay?: number
   /** How many words have already been used in DAY tests (cursor). 레거시 공용 커서. */
   usedCount?: number
+  /**
+   * 이 교재의 DAY 시험지를 볼 수 있는 학생 uid 목록. 없거나 비어 있으면
+   * 전체 공개. DAY 를 만들 때 시험지에 그대로 복사되고, 나중에 바꾸면
+   * 이미 만들어 둔 DAY 시험지에도 반영된다(updateVocabSeriesSheetsAudience).
+   */
+  studentUids?: string[]
   /**
    * @deprecated 학생별로 DAY 시험지를 따로 만들던 시절의 진행도. 지금은
    * 시험지가 교재마다 하나라 위의 usedCount/lastDayNumber 만 쓴다. 옛 문서에

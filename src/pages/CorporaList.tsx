@@ -74,6 +74,11 @@ export function CorporaList() {
                   DAY {s.lastDayNumber}까지 생성
                 </span>
               </div>
+              {s.studentUids && s.studentUids.length > 0 && (
+                <span className="inline-block mt-1 rounded bg-brand-100 text-brand-700 text-[10px] font-semibold px-1.5 py-0.5">
+                  지정 학생 {s.studentUids.length}명
+                </span>
+              )}
               <p className="text-sm text-slate-500 mt-1">
                 전체 {total}단어 · 사용 {used} · 남은 {remaining}
                 {s.perDay ? ` · DAY당 ${s.perDay}` : ''}
