@@ -18,7 +18,9 @@ const SYSTEM_PROMPT = `당신은 한국 고등학생을 위한 영어 어휘 학
 - exampleKo: example의 한국어 번역. 자연스러운 한국어 한 문장
 - definitionEn: 영영 정의(영어로 설명). 학습자 사전 스타일, 한 문장. 한국어 뜻과 일치하는 문맥의 의미.
 
-ko에 여러 뜻이 쉼표로 묶여 있으면 가장 대표적인 의미 하나에 맞춰 synonyms/definitionEn/example을 작성하세요.`
+ko에 여러 뜻이 쉼표로 묶여 있으면 가장 대표적인 의미 하나에 맞춰 synonyms/definitionEn/example을 작성하세요.
+
+입력으로 받은 단어를 하나도 빠뜨리지 말고, 받은 순서 그대로 모두 채워서 제출하세요.`
 
 interface InputWord {
   en: string
@@ -96,8 +98,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const msg = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 8000,
+      model: 'claude-opus-5',
+      // thinking 은 기본값(적응형)으로 둔다. Opus 5 에서 thinking 을 끈 채
+      // tool_choice 를 강제하면 도구 호출이 평문으로 새어나와 조용히 실패할 수 있다.
+      max_tokens: 16000,
+      // 예문·발음기호 정도는 낮은 effort 로 충분하다. 한 번에 12단어씩
+      // 들어오므로(vocabEnrich.ts) 60초 안에 끝나야 한다.
+      output_config: { effort: 'low' },
       system: SYSTEM_PROMPT,
       tools: [
         {

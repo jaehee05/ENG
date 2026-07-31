@@ -51,6 +51,44 @@ export async function translatePassage(passage: string): Promise<string> {
   return data.passageKo ?? ''
 }
 
+export interface EnrichedWord {
+  en: string
+  ko: string
+  ipa: string
+  pos: string
+  synonyms: string[]
+  example: string
+  exampleKo: string
+  definitionEn: string
+}
+
+/**
+ * 단어 하나하나에 발음기호·품사·유의어·예문·영영정의를 채워 받는다.
+ * 한 번의 호출 = 한 번의 요청. 배치로 나눠 부르는 쪽은 vocabEnrich.ts.
+ */
+export async function enrichVocabBatch(
+  words: { en: string; ko: string }[],
+): Promise<EnrichedWord[]> {
+  if (words.length === 0) return []
+  const res = await fetch('/api/enrich-vocab', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ words }),
+  })
+  if (!res.ok) {
+    let message = `요청 실패 (HTTP ${res.status})`
+    try {
+      const body = (await res.json()) as { error?: string }
+      if (body.error) message = body.error
+    } catch {
+      // ignore
+    }
+    throw new Error(message)
+  }
+  const data = (await res.json()) as { words?: EnrichedWord[] }
+  return data.words ?? []
+}
+
 export interface WordDistractors {
   en: string
   distractors: string[]
