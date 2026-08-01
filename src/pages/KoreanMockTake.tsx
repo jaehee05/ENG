@@ -23,14 +23,12 @@ function BubbleRow({
   sel,
   focused,
   onFocus,
-  onPick,
 }: {
   idx: number
   number: number
   sel: number
   focused: boolean
   onFocus: () => void
-  onPick: (n: number) => void
 }) {
   return (
     <div
@@ -48,23 +46,28 @@ function BubbleRow({
       >
         {number}
       </button>
-      <div className="flex justify-center gap-[3px] py-1">
+      {/* 답란은 눌러도 답이 들어가지 않는다 — 그 번호로 이동만 한다.
+          실제 마킹은 하단 탭에서. 종이 OMR 을 흉내 내려다 스치기만 해도
+          답이 찍히던 것을 막는다. */}
+      <button
+        type="button"
+        onClick={onFocus}
+        aria-label={`${number}번 문제로 이동`}
+        className="flex justify-center gap-[3px] py-1 w-full"
+      >
         {[1, 2, 3, 4, 5].map((n) => (
-          <button
+          <span
             key={n}
-            type="button"
-            onClick={() => onPick(n)}
-            className={`w-[16px] h-[22px] rounded-full text-[9px] font-semibold border transition ${
+            className={`w-[16px] h-[22px] inline-flex items-center justify-center rounded-full text-[9px] font-semibold border ${
               sel === n
                 ? 'bg-slate-900 text-white border-slate-900'
-                : 'bg-white text-slate-400 border-slate-300 active:bg-slate-100'
+                : 'bg-white text-slate-400 border-slate-300'
             }`}
-            aria-label={`${number}번 ${n}`}
           >
             {n}
-          </button>
+          </span>
         ))}
-      </div>
+      </button>
     </div>
   )
 }
@@ -76,7 +79,6 @@ function SheetColumn({
   answers,
   focused,
   setFocused,
-  pick,
 }: {
   title: string
   accent: 'brand' | 'rose'
@@ -84,7 +86,6 @@ function SheetColumn({
   answers: number[]
   focused: number
   setFocused: (i: number) => void
-  pick: (i: number, n: number) => void
 }) {
   const border = accent === 'brand' ? 'border-brand-300' : 'border-rose-300'
   const head = accent === 'brand' ? 'bg-brand-50 text-brand-700' : 'bg-rose-50 text-rose-700'
@@ -105,7 +106,6 @@ function SheetColumn({
             sel={answers[idx] ?? 0}
             focused={focused === idx}
             onFocus={() => setFocused(idx)}
-            onPick={(n) => pick(idx, n)}
           />
         ))}
       </div>
@@ -312,16 +312,20 @@ export function KoreanMockTake() {
         <button
           type="button"
           onClick={() => setStarted(false)}
-          className="text-slate-400 hover:text-slate-700 text-sm"
+          className="shrink-0 whitespace-nowrap text-slate-400 hover:text-slate-700 text-sm"
         >
           ‹ 이전
         </button>
-        <h1 className="text-sm font-bold text-slate-900 truncate">{mock.title}</h1>
+        {/* min-w-0 이 없으면 제목이 줄지 않아 양옆 버튼이 눌리고,
+            버튼 안 글자가 '제/출' 로 세로로 접힌다. */}
+        <h1 className="min-w-0 flex-1 text-center text-sm font-bold text-slate-900 truncate">
+          {mock.title}
+        </h1>
         <button
           type="button"
           onClick={handleSubmit}
           disabled={submitting}
-          className={`rounded-full text-sm font-semibold px-4 py-1.5 transition ${
+          className={`shrink-0 whitespace-nowrap rounded-full text-sm font-semibold px-4 py-1.5 transition ${
             answeredCount > 0 ? 'bg-brand-600 text-white hover:bg-brand-700' : 'bg-slate-200 text-slate-400'
           } disabled:opacity-60`}
         >
@@ -339,7 +343,6 @@ export function KoreanMockTake() {
             answers={answers}
             focused={focused}
             setFocused={setFocused}
-            pick={pick}
           />
         ))}
         {electiveCols.map((col, ei) => (
@@ -351,7 +354,6 @@ export function KoreanMockTake() {
             answers={answers}
             focused={focused}
             setFocused={setFocused}
-            pick={pick}
           />
         ))}
       </div>
