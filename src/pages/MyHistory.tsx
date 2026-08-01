@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
-import { listAttemptsForUser } from '../lib/firestore'
+import { deleteAttempt, listAttemptsForUser } from '../lib/firestore'
 import { WORDBOOK_ENABLED } from '../lib/features'
 import { MOCK_SUBJECT_LABEL, type Attempt, type MockSubject } from '../lib/types'
 
@@ -67,6 +67,32 @@ export function MyHistory() {
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  // 시험지를 확인하려고 관리자가 직접 풀어 본 기록이 쌓인다. 여기서 지운다.
+  const isAdmin = profile?.role === 'admin'
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  async function handleDelete(a: Attempt) {
+    if (
+      !window.confirm(
+        `${a.refTitle}\n${fmtDate(a.createdAt) || '날짜 없음'} · ${a.correct}/${a.total} 기록을 삭제하시겠습니까?` +
+          (a.practice
+            ? '\n연습 기록이라 응시 횟수에는 영향이 없습니다.'
+            : '\n응시 횟수 제한이 있으면 한 번 더 풀 수 있게 됩니다.'),
+      )
+    )
+      return
+    setDeletingId(a.id)
+    setDeleteError(null)
+    try {
+      await deleteAttempt(a.id)
+      setAttempts((prev) => prev.filter((x) => x.id !== a.id))
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : '기록 삭제 실패')
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   useEffect(() => {
     if (!profile) return
@@ -128,6 +154,7 @@ export function MyHistory() {
 
       {loading && <p className="text-slate-500 text-sm">불러오는 중...</p>}
       {error && <p className="text-red-600 text-sm">{error}</p>}
+      {deleteError && <p className="text-red-600 text-sm">{deleteError}</p>}
 
       {!loading && (
         <>
@@ -227,6 +254,16 @@ export function MyHistory() {
                                 >
                                   다시 보기
                                 </Link>
+                                {isAdmin && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDelete(a)}
+                                    disabled={deletingId === a.id}
+                                    className="text-xs text-slate-400 hover:text-red-600 disabled:opacity-50"
+                                  >
+                                    {deletingId === a.id ? '삭제 중…' : '삭제'}
+                                  </button>
+                                )}
                               </div>
                             </li>
                           )
