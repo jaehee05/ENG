@@ -145,10 +145,9 @@ function fmtAttemptDate(ts: Attempt['createdAt']): string {
   return `${d.getMonth() + 1}/${d.getDate()}`
 }
 
-type AttemptFilter = 'all' | 'vocab' | 'korean_mock'
+type AttemptFilter = 'vocab' | 'korean_mock'
 
 const ATTEMPT_FILTERS: { key: AttemptFilter; label: string }[] = [
-  { key: 'all', label: '전체' },
   { key: 'vocab', label: '단어 시험' },
   { key: 'korean_mock', label: '모의고사' },
 ]
@@ -356,13 +355,17 @@ export function Dashboard() {
         ),
     [attempts],
   )
-  const [attemptFilter, setAttemptFilter] = useState<AttemptFilter>('all')
+  const [pickedFilter, setPickedFilter] = useState<AttemptFilter | null>(null)
+  /**
+   * 아직 안 고른 학생에게는 가장 최근에 응시한 종류를 편다. 'vocab' 로
+   * 못박으면 국어만 듣는 학생은 홈에 들어올 때마다 빈 목록을 본다.
+   * 기록이 아예 없으면 단어 쪽으로 둔다.
+   */
+  const attemptFilter: AttemptFilter =
+    pickedFilter ??
+    (gradedAttempts[0]?.type === 'korean_mock' ? 'korean_mock' : 'vocab')
   const shownAttempts = useMemo(
-    () =>
-      (attemptFilter === 'all'
-        ? gradedAttempts
-        : gradedAttempts.filter((a) => a.type === attemptFilter)
-      ).slice(0, 5),
+    () => gradedAttempts.filter((a) => a.type === attemptFilter).slice(0, 5),
     [gradedAttempts, attemptFilter],
   )
 
@@ -700,7 +703,7 @@ export function Dashboard() {
             <button
               key={f.key}
               type="button"
-              onClick={() => setAttemptFilter(f.key)}
+              onClick={() => setPickedFilter(f.key)}
               className={`px-3 py-1.5 rounded-full transition ${
                 attemptFilter === f.key
                   ? 'bg-slate-900 text-white'
@@ -713,9 +716,9 @@ export function Dashboard() {
         </div>
         {shownAttempts.length === 0 ? (
           <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
-            {attemptFilter === 'all'
-              ? '아직 응시한 시험이 없어요.'
-              : '이 종류로 응시한 시험이 없어요.'}
+            {attemptFilter === 'vocab'
+              ? '아직 응시한 단어 시험이 없어요.'
+              : '아직 응시한 모의고사가 없어요.'}
           </div>
         ) : (
           <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white overflow-hidden">
