@@ -60,6 +60,15 @@ html.native-app, html.native-app body {
   user-select: none;
   -webkit-touch-callout: none;
 }
+/* 해설도 복사 못 하게. 시험 화면(.exam-noselect)과 같은 이유 —
+   통째로 퍼가는 것을 막는다. 편집기(.rte-content)는 건드리지 않는다:
+   관리자가 쓰는 곳이라 선택이 막히면 편집이 안 된다. */
+.rte-view {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
 .exam-noselect input,
 .exam-noselect textarea {
   -webkit-user-select: text;
