@@ -253,12 +253,6 @@ export function VocabList({ manage = false }: { manage?: boolean }) {
         </div>
         {canManage && (
           <div className="flex gap-1.5 flex-wrap">
-            <Link
-              to="/admin/vocab/merge"
-              className="rounded-md border border-slate-300 text-slate-700 text-xs font-medium px-3 py-1.5 hover:bg-slate-50"
-            >
-              중복 병합
-            </Link>
             <button
               type="button"
               onClick={handleClearAllLimits}
