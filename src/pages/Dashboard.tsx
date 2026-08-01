@@ -8,6 +8,7 @@ import {
   isAssignmentDone,
   listAnnouncements,
   listAssignmentsForStudent,
+  deleteAttempt,
   listAttemptsForUser,
   listClassSessionsForStudent,
   listPaymentsForStudent,
@@ -369,6 +370,30 @@ export function Dashboard() {
     [gradedAttempts, attemptFilter],
   )
 
+  // 시험지를 확인하려고 관리자가 직접 풀어 본 기록이 여기 그대로 뜬다.
+  // '내 기록' 까지 가지 않고 보이는 자리에서 지운다. (isAdmin 은 위에서 이미 잡았다)
+  const [deletingAttemptId, setDeletingAttemptId] = useState<string | null>(null)
+  const [attemptDeleteError, setAttemptDeleteError] = useState<string | null>(null)
+
+  async function handleDeleteAttempt(a: Attempt) {
+    if (
+      !window.confirm(
+        `${a.refTitle}\n${fmtAttemptDate(a.createdAt) || '날짜 없음'} · ${a.correct}/${a.total} 기록을 삭제하시겠습니까?`,
+      )
+    )
+      return
+    setDeletingAttemptId(a.id)
+    setAttemptDeleteError(null)
+    try {
+      await deleteAttempt(a.id)
+      setAttempts((prev) => prev.filter((x) => x.id !== a.id))
+    } catch (e) {
+      setAttemptDeleteError(e instanceof Error ? e.message : '기록 삭제 실패')
+    } finally {
+      setDeletingAttemptId(null)
+    }
+  }
+
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   function toggleExpanded(category: string) {
     setExpanded((prev) => {
@@ -714,6 +739,9 @@ export function Dashboard() {
             </button>
           ))}
         </div>
+        {attemptDeleteError && (
+          <p className="text-xs text-red-600">{attemptDeleteError}</p>
+        )}
         {shownAttempts.length === 0 ? (
           <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
             {attemptFilter === 'vocab'
@@ -725,10 +753,10 @@ export function Dashboard() {
             {shownAttempts.map((a) => {
               const ratio = a.total > 0 ? Math.round((a.correct / a.total) * 100) : null
               return (
-                <li key={a.id}>
+                <li key={a.id} className="flex items-stretch">
                   <Link
                     to={attemptResultPath(a)}
-                    className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50"
+                    className="flex flex-1 min-w-0 items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50"
                   >
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-slate-900 truncate">
@@ -757,6 +785,17 @@ export function Dashboard() {
                       )}
                     </span>
                   </Link>
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteAttempt(a)}
+                      disabled={deletingAttemptId === a.id}
+                      className="shrink-0 px-3 text-[11px] text-slate-400 hover:text-red-600 hover:bg-slate-50 disabled:opacity-50"
+                      aria-label="기록 삭제"
+                    >
+                      {deletingAttemptId === a.id ? '…' : '삭제'}
+                    </button>
+                  )}
                 </li>
               )
             })}
