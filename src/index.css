@@ -13,6 +13,11 @@
 .rte-content b, .rte-content strong, .rte-view b, .rte-view strong { font-weight: 700; }
 .rte-content u, .rte-view u { text-decoration: underline; }
 .rte-view { line-height: 1.7; }
+/* 해설도 지문과 같이 양쪽 정렬. 편집기(.rte-content)까지 맞춰 둬야 관리자가
+   쓰면서 보는 모양과 학생이 보는 모양이 어긋나지 않는다.
+   표 칸은 좁아서 양쪽 정렬하면 자간이 벌어지므로 왼쪽으로 되돌린다. */
+.rte-content, .rte-view { text-align: justify; }
+.rte-content td, .rte-content th, .rte-view td, .rte-view th { text-align: left; }
 .rte-view blockquote { margin-left: 1.5rem; }
 .rte-view p { margin: 0 0 0.35rem; }
 .rte-content img, .rte-view img { max-width: 100%; height: auto; }
