@@ -154,6 +154,77 @@ type TabKey =
   | 'wordbook'
   | 'settings'
 
+/** 순차 부여 주기. */
+type SeqUnit = 'day' | 'week' | 'month'
+
+const SEQ_UNIT_LABEL: Record<SeqUnit, string> = {
+  day: '매일',
+  week: '매주',
+  month: '매달',
+}
+
+/**
+ * base 에서 주기 k 회차만큼 뒤.
+ *
+ * 매달은 그 달에 없는 날짜를 말일로 당긴다. setMonth 에 그냥 맡기면 1/31 에
+ * 한 달을 더할 때 3/3 으로 넘어가 회차가 한 달을 건너뛰고 이후로도 어긋난다.
+ */
+function addSeq(base: Date, unit: SeqUnit, k: number): Date {
+  const d = new Date(base)
+  if (unit === 'day') {
+    d.setDate(d.getDate() + k)
+  } else if (unit === 'week') {
+    d.setDate(d.getDate() + 7 * k)
+  } else {
+    const day = d.getDate()
+    d.setDate(1)
+    d.setMonth(d.getMonth() + k)
+    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
+    d.setDate(Math.min(day, lastDay))
+  }
+  return d
+}
+
+/** 그 날 23:59:59 — 마감은 하루가 끝날 때까지다. */
+function endOfDay(d: Date): Date {
+  const x = new Date(d)
+  x.setHours(23, 59, 59, 999)
+  return x
+}
+
+function fmtMD(d: Date): string {
+  return `${d.getMonth() + 1}/${d.getDate()}`
+}
+
+/**
+ * 순차 부여 계획. 고른 시험지를 n개씩 잘라 회차마다 시작일을 밀어 준다.
+ *
+ * 마감은 다음 회차가 열리기 전날 끝까지다 — 매일 1개면 당일, 매주면 그 주가
+ * 지나기 전까지. 이렇게 두면 회차가 겹치지 않아 "이번 것부터" 가 분명하다.
+ */
+function buildSeqPlan<T>(
+  items: T[],
+  base: Date,
+  unit: SeqUnit,
+  perRound: number,
+): { items: T[]; startAt: Date; dueAt: Date }[] {
+  const n = Math.max(1, perRound)
+  const out: { items: T[]; startAt: Date; dueAt: Date }[] = []
+  for (let k = 0; k * n < items.length; k++) {
+    const startAt = addSeq(base, unit, k)
+    const nextStart = addSeq(base, unit, k + 1)
+    const due = new Date(nextStart)
+    due.setDate(due.getDate() - 1)
+    out.push({
+      items: items.slice(k * n, (k + 1) * n),
+      startAt,
+      // 주기가 1일이면 다음 시작 전날 = 당일이다
+      dueAt: endOfDay(due < startAt ? startAt : due),
+    })
+  }
+  return out
+}
+
 export function AdminStudentDetail() {
   const { id } = useParams<{ id: string }>()
   const { profile } = useAuth()
@@ -177,6 +248,10 @@ export function AdminStudentDetail() {
   /** 단어는 DAY 시험지를 한 번에 여러 개 부여한다. 시험지마다 과제 1건. */
   const [vocabIds, setVocabIds] = useState<string[]>([])
   const [assignStart, setAssignStart] = useState('')
+  /** 단어 시험지 순차 부여 — 시작일부터 주기마다 n개씩 열어 준다. */
+  const [seqOn, setSeqOn] = useState(false)
+  const [seqUnit, setSeqUnit] = useState<SeqUnit>('day')
+  const [seqPerRound, setSeqPerRound] = useState('1')
   const [assignDue, setAssignDue] = useState('')
   const [assignNote, setAssignNote] = useState('')
   /** 단어 과제 통과 기준(최소 정답 수). 30단어 DAY 기준 25개가 기본. */
@@ -351,6 +426,20 @@ export function AdminStudentDetail() {
   /** 고른 것 중 이미 부여한 시험지 수. 막지는 않고 알려만 준다. */
   const reassignCount = vocabIds.filter((vid) => assignedVocabIds.has(vid)).length
 
+  /** 순차 부여 미리보기. 실제 부여와 같은 계산(buildSeqPlan)을 쓴다. */
+  const seqPreview = useMemo(() => {
+    if (!seqOn || !assignStart) return null
+    const base = new Date(`${assignStart}T00:00`)
+    if (Number.isNaN(base.getTime())) return null
+    const picked = vocabIds
+      .map((vid) => studentVocabSets.find((s) => s.id === vid))
+      .filter((s): s is VocabSet => Boolean(s))
+      .sort(byDay)
+    if (picked.length === 0) return null
+    const n = Math.max(1, Number.parseInt(seqPerRound, 10) || 1)
+    return buildSeqPlan(picked, base, seqUnit, n)
+  }, [seqOn, assignStart, vocabIds, studentVocabSets, seqPerRound, seqUnit])
+
   function renderVocabRow(s: VocabSet) {
     const words = s.words?.length ?? 0
     return (
@@ -468,33 +557,48 @@ export function AdminStudentDetail() {
         setAssignError('과제로 부여할 시험지를 선택하세요.')
         return
       }
+      // 순차 부여: 시작일부터 주기마다 n개씩 열어 준다. 끄면 지금까지처럼
+      // 고른 전부를 같은 시작일·마감일로 한 번에 부여한다.
+      const perRound = Math.max(1, Number.parseInt(seqPerRound, 10) || 1)
+      if (seqOn && !startDate) {
+        setAssignError('순차 부여를 쓰려면 시작일을 정하세요.')
+        return
+      }
+      const plan =
+        seqOn && startDate
+          ? buildSeqPlan(picked, startDate, seqUnit, perRound)
+          : [{ items: picked, startAt: startDate, dueAt: dueDate }]
+
       setAssigning(true)
       // 하나씩 만든다. 중간에 실패해도 여기까지 만든 것은 그대로 두고,
       // 알림과 목록에도 반영한 뒤 몇 개까지 됐는지 알린다.
       const made: VocabSet[] = []
       try {
-        for (const v of picked) {
-          await createAssignment({
-            studentUid: id,
-            studentName: account.displayName,
-            assignedBy: profile.id,
-            assignedByName: profile.displayName,
-            type: 'vocab',
-            category: assignCategory,
-            refId: v.id,
-            refTitle: v.title,
-            note: assignNote,
-            minCorrect: cappedMinCorrect(minCorrect, v),
-            startAt: startDate,
-            dueAt: dueDate,
-          })
-          made.push(v)
+        for (const round of plan) {
+          for (const v of round.items) {
+            await createAssignment({
+              studentUid: id,
+              studentName: account.displayName,
+              assignedBy: profile.id,
+              assignedByName: profile.displayName,
+              type: 'vocab',
+              category: assignCategory,
+              refId: v.id,
+              refTitle: v.title,
+              note: assignNote,
+              minCorrect: cappedMinCorrect(minCorrect, v),
+              startAt: round.startAt,
+              dueAt: round.dueAt,
+            })
+            made.push(v)
+          }
         }
         setVocabIds([])
         setAssignStart('')
         setAssignDue('')
         setAssignNote('')
         setAssignMinCorrect(DEFAULT_MIN_CORRECT)
+        setSeqOn(false)
         setAssignFormOpen(false)
       } catch (err) {
         // 이미 부여된 것은 선택에서 뺀다 — 그대로 다시 누르면 중복으로 들어간다
@@ -506,7 +610,9 @@ export function AdminStudentDetail() {
         )
       } finally {
         if (made.length > 0) {
-          await maybePushAssignment(made.map((v) => v.title))
+          // 순차 부여는 첫 회차만 지금 열린다 — 전부 알리면 스팸이다.
+          const notify = seqOn ? (plan[0]?.items ?? []) : made
+          if (notify.length > 0) await maybePushAssignment(notify.map((v) => v.title))
           await reloadAssignments()
         }
         setAssigning(false)
@@ -817,6 +923,87 @@ export function AdminStudentDetail() {
             )}
           </div>
 
+          {/* 3-1. 단어 시험지 순차 부여 */}
+          {assignType === 'vocab' && (
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3 space-y-2">
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={seqOn}
+                  onChange={(e) => setSeqOn(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                />
+                <span className="text-sm text-slate-700">
+                  순차 부여
+                  <span className="block text-xs text-slate-500 mt-0.5">
+                    시작일부터 주기마다 정해진 개수씩 열어 줍니다. 한 번에 다
+                    부여하되 학생에게는 차례로 보입니다.
+                  </span>
+                </span>
+              </label>
+
+              {seqOn && (
+                <>
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <div>
+                      <label className="block text-[11px] text-slate-500 mb-1">주기</label>
+                      <select
+                        value={seqUnit}
+                        onChange={(e) => setSeqUnit(e.target.value as SeqUnit)}
+                        className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                      >
+                        {(['day', 'week', 'month'] as SeqUnit[]).map((u) => (
+                          <option key={u} value={u}>
+                            {SEQ_UNIT_LABEL[u]}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] text-slate-500 mb-1">
+                        회차당 개수
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={seqPerRound}
+                        onChange={(e) => setSeqPerRound(e.target.value)}
+                        className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                      />
+                    </div>
+                  </div>
+
+                  {!assignStart && (
+                    <p className="text-[11px] text-amber-700">
+                      시작일을 정해야 순차 부여를 쓸 수 있습니다.
+                    </p>
+                  )}
+                  {seqPreview && (
+                    <div className="rounded border border-slate-200 bg-white px-2.5 py-2">
+                      <p className="text-[11px] text-slate-500 mb-1">
+                        총 {seqPreview.length}회차 · 마지막 회차{' '}
+                        {fmtMD(seqPreview[seqPreview.length - 1].startAt)} 시작
+                      </p>
+                      <ul className="space-y-0.5 max-h-32 overflow-y-auto">
+                        {seqPreview.slice(0, 8).map((r, i) => (
+                          <li key={i} className="text-[11px] text-slate-600">
+                            {fmtMD(r.startAt)}~{fmtMD(r.dueAt)} ·{' '}
+                            {r.items.map((v) => v.title).join(', ')}
+                          </li>
+                        ))}
+                        {seqPreview.length > 8 && (
+                          <li className="text-[11px] text-slate-400">
+                            … 외 {seqPreview.length - 8}회차
+                          </li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
           {/* 3. 일정 + 분류 */}
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
             <div>
@@ -832,13 +1019,17 @@ export function AdminStudentDetail() {
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">
-                마감일 <span className="text-slate-400 font-normal">(선택)</span>
+                마감일{' '}
+                <span className="text-slate-400 font-normal">
+                  {seqOn ? '(순차 부여가 회차마다 정합니다)' : '(선택)'}
+                </span>
               </label>
               <input
                 type="date"
                 value={assignDue}
                 onChange={(e) => setAssignDue(e.target.value)}
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                disabled={seqOn}
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-slate-100 disabled:text-slate-400"
               />
             </div>
             <div>
@@ -921,9 +1112,11 @@ export function AdminStudentDetail() {
             >
               {assigning
                 ? '부여 중…'
-                : assignType === 'vocab' && vocabIds.length > 1
-                  ? `과제 ${vocabIds.length}건 부여`
-                  : '과제 부여'}
+                : seqPreview
+                  ? `과제 ${vocabIds.length}건 · ${seqPreview.length}회차로 부여`
+                  : assignType === 'vocab' && vocabIds.length > 1
+                    ? `과제 ${vocabIds.length}건 부여`
+                    : '과제 부여'}
             </button>
           </div>
         </form>
