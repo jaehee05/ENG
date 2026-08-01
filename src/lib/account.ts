@@ -68,6 +68,53 @@ export async function updateAccountSubjects(
   await updateDoc(doc(db, 'users', id), { subjects })
 }
 
+export interface AccountProfilePatch {
+  displayName: string
+  email: string
+  school?: string
+  phone?: string
+  parentPhone?: string
+}
+
+/**
+ * 관리자가 학생의 기본 정보를 고친다.
+ *
+ * 회원가입과 같은 규칙으로 다듬어 저장한다 — 이메일은 소문자 trim, 전화는
+ * formatPhoneKR. 화면마다 형식이 다르면 사전 등록 자동 연결(이름+전화 대조)이
+ * 어긋나고, 같은 사람이 두 계정으로 갈린다.
+ *
+ * 이메일은 로그인 아이디라 다른 계정이 쓰고 있으면 막는다. 비밀번호·상태·
+ * 역할은 여기서 안 건드린다 — 각각 setAccountPassword/setAccountStatus 가 있다.
+ */
+export async function updateAccountProfile(
+  id: string,
+  patch: AccountProfilePatch,
+): Promise<UserAccount> {
+  const displayName = patch.displayName.trim()
+  if (!displayName) throw new Error('이름을 입력하세요.')
+  const email = patch.email.trim().toLowerCase()
+  if (!email) throw new Error('이메일을 입력하세요.')
+
+  // limit(2) — 자기 자신이 걸릴 수 있어 하나로는 남의 것인지 못 가린다.
+  const hits = await getDocs(
+    query(collection(db, 'users'), where('email', '==', email), limit(2)),
+  )
+  if (hits.docs.some((d) => d.id !== id)) {
+    throw new Error('이미 사용 중인 이메일입니다.')
+  }
+
+  await updateDoc(doc(db, 'users', id), {
+    displayName,
+    email,
+    school: (patch.school ?? '').trim(),
+    phone: formatPhoneKR(patch.phone),
+    parentPhone: formatPhoneKR(patch.parentPhone),
+  })
+  const after = await getAccount(id)
+  if (!after) throw new Error('저장한 계정을 다시 읽지 못했습니다.')
+  return after
+}
+
 export async function getAccount(id: string): Promise<UserAccount | null> {
   const snap = await getDoc(doc(db, 'users', id))
   if (!snap.exists()) return null
