@@ -178,13 +178,15 @@ export function KoreanMockList({ manage = false }: { manage?: boolean }) {
                 className="flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-slate-50 active:bg-slate-100"
               >
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
+                  {/* flex-wrap 을 쓰면 제목이 긴 항목만 두 줄이 되어 행 높이가
+                      제각각이 된다. 한 줄로 두고 제목을 줄인다. */}
+                  <div className="flex items-center gap-2">
                     <span
-                      className={`inline-block rounded-full text-[10px] font-medium px-2 py-0.5 border ${SUBJECT_BADGE_CLASS[subj]}`}
+                      className={`shrink-0 inline-block rounded-full text-[10px] font-medium px-2 py-0.5 border ${SUBJECT_BADGE_CLASS[subj]}`}
                     >
                       {MOCK_SUBJECT_LABEL[subj]}
                     </span>
-                    <p className="text-sm font-semibold text-slate-900 truncate">
+                    <p className="min-w-0 text-sm font-semibold text-slate-900 truncate">
                       {m.title}
                     </p>
                   </div>
