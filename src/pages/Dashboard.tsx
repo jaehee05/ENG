@@ -131,13 +131,6 @@ function StatTile({
   )
 }
 
-const ATTEMPT_TYPE_LABEL: Record<Attempt['type'], string> = {
-  vocab: '단어 시험지',
-  reading: '지문 문제풀이',
-  wordbook: '내 단어장 시험',
-  korean_mock: '모의고사',
-}
-
 /** 응시 기록에서 결과 화면 경로. MyHistory 와 같은 규칙. */
 function attemptResultPath(a: Attempt): string {
   if (a.type === 'vocab') return `/vocab/${a.refId}/result/${a.id}`
@@ -150,6 +143,63 @@ function fmtAttemptDate(ts: Attempt['createdAt']): string {
   if (!ts) return ''
   const d = ts.toDate()
   return `${d.getMonth() + 1}/${d.getDate()}`
+}
+
+/** 홈의 시험 현황 한 묶음 — 단어 시험 / 모의고사. */
+function AttemptGroup({
+  title,
+  attempts,
+}: {
+  title: string
+  attempts: Attempt[]
+}) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+      <p className="px-4 py-2 text-[11px] font-semibold text-slate-500 border-b border-slate-100">
+        {title}
+      </p>
+      <ul className="divide-y divide-slate-100">
+        {attempts.map((a) => {
+          const ratio = a.total > 0 ? Math.round((a.correct / a.total) * 100) : null
+          return (
+            <li key={a.id}>
+              <Link
+                to={attemptResultPath(a)}
+                className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-900 truncate">
+                    {a.refTitle}
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {fmtAttemptDate(a.createdAt)}
+                  </p>
+                </div>
+                <span className="shrink-0 text-right">
+                  <span
+                    className={`block text-sm font-semibold ${
+                      ratio === null
+                        ? 'text-slate-500'
+                        : ratio >= 80
+                          ? 'text-brand-700'
+                          : ratio >= 60
+                            ? 'text-amber-700'
+                            : 'text-red-600'
+                    }`}
+                  >
+                    {a.correct}/{a.total}
+                  </span>
+                  {ratio !== null && (
+                    <span className="block text-[10px] text-slate-400">{ratio}%</span>
+                  )}
+                </span>
+              </Link>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
 }
 
 export function Dashboard() {
@@ -332,20 +382,27 @@ export function Dashboard() {
   }, [assignments, openRaw])
 
   /**
-   * 시험 현황 — 최근 정식 응시 5건. 연습은 뺀다. 다른 화면들도 !practice 로
-   * 통계를 내므로 여기만 섞으면 숫자가 어긋난다.
+   * 시험 현황 — 단어 시험과 모의고사를 따로 센다. 성격이 달라 한 줄에 섞으면
+   * 어느 쪽이 밀렸는지 안 보인다.
+   *
+   * 연습 응시는 뺀다. 다른 화면들도 !practice 로 통계를 내므로 여기만 섞으면
+   * 같은 학생 숫자가 화면마다 어긋난다.
+   *
+   * 지문·내 단어장은 빼 둔다 — 지문은 기능이 없어졌고(#11) 내 단어장은
+   * 숨김이다(features.ts). 지난 기록은 '내 기록' 에 그대로 있다.
    */
-  const recentAttempts = useMemo(
-    () =>
-      [...attempts]
-        .filter((a) => !a.practice)
-        .sort(
-          (x, y) =>
-            (y.createdAt?.toMillis() ?? 0) - (x.createdAt?.toMillis() ?? 0),
-        )
-        .slice(0, 5),
-    [attempts],
-  )
+  const recentByType = useMemo(() => {
+    const sorted = [...attempts]
+      .filter((a) => !a.practice)
+      .sort(
+        (x, y) => (y.createdAt?.toMillis() ?? 0) - (x.createdAt?.toMillis() ?? 0),
+      )
+    return {
+      vocab: sorted.filter((a) => a.type === 'vocab').slice(0, 5),
+      mock: sorted.filter((a) => a.type === 'korean_mock').slice(0, 5),
+    }
+  }, [attempts])
+
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   function toggleExpanded(category: string) {
     setExpanded((prev) => {
@@ -675,51 +732,21 @@ export function Dashboard() {
             전체 기록 →
           </Link>
         </div>
-        {recentAttempts.length === 0 ? (
+        {recentByType.vocab.length === 0 && recentByType.mock.length === 0 ? (
           <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
             아직 응시한 시험이 없어요.
           </div>
         ) : (
-          <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white overflow-hidden">
-            {recentAttempts.map((a) => {
-              const ratio = a.total > 0 ? Math.round((a.correct / a.total) * 100) : null
-              return (
-                <li key={a.id}>
-                  <Link
-                    to={attemptResultPath(a)}
-                    className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-slate-900 truncate">
-                        {a.refTitle}
-                      </p>
-                      <p className="text-[11px] text-slate-400 mt-0.5">
-                        {ATTEMPT_TYPE_LABEL[a.type]} · {fmtAttemptDate(a.createdAt)}
-                      </p>
-                    </div>
-                    <span className="shrink-0 text-right">
-                      <span
-                        className={`block text-sm font-semibold ${
-                          ratio === null
-                            ? 'text-slate-500'
-                            : ratio >= 80
-                              ? 'text-brand-700'
-                              : ratio >= 60
-                                ? 'text-amber-700'
-                                : 'text-red-600'
-                        }`}
-                      >
-                        {a.correct}/{a.total}
-                      </span>
-                      {ratio !== null && (
-                        <span className="block text-[10px] text-slate-400">{ratio}%</span>
-                      )}
-                    </span>
-                  </Link>
-                </li>
-              )
-            })}
-          </ul>
+          // 한쪽만 응시한 학생에게 빈 칸을 보이지 않는다. 둘 다 있으면
+          // 넓은 화면에서 나란히.
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {recentByType.vocab.length > 0 && (
+              <AttemptGroup title="단어 시험" attempts={recentByType.vocab} />
+            )}
+            {recentByType.mock.length > 0 && (
+              <AttemptGroup title="모의고사" attempts={recentByType.mock} />
+            )}
+          </div>
         )}
       </section>
 
