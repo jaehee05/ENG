@@ -200,7 +200,11 @@ export function VocabDetail() {
 
   return (
     <div className="space-y-5 max-w-3xl mx-auto">
-      <BackLink to="/vocab" label="단어 시험지" />
+      {/* 교재에서 만든 DAY 시험지면 그 교재의 DAY 목록으로 돌아간다 */}
+      <BackLink
+        to={set?.seriesId ? `/vocab/series/${set.seriesId}` : '/vocab'}
+        label={set?.seriesId ? '교재' : '단어 시험지'}
+      />
       <header className="flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">

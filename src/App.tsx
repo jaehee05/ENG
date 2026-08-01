@@ -7,6 +7,7 @@ import { Signup } from './pages/Signup'
 import { Dashboard } from './pages/Dashboard'
 import { VocabList } from './pages/VocabList'
 import { VocabHome } from './pages/VocabHome'
+import { VocabSeriesDetail } from './pages/VocabSeriesDetail'
 import { AdminVocabStudent } from './pages/AdminVocabStudent'
 import { AdminVocabMerge } from './pages/AdminVocabMerge'
 import { VocabDetail } from './pages/VocabDetail'
@@ -58,6 +59,8 @@ function App() {
               <Route path="/" element={<Dashboard />} />
 
               <Route path="/vocab" element={<VocabHome />} />
+              {/* /vocab/:id 보다 세그먼트가 하나 많아 라우터가 이쪽을 먼저 고른다 */}
+              <Route path="/vocab/series/:seriesId" element={<VocabSeriesDetail />} />
               <Route path="/vocab/:id" element={<VocabDetail />} />
               <Route path="/vocab/:id/take" element={<VocabTake />} />
               <Route path="/vocab/:id/sheet" element={<VocabSheet />} />
