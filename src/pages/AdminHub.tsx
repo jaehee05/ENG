@@ -147,19 +147,6 @@ export function AdminHub() {
             </svg>
           ),
         },
-        {
-          to: '/admin/vocab/merge',
-          title: '중복 시험지 병합',
-          desc: '학생마다 따로 만들던 사본을 하나로 합치기',
-          tone: 'sky',
-          icon: (
-            <svg {...iconProps}>
-              <path d="M7 3v6a4 4 0 0 0 4 4h6" />
-              <path d="M17 3v6a4 4 0 0 1-4 4H7" />
-              <path d="m14 10 3 3-3 3" />
-            </svg>
-          ),
-        },
       ],
     },
     {

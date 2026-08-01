@@ -241,57 +241,6 @@ export async function deleteVocabSet(
   if (series) await syncVocabSeriesProgress(series)
 }
 
-/**
- * 어떤 컬렉션의 refId 를 다른 시험지로 옮긴다. 배치 상한(500)을 넘기지 않게
- * 나눠서 커밋한다. 옮긴 문서 수를 반환.
- */
-async function remapRefId(
-  col: 'attempts' | 'assignments',
-  from: string,
-  to: string,
-): Promise<number> {
-  const snap = await getDocs(query(collection(db, col), where('refId', '==', from)))
-  const BATCH_LIMIT = 450
-  for (let i = 0; i < snap.docs.length; i += BATCH_LIMIT) {
-    const batch = writeBatch(db)
-    for (const d of snap.docs.slice(i, i + BATCH_LIMIT)) batch.update(d.ref, { refId: to })
-    await batch.commit()
-  }
-  return snap.docs.length
-}
-
-/**
- * 학생마다 따로 만들어 두었던 같은 시험지들을 하나로 합친다.
- *
- * 남길 시험지를 빼고 나머지를 지우되, 지우기 전에 그 시험지를 가리키던 응시
- * 기록과 과제의 refId 를 남는 쪽으로 옮긴다. 안 옮기면 학생 기록이 없는
- * 문서를 가리켜 결과 화면이 깨진다.
- *
- * 남는 시험지에서는 소유 학생을 뗀다 — 이제 모두가 같은 것을 푼다.
- */
-export async function mergeVocabSets(
-  survivor: Pick<VocabSet, 'id' | 'studentUid'>,
-  losers: Pick<VocabSet, 'id'>[],
-): Promise<{ attempts: number; assignments: number; deleted: number }> {
-  let attempts = 0
-  let assignments = 0
-  let deleted = 0
-  for (const loser of losers) {
-    if (loser.id === survivor.id) continue
-    attempts += await remapRefId('attempts', loser.id, survivor.id)
-    assignments += await remapRefId('assignments', loser.id, survivor.id)
-    await deleteDoc(doc(db, 'vocabSets', loser.id))
-    deleted++
-  }
-  if (survivor.studentUid) {
-    await updateDoc(doc(db, 'vocabSets', survivor.id), {
-      studentUid: deleteField(),
-      studentName: deleteField(),
-    })
-  }
-  return { attempts, assignments, deleted }
-}
-
 export async function updateVocabSetWords(
   id: string,
   words: WordEntry[],
