@@ -6,6 +6,7 @@ import { DESKTOP_QUERY, useMediaQuery } from '../lib/useMediaQuery'
 import {
   getAccount,
   updateAccountColorKey,
+  updateAccountProfile,
   updateAccountSubjects,
 } from '../lib/account'
 import {
@@ -1185,6 +1186,7 @@ export function AdminStudentDetail() {
 
   const settingsPanel = (
     <div className="max-w-2xl space-y-1 rounded-lg border border-slate-200 bg-white p-4">
+      <ProfileEditor account={account} onSaved={(next) => setAccount(next)} />
       <SubjectPicker
         account={account}
         onSaved={(next) => setAccount({ ...account, subjects: next })}
@@ -1687,6 +1689,144 @@ function ProgressCard({ label, done, total }: { label: string; done: number; tot
       </p>
       <div className="h-1 w-full rounded-full bg-slate-100 overflow-hidden">
         <div className="h-full bg-brand-500" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  )
+}
+
+/**
+ * 학생 기본 정보 수정 — 이름·학교·이메일·전화.
+ *
+ * 상태(승인/거절)와 비밀번호는 학생 관리 목록에 이미 있어 여기 안 넣는다.
+ * 역할(관리자/학생)도 뺐다 — 이 화면에서 실수로 바꿀 일이 아니다.
+ */
+function ProfileEditor({
+  account,
+  onSaved,
+}: {
+  account: UserAccount
+  onSaved: (next: UserAccount) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [displayName, setDisplayName] = useState(account.displayName)
+  const [email, setEmail] = useState(account.email)
+  const [school, setSchool] = useState(account.school ?? '')
+  const [phone, setPhone] = useState(account.phone ?? '')
+  const [parentPhone, setParentPhone] = useState(account.parentPhone ?? '')
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [done, setDone] = useState<string | null>(null)
+
+  function start() {
+    // 열 때마다 현재 값으로 되돌린다 — 저장 안 하고 닫았다 다시 열면
+    // 지난번에 고치다 만 값이 남아 있으면 안 된다.
+    setDisplayName(account.displayName)
+    setEmail(account.email)
+    setSchool(account.school ?? '')
+    setPhone(account.phone ?? '')
+    setParentPhone(account.parentPhone ?? '')
+    setErr(null)
+    setDone(null)
+    setOpen(true)
+  }
+
+  async function save() {
+    setSaving(true)
+    setErr(null)
+    try {
+      const next = await updateAccountProfile(account.id, {
+        displayName,
+        email,
+        school,
+        phone,
+        parentPhone,
+      })
+      onSaved(next)
+      setOpen(false)
+      setDone('학생 정보를 저장했습니다.')
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '저장 실패')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!open) {
+    return (
+      <div className="pb-3 mb-1 border-b border-slate-100">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 text-xs text-slate-600 space-y-0.5">
+            <p className="text-sm font-medium text-slate-900">
+              {account.displayName}
+            </p>
+            <p>{account.school || '학교 미입력'}</p>
+            <p className="break-all">{account.email}</p>
+            <p>
+              학생 {account.phone || '-'} · 학부모 {account.parentPhone || '-'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={start}
+            className="shrink-0 rounded-md border border-slate-300 text-slate-700 text-[11px] font-medium px-2.5 py-1 touch:py-1.5 hover:bg-slate-50"
+          >
+            정보 수정
+          </button>
+        </div>
+        {done && <p className="text-[11px] text-brand-700 mt-1.5">{done}</p>}
+      </div>
+    )
+  }
+
+  const field = (
+    label: string,
+    value: string,
+    set: (v: string) => void,
+    placeholder?: string,
+  ) => (
+    <div>
+      <label className="block text-[10px] text-slate-500 mb-0.5">{label}</label>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => set(e.target.value)}
+        placeholder={placeholder}
+        className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+      />
+    </div>
+  )
+
+  return (
+    <div className="pb-3 mb-1 border-b border-slate-100 space-y-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {field('이름', displayName, setDisplayName)}
+        {field('학교', school, setSchool, '예: 한빛고')}
+        {field('이메일 (로그인 아이디)', email, setEmail)}
+        <div />
+        {field('학생 전화', phone, setPhone, '010-0000-0000')}
+        {field('학부모 전화', parentPhone, setParentPhone, '010-0000-0000')}
+      </div>
+      <p className="text-[10px] text-slate-400">
+        전화번호는 저장할 때 010-0000-0000 형태로 정리됩니다. 비밀번호와 승인
+        상태는 학생 관리 목록에서 바꿉니다.
+      </p>
+      {err && <p className="text-xs text-red-600">{err}</p>}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={save}
+          disabled={saving}
+          className="rounded-md bg-slate-900 text-white text-xs font-medium px-3 py-1.5 hover:bg-slate-800 disabled:opacity-50"
+        >
+          {saving ? '저장 중…' : '저장'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="rounded-md border border-slate-300 text-slate-700 text-xs font-medium px-3 py-1.5 hover:bg-slate-50"
+        >
+          취소
+        </button>
       </div>
     </div>
   )
