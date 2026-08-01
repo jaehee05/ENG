@@ -1,24 +1,109 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import {
   clearAllVocabAttemptLimits,
   deleteVocabSet,
   formatDate,
+  listVocabSeries,
   listVocabSets,
   updateVocabSetWords,
 } from '../lib/firestore'
-import { isVisibleToStudent, type VocabSense, type VocabSet, type WordEntry } from '../lib/types'
+import {
+  isVisibleToStudent,
+  type VocabSense,
+  type VocabSeries,
+  type VocabSet,
+  type WordEntry,
+} from '../lib/types'
 import { parseSenseBody } from '../lib/parseTextbookVocab'
+import { groupBySeries } from '../lib/vocabGroups'
+
+/** 시험지 한 줄. 교재 안(DAY 라벨 있음)과 기타 목록에서 같이 쓴다. */
+function SetRow({
+  set: s,
+  label,
+  canManage,
+  deleting,
+  onDelete,
+}: {
+  set: VocabSet
+  label?: string
+  canManage: boolean
+  deleting: boolean
+  onDelete: (e: React.MouseEvent, s: VocabSet) => void
+}) {
+  return (
+    <li className="relative">
+      <Link
+        to={`/vocab/${s.id}`}
+        className="flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-slate-50 active:bg-slate-100"
+      >
+        <div className="min-w-0 flex items-center gap-3">
+          {label && (
+            <span className="shrink-0 inline-flex items-center justify-center min-w-11 rounded-md bg-slate-100 text-slate-700 text-xs font-semibold px-2 py-1">
+              {label}
+            </span>
+          )}
+          <div className="min-w-0">
+            <p className="text-[15px] font-medium text-slate-900 truncate">{s.title}</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {s.words.length}단어 · {formatDate(s.createdAt)}
+              {s.format === 'choice' ? ' · 5지선다' : ''}
+              {/* 소유자가 남아 있으면 아직 병합 안 된 옛 시험지다 */}
+              {canManage && s.studentName && (
+                <span className="text-amber-600"> · {s.studentName} (병합 전)</span>
+              )}
+              {/* 교재에서 공개 대상을 지정한 시험지 */}
+              {canManage && s.studentUids && s.studentUids.length > 0 && (
+                <span className="text-brand-700"> · 지정 {s.studentUids.length}명</span>
+              )}
+            </p>
+          </div>
+        </div>
+        <span className="text-slate-300 text-lg shrink-0">→</span>
+      </Link>
+      {canManage && (
+        <button
+          type="button"
+          onClick={(e) => onDelete(e, s)}
+          disabled={deleting}
+          className="absolute top-2 right-9 text-[10px] text-slate-400 hover:text-red-600 px-1.5 py-0.5 rounded disabled:opacity-50"
+          aria-label="삭제"
+        >
+          {deleting ? '…' : '삭제'}
+        </button>
+      )}
+    </li>
+  )
+}
 
 export function VocabList({ manage = false }: { manage?: boolean }) {
   const { profile } = useAuth()
   const isAdmin = profile?.role === 'admin'
   const canManage = isAdmin && manage
   const [sets, setSets] = useState<VocabSet[]>([])
+  const [series, setSeries] = useState<VocabSeries[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  /** 펼쳐 둔 교재. 교재가 여러 개면 한 화면에 다 펼치면 너무 길다. */
+  const [openIds, setOpenIds] = useState<Set<string>>(new Set())
+
+  const { groups, loose } = useMemo(
+    () => groupBySeries(series, sets),
+    [series, sets],
+  )
+  const allOpen = groups.length > 0 && groups.every((g) => openIds.has(g.series.id))
+
+  function toggleOpen(id: string) {
+    setOpenIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   useEffect(() => {
     if (!profile) return
@@ -27,8 +112,8 @@ export function VocabList({ manage = false }: { manage?: boolean }) {
     // 2) 교재에서 지정한 공개 대상(studentUids) — 없으면 전체 공개
     // 관리 뷰는 전부 본다. (관리자는 /vocab 에서 VocabHome 이 학생 목록으로
     // 보내므로 여기 안 온다.)
-    listVocabSets()
-      .then((all) => {
+    Promise.all([listVocabSets(), listVocabSeries()])
+      .then(([all, allSeries]) => {
         const mine = canManage
           ? all
           : all.filter(
@@ -41,6 +126,7 @@ export function VocabList({ manage = false }: { manage?: boolean }) {
             a.title.localeCompare(b.title, 'ko', { numeric: true, sensitivity: 'base' }),
           ),
         )
+        setSeries(allSeries)
       })
       .catch((e) => setError(e.message ?? '목록을 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
@@ -190,6 +276,16 @@ export function VocabList({ manage = false }: { manage?: boolean }) {
               {reprocessing ? '재분석 중…' : '단어 재분석'}
             </button>
             {/* 시험지는 교재에서만 만든다 — 붙여넣기로 만드는 별도 경로는 없앴다. */}
+            <button
+              type="button"
+              onClick={() =>
+                setOpenIds(allOpen ? new Set() : new Set(groups.map((g) => g.series.id)))
+              }
+              disabled={groups.length === 0}
+              className="rounded-md border border-slate-200 text-slate-700 text-xs font-medium px-3 py-1.5 hover:bg-slate-50 disabled:opacity-50"
+            >
+              {allOpen ? '전체 접기' : '전체 펼치기'}
+            </button>
             <Link
               to="/vocab/corpora"
               className="rounded-md bg-slate-900 text-white text-xs font-medium px-3 py-1.5 hover:bg-slate-800"
@@ -211,41 +307,69 @@ export function VocabList({ manage = false }: { manage?: boolean }) {
         </div>
       )}
 
-      <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white overflow-hidden">
-        {sets.map((s) => (
-          <li key={s.id} className="relative">
-            <Link
-              to={`/vocab/${s.id}`}
-              className="flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-slate-50 active:bg-slate-100"
+      {/* 교재별로 접어 둔다. 교재가 여러 개면 한 화면에 다 펼치면 너무 길다. */}
+      <div className="space-y-2">
+        {groups.map(({ series: sr, days }) => {
+          const open = openIds.has(sr.id)
+          return (
+            <section
+              key={sr.id}
+              className="rounded-lg border border-slate-200 bg-white overflow-hidden"
             >
-              <div className="min-w-0">
-                <p className="text-[15px] font-medium text-slate-900 truncate">
-                  {s.title}
-                </p>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {s.words.length}단어 · {formatDate(s.createdAt)}
-                  {/* 소유자가 남아 있으면 아직 병합 안 된 옛 시험지다 */}
-                  {canManage && s.studentName && (
-                    <span className="text-amber-600"> · {s.studentName} (병합 전)</span>
-                  )}
-                </p>
-              </div>
-              <span className="text-slate-300 text-lg shrink-0">→</span>
-            </Link>
-            {canManage && (
               <button
                 type="button"
-                onClick={(e) => handleDelete(e, s)}
-                disabled={deletingId === s.id}
-                className="absolute top-2 right-9 text-[10px] text-slate-400 hover:text-red-600 px-1.5 py-0.5 rounded disabled:opacity-50"
-                aria-label="삭제"
+                onClick={() => toggleOpen(sr.id)}
+                className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-slate-50"
               >
-                {deletingId === s.id ? '…' : '삭제'}
+                <div className="min-w-0">
+                  <p className="text-[15px] font-semibold text-slate-900 truncate">
+                    {sr.title}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    시험지 {days.length}개 · DAY {days[0].day}
+                    {days.length > 1 && `~${days[days.length - 1].day}`}
+                  </p>
+                </div>
+                <span className="shrink-0 text-slate-400 text-sm">
+                  {open ? '−' : '+'}
+                </span>
               </button>
-            )}
-          </li>
-        ))}
-      </ul>
+              {open && (
+                <ul className="divide-y divide-slate-100 border-t border-slate-100">
+                  {days.map(({ day, set }) => (
+                    <SetRow
+                      key={set.id}
+                      label={`DAY ${day}`}
+                      set={set}
+                      canManage={canManage}
+                      deleting={deletingId === set.id}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+                </ul>
+              )}
+            </section>
+          )
+        })}
+      </div>
+
+      {/* 교재에 안 붙는 옛 시험지. 묶을 데가 없다고 사라지면 안 된다. */}
+      {loose.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-sm font-semibold text-slate-700">기타 시험지</h2>
+          <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white overflow-hidden">
+            {loose.map((s) => (
+              <SetRow
+                key={s.id}
+                set={s}
+                canManage={canManage}
+                deleting={deletingId === s.id}
+                onDelete={handleDelete}
+              />
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   )
 }
