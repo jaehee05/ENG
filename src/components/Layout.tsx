@@ -95,7 +95,9 @@ const studentNav: NavItem[] = [
   { to: '/schedule', label: '일정', icon: calendarIcon },
 ]
 
-// 하단 탭바: 홈·과제·일정·더보기 4개 고정 (학생·관리자 공통). 나머지는 더보기로.
+// 아이폰 하단 탭바. 학생은 여기에 '단어' 를 더해 5개 — 매일 들어가는 곳이라
+// 더보기 안에 두면 두 번 눌러야 한다. 관리자는 /vocab 이 학생별 현황이라
+// 성격이 달라 4개로 둔다.
 const bottomTabs: NavItem[] = [
   { to: '/', label: '홈', end: true, icon: homeIcon },
   { to: '/assignments', label: '과제', icon: checkIcon },
@@ -119,10 +121,9 @@ const adminExtraNav: NavItem[] = [
 ]
 
 export function Layout() {
-  const { profile, logOut } = useAuth()
+  const { profile } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const [menuOpen, setMenuOpen] = useState(false)
   const isAdmin = profile?.role === 'admin'
   const [unread, setUnread] = useState(0)
 
@@ -164,12 +165,6 @@ export function Layout() {
     }
   }, [navigate])
 
-  async function handleLogout() {
-    setMenuOpen(false)
-    await logOut()
-    navigate('/login')
-  }
-
   // 학생 계정 과목 확인 — 국어만이면 영어 콘텐츠 탭 숨김. 국어 포함이면 모의고사 탭 노출.
   const subj = profile ? accountSubjects(profile) : { korean: true, english: true }
   const englishOnlyPaths = new Set<string>([
@@ -193,14 +188,28 @@ export function Layout() {
   }
   const koreanOnly = !isAdmin && subj.korean && !subj.english
 
+  // 헤더의 점 3개 메뉴를 없애면서 md 이상에서도 '더보기' 로 들어가게 한다.
+  // 내 정보·공지사항·로그아웃이 거기 있어, 이게 없으면 데스크톱에서 로그아웃할
+  // 길이 사라진다.
+  const moreNavItem: NavItem = { to: '/more', label: '더보기', icon: moreIcon }
+
   // 아이패드 세로(md, 768) 이상: 모든 항목 표시
   const desktopNav = isAdmin
-    ? [...studentNav, ...studentExtraNav, ...adminExtraNav]
+    ? [...studentNav, ...studentExtraNav, ...adminExtraNav, moreNavItem]
     : koreanOnly
-      ? [...filterForSubjects(studentNav), mockNavItem]
-      : filterForSubjects([...studentNav, ...studentExtraNav])
-  // 아이폰(md 미만) 하단 탭바: 홈·과제·일정·더보기 4개 고정
-  const mobileNav = bottomTabs
+      ? [...filterForSubjects(studentNav), mockNavItem, moreNavItem]
+      : [...filterForSubjects([...studentNav, ...studentExtraNav]), moreNavItem]
+  // 아이폰(md 미만) 하단 탭바. 학생은 홈·과제·단어·일정·더보기.
+  // filterForSubjects 를 거치는 이유 — 국어만 듣는 학생에게는 단어를 숨긴다.
+  const mobileNav = isAdmin
+    ? bottomTabs
+    : filterForSubjects([
+        bottomTabs[0],
+        bottomTabs[1],
+        { to: '/vocab', label: '단어', icon: vocabIcon },
+        bottomTabs[2],
+        bottomTabs[3],
+      ])
 
   return (
     <div className="h-dvh flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
@@ -237,67 +246,8 @@ export function Layout() {
                 <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
               )}
             </Link>
-            <button
-              type="button"
-              onClick={() => setMenuOpen((v) => !v)}
-              aria-label="메뉴"
-              className="h-8 w-8 inline-flex items-center justify-center rounded-md text-slate-600 hover:bg-slate-100"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                <circle cx="5" cy="12" r="1" />
-                <circle cx="12" cy="12" r="1" />
-                <circle cx="19" cy="12" r="1" />
-              </svg>
-            </button>
           </div>
         </div>
-        {menuOpen && (
-          <div className="border-t border-slate-200 bg-white">
-            <div className="max-w-6xl xl:max-w-7xl 2xl:max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-3 text-sm flex-wrap">
-              <span className="text-slate-600">{profile?.displayName}</span>
-              <div className="flex items-center gap-3 flex-wrap">
-                {/* /profile 은 하단 "더보기" 탭에만 있어 md 이상(더보기 탭 없음)에서
-                    닿을 수 없었다. 헤더 메뉴에 넣어 전 기기에서 접근 가능하게 한다. */}
-                <Link
-                  to="/profile"
-                  onClick={() => setMenuOpen(false)}
-                  className="text-slate-600 hover:text-slate-900 underline-offset-2 hover:underline"
-                >
-                  내 정보
-                </Link>
-                <Link
-                  to="/history"
-                  onClick={() => setMenuOpen(false)}
-                  className="text-slate-600 hover:text-slate-900 underline-offset-2 hover:underline"
-                >
-                  내 기록
-                </Link>
-                <Link
-                  to="/notice"
-                  onClick={() => setMenuOpen(false)}
-                  className="text-slate-600 hover:text-slate-900 underline-offset-2 hover:underline"
-                >
-                  공지사항
-                </Link>
-                {isAdmin && (
-                  <Link
-                    to="/admin/announce"
-                    onClick={() => setMenuOpen(false)}
-                    className="text-slate-600 hover:text-slate-900 underline-offset-2 hover:underline"
-                  >
-                    공지 관리
-                  </Link>
-                )}
-                <button
-                  onClick={handleLogout}
-                  className="text-slate-600 hover:text-slate-900 underline-offset-2 hover:underline"
-                >
-                  로그아웃
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </header>
 
       {/* 본문 */}
