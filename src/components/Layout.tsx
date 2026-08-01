@@ -5,6 +5,7 @@ import { FirebaseMessaging } from '@capacitor-firebase/messaging'
 import { useAuth } from '../contexts/useAuth'
 import { unreadNotificationCount } from '../lib/firestore'
 import { accountSubjects } from '../lib/types'
+import { WORDBOOK_ENABLED } from '../lib/features'
 
 interface NavItem {
   to: string
@@ -103,7 +104,10 @@ const bottomTabs: NavItem[] = [
 ]
 
 const studentExtraNav: NavItem[] = [
-  { to: '/wordbook', label: '단어장', icon: wordbookIcon },
+  // 내 단어장은 화면에서만 감췄다 — features.ts 의 WORDBOOK_ENABLED 참고.
+  ...(WORDBOOK_ENABLED
+    ? [{ to: '/wordbook', label: '단어장', icon: wordbookIcon }]
+    : []),
   { to: '/history', label: '기록', icon: historyIcon },
 ]
 

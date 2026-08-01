@@ -125,7 +125,7 @@ export function VocabSeriesList() {
                 </span>
               )}
               <span className="text-xs text-slate-500">
-                응시 {taken} · 남은 {untaken}
+                응시 {taken} · 잔여 {untaken}
               </span>
             </div>
             {/* 진행 막대 — 몇 DAY 남았는지 한눈에 */}

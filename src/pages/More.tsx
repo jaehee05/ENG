@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
+import { WORDBOOK_ENABLED } from '../lib/features'
 import { deleteAccount } from '../lib/account'
 import { accountSubjects } from '../lib/types'
 
@@ -157,7 +158,9 @@ export function More() {
       {/* 학습 콘텐츠 (하단탭에서 빠진 항목들) */}
       <Card>
         {showEnglish && <LinkRow to="/vocab" label="단어 시험지" />}
-        {showEnglish && <LinkRow to="/wordbook" label="내 단어장" />}
+        {showEnglish && WORDBOOK_ENABLED && (
+          <LinkRow to="/wordbook" label="내 단어장" />
+        )}
         {showMock && <LinkRow to="/korean-mocks" label="모의고사" />}
         <LinkRow to="/history" label="내 기록" />
       </Card>

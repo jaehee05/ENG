@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import { ScheduleManager } from '../components/ScheduleManager'
 import { DESKTOP_QUERY, useMediaQuery } from '../lib/useMediaQuery'
+import { WORDBOOK_ENABLED } from '../lib/features'
 import {
   getAccount,
   updateAccountColorKey,
@@ -126,6 +127,20 @@ const TYPE_CLASS: Record<Attempt['type'], string> = {
 }
 
 type TypeFilter = 'all' | Attempt['type']
+
+/**
+ * 시험 이력 필터 칩.
+ *
+ * 내 단어장은 숨김이라 칩에서 뺀다. 이미 쌓인 단어장 응시 기록은 '전체' 에
+ * 그대로 남는다 — 기능을 감추는 것이지 기록을 지우는 게 아니다.
+ */
+const ATTEMPT_FILTERS: readonly TypeFilter[] = [
+  'all',
+  'vocab',
+  'reading',
+  'korean_mock',
+  ...(WORDBOOK_ENABLED ? (['wordbook'] as const) : []),
+]
 
 /**
  * 탭 구성. 자주 쓰는 순서대로 두고 첫 탭(과제)을 기본값으로 한다.
@@ -601,7 +616,6 @@ export function AdminStudentDetail() {
     { key: 'attempts', label: '시험 이력', badge: attempts.length },
     { key: 'metrics', label: '학습 지표' },
     { key: 'schedule', label: '일정' },
-    { key: 'wordbook', label: '단어장', badge: wordbook.length },
     { key: 'settings', label: '설정' },
   ]
 
@@ -643,11 +657,6 @@ export function AdminStudentDetail() {
       <StatCard
         label="평균"
         value={stats.totalAttempts > 0 ? `${stats.avgRatio}%` : '—'}
-      />
-      <StatCard
-        label="단어장"
-        value={`${stats.wordbookSize}`}
-        sub={`조회 ${stats.wordbookTotalLookups}`}
       />
       <StatCard
         label="최근"
@@ -978,7 +987,7 @@ export function AdminStudentDetail() {
   const attemptsPanel = (
     <div className="space-y-3">
       <div className="flex items-center gap-1 text-xs overflow-x-auto pb-1">
-        {(['all', 'vocab', 'reading', 'korean_mock', 'wordbook'] as const).map((k) => (
+        {ATTEMPT_FILTERS.map((k) => (
           <button
             key={k}
             onClick={() => setTypeFilter(k)}

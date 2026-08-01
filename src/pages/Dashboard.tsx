@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
+import { WORDBOOK_ENABLED } from '../lib/features'
 import {
   clearDDay,
   formatDate,
@@ -47,6 +48,8 @@ interface ShortcutCard {
   title: string
   desc: string
   icon: ReactNode
+  /** 내 단어장 카드 표시. 숨김 상태면 목록에서 뺀다. */
+  wordbook?: boolean
 }
 
 const sIcon = {
@@ -74,6 +77,7 @@ const shortcuts: ShortcutCard[] = [
   },
   {
     to: '/wordbook',
+    wordbook: true,
     title: '내 단어장',
     desc: '모은 단어 복습',
     icon: (
@@ -646,6 +650,8 @@ export function Dashboard() {
           </h2>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
             {shortcuts
+              // 내 단어장은 화면에서만 감췄다 — features.ts 의 WORDBOOK_ENABLED 참고.
+              .filter((c) => WORDBOOK_ENABLED || !c.wordbook)
               .map((c) => (
               <Link
                 key={c.to}
