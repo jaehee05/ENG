@@ -132,7 +132,7 @@ export function VocabSeriesDetail() {
           {title}
         </h1>
         <p className="text-sm text-slate-500 mt-1">
-          전체 {days.length}개 · 응시 {done.length} · 남은 {todo.length}
+          전체 {days.length}개 · 응시 {done.length} · 잔여 {todo.length}
         </p>
       </header>
 
