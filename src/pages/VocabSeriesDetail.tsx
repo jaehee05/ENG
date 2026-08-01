@@ -8,7 +8,7 @@ import {
   listVocabSeries,
   listVocabSets,
 } from '../lib/firestore'
-import { groupBySeries, visibleSetsFor } from '../lib/studentVocab'
+import { groupBySeries, visibleSetsFor } from '../lib/vocabGroups'
 import { sheetStatuses, type SheetStatus } from '../lib/vocabStatus'
 
 /** DAY 한 줄. 응시 전/후 모양이 달라 묶어 둔다. */

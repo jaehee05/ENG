@@ -7,7 +7,7 @@ import {
   listVocabSeries,
   listVocabSets,
 } from '../lib/firestore'
-import { groupBySeries, visibleSetsFor, type SeriesGroup } from '../lib/studentVocab'
+import { groupBySeries, visibleSetsFor, type SeriesGroup } from '../lib/vocabGroups'
 import { sheetStatuses } from '../lib/vocabStatus'
 import type { Attempt, VocabSet } from '../lib/types'
 
