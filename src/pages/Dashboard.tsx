@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
-import { WORDBOOK_ENABLED } from '../lib/features'
 import {
   clearDDay,
   formatDate,
@@ -15,7 +14,6 @@ import {
   setDDay,
 } from '../lib/firestore'
 import {
-  accountSubjects,
   isAssignmentOverdue as isOverdue,
   isAssignmentVisibleToStudent,
 } from '../lib/types'
@@ -42,63 +40,6 @@ function fmtDDayDate(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number)
   return `${y}년 ${m}월 ${d}일`
 }
-
-interface ShortcutCard {
-  to: string
-  title: string
-  desc: string
-  icon: ReactNode
-  /** 내 단어장 카드 표시. 숨김 상태면 목록에서 뺀다. */
-  wordbook?: boolean
-}
-
-const sIcon = {
-  width: 18,
-  height: 18,
-  viewBox: '0 0 24 24',
-  fill: 'none' as const,
-  stroke: 'currentColor',
-  strokeWidth: 1.6,
-  strokeLinecap: 'round' as const,
-  strokeLinejoin: 'round' as const,
-}
-
-const shortcuts: ShortcutCard[] = [
-  {
-    to: '/vocab',
-    title: '단어 시험지',
-    desc: 'DAY 단위 시험',
-    icon: (
-      <svg {...sIcon}>
-        <path d="M9 4h6a2 2 0 0 1 2 2v14l-5-2-5 2V6a2 2 0 0 1 2-2Z" />
-        <path d="M9 8h6M9 11h4" />
-      </svg>
-    ),
-  },
-  {
-    to: '/wordbook',
-    wordbook: true,
-    title: '내 단어장',
-    desc: '모은 단어 복습',
-    icon: (
-      <svg {...sIcon}>
-        <path d="M5 3h11a2 2 0 0 1 2 2v16l-3-2-3 2-3-2-3 2V5a2 2 0 0 1 2-2Z" />
-      </svg>
-    ),
-  },
-  {
-    to: '/history',
-    title: '내 기록',
-    desc: '지난 시험 점수',
-    icon: (
-      <svg {...sIcon}>
-        <path d="M3 12a9 9 0 1 0 3.4-7.04" />
-        <path d="M3 4v5h5" />
-        <path d="M12 8v4l3 2" />
-      </svg>
-    ),
-  },
-]
 
 function assignmentPath(a: Assignment): string | null {
   if (a.type === 'vocab') return `/vocab/${a.refId}`
@@ -161,6 +102,56 @@ type OpenItem =
   | { kind: 'single'; a: Assignment; sortKey: number }
   | { kind: 'group'; category: string; items: Assignment[]; sortKey: number }
 
+/** 홈의 과제 현황 타일. */
+function StatTile({
+  label,
+  value,
+  to,
+  tone,
+}: {
+  label: string
+  value: number
+  to: string
+  tone?: 'danger'
+}) {
+  return (
+    <Link
+      to={to}
+      className="block rounded-lg border border-slate-200 bg-white px-3 py-3 hover:border-slate-300 hover:bg-slate-50/60 transition"
+    >
+      <p className="text-[11px] text-slate-500">{label}</p>
+      <p
+        className={`text-2xl font-semibold tracking-tight mt-0.5 ${
+          tone === 'danger' ? 'text-red-600' : 'text-slate-900'
+        }`}
+      >
+        {value}
+      </p>
+    </Link>
+  )
+}
+
+const ATTEMPT_TYPE_LABEL: Record<Attempt['type'], string> = {
+  vocab: '단어 시험지',
+  reading: '지문 문제풀이',
+  wordbook: '내 단어장 시험',
+  korean_mock: '모의고사',
+}
+
+/** 응시 기록에서 결과 화면 경로. MyHistory 와 같은 규칙. */
+function attemptResultPath(a: Attempt): string {
+  if (a.type === 'vocab') return `/vocab/${a.refId}/result/${a.id}`
+  if (a.type === 'reading') return `/reading/${a.refId}/result/${a.id}`
+  if (a.type === 'korean_mock') return `/korean-mocks/${a.refId}/result/${a.id}`
+  return `/wordbook/result/${a.id}`
+}
+
+function fmtAttemptDate(ts: Attempt['createdAt']): string {
+  if (!ts) return ''
+  const d = ts.toDate()
+  return `${d.getMonth() + 1}/${d.getDate()}`
+}
+
 export function Dashboard() {
   const { profile } = useAuth()
   const [assignments, setAssignments] = useState<Assignment[]>([])
@@ -179,16 +170,6 @@ export function Dashboard() {
   const [ddayDate, setDdayDate] = useState('')
   const [ddaySaving, setDdaySaving] = useState(false)
   const isAdmin = profile?.role === 'admin'
-
-  // 국어만 수강하는 학생: 홈은 보여주되 '학습' 바로가기(지문·단어 등)는 숨기고
-  // 과제 리스트를 메인으로 둔다.
-  const koreanOnly =
-    !!profile &&
-    profile.role === 'student' &&
-    (() => {
-      const s = accountSubjects(profile)
-      return s.korean && !s.english
-    })()
 
 
   useEffect(() => {
@@ -339,6 +320,32 @@ export function Dashboard() {
   }, [openRaw])
 
   const totalOpen = openRaw.length
+
+  /** 과제 현황 — 진행 중 / 기한 지남 / 완료. 버튼 대신 홈에 세워 둔다. */
+  const assignStats = useMemo(() => {
+    const overdue = openRaw.filter((a) => isOverdue(a)).length
+    return {
+      open: openRaw.length,
+      overdue,
+      done: assignments.length - openRaw.length,
+    }
+  }, [assignments, openRaw])
+
+  /**
+   * 시험 현황 — 최근 정식 응시 5건. 연습은 뺀다. 다른 화면들도 !practice 로
+   * 통계를 내므로 여기만 섞으면 숫자가 어긋난다.
+   */
+  const recentAttempts = useMemo(
+    () =>
+      [...attempts]
+        .filter((a) => !a.practice)
+        .sort(
+          (x, y) =>
+            (y.createdAt?.toMillis() ?? 0) - (x.createdAt?.toMillis() ?? 0),
+        )
+        .slice(0, 5),
+    [attempts],
+  )
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   function toggleExpanded(category: string) {
     setExpanded((prev) => {
@@ -643,33 +650,78 @@ export function Dashboard() {
         </section>
       )}
 
-      {!koreanOnly && (
-        <section className="space-y-2.5">
+      <section className="space-y-2.5">
+        <h2 className="text-[13px] font-semibold text-slate-900 uppercase tracking-wider">
+          과제 현황
+        </h2>
+        <div className="grid grid-cols-3 gap-2">
+          <StatTile label="진행 중" value={assignStats.open} to="/assignments" />
+          <StatTile
+            label="기한 지남"
+            value={assignStats.overdue}
+            tone={assignStats.overdue > 0 ? 'danger' : undefined}
+            to="/assignments"
+          />
+          <StatTile label="완료" value={assignStats.done} to="/assignments" />
+        </div>
+      </section>
+
+      <section className="space-y-2.5">
+        <div className="flex items-baseline justify-between">
           <h2 className="text-[13px] font-semibold text-slate-900 uppercase tracking-wider">
-            학습
+            시험 현황
           </h2>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-            {shortcuts
-              // 내 단어장은 화면에서만 감췄다 — features.ts 의 WORDBOOK_ENABLED 참고.
-              .filter((c) => WORDBOOK_ENABLED || !c.wordbook)
-              .map((c) => (
-              <Link
-                key={c.to}
-                to={c.to}
-                className="block rounded-lg border border-slate-200 bg-white p-4 hover:border-slate-300 hover:bg-slate-50/60 transition"
-              >
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-slate-100 text-slate-700">
-                  {c.icon}
-                </span>
-                <p className="mt-3 text-[15px] font-semibold text-slate-900">
-                  {c.title}
-                </p>
-                <p className="text-xs text-slate-500 mt-0.5">{c.desc}</p>
-              </Link>
-            ))}
+          <Link to="/history" className="text-xs text-slate-500 hover:text-slate-900">
+            전체 기록 →
+          </Link>
+        </div>
+        {recentAttempts.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
+            아직 응시한 시험이 없어요.
           </div>
-        </section>
-      )}
+        ) : (
+          <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white overflow-hidden">
+            {recentAttempts.map((a) => {
+              const ratio = a.total > 0 ? Math.round((a.correct / a.total) * 100) : null
+              return (
+                <li key={a.id}>
+                  <Link
+                    to={attemptResultPath(a)}
+                    className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-slate-900 truncate">
+                        {a.refTitle}
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        {ATTEMPT_TYPE_LABEL[a.type]} · {fmtAttemptDate(a.createdAt)}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-right">
+                      <span
+                        className={`block text-sm font-semibold ${
+                          ratio === null
+                            ? 'text-slate-500'
+                            : ratio >= 80
+                              ? 'text-brand-700'
+                              : ratio >= 60
+                                ? 'text-amber-700'
+                                : 'text-red-600'
+                        }`}
+                      >
+                        {a.correct}/{a.total}
+                      </span>
+                      {ratio !== null && (
+                        <span className="block text-[10px] text-slate-400">{ratio}%</span>
+                      )}
+                    </span>
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </section>
 
       {/* D-day 설정 모달 (관리자) */}
       {ddayOpen && (
