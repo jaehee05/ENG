@@ -787,6 +787,22 @@ export function KoreanMockDetail() {
                         ]
                   return (
                     <>
+                      {/* 학생 화면에 뜨는 순서대로 놓는다 — 한마디, 정답, 오답. */}
+                      <div>
+                        <p className="text-xs font-medium text-slate-600 mb-1">
+                          출제자의 한마디{' '}
+                          <span className="text-slate-400 font-normal">
+                            — 이 문항에 대해 하고 싶은 말 (선택)
+                          </span>
+                        </p>
+                        <RichTextEditor
+                          value={explNoteDraft}
+                          onChange={setExplNoteDraft}
+                          styles={explStyles}
+                          onStylesChange={saveExplStyles}
+                        />
+                      </div>
+
                       <div>
                         <p className="text-xs font-medium text-slate-600 mb-1">
                           정답 해설{' '}
@@ -850,21 +866,6 @@ export function KoreanMockDetail() {
                             </p>
                           </div>
                         )}
-                      </div>
-
-                      <div>
-                        <p className="text-xs font-medium text-slate-600 mb-1">
-                          출제자의 한마디{' '}
-                          <span className="text-slate-400 font-normal">
-                            — 이 문항에 대해 하고 싶은 말 (선택)
-                          </span>
-                        </p>
-                        <RichTextEditor
-                          value={explNoteDraft}
-                          onChange={setExplNoteDraft}
-                          styles={explStyles}
-                          onStylesChange={saveExplStyles}
-                        />
                       </div>
                     </>
                   )
