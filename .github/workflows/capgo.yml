@@ -31,6 +31,15 @@ jobs:
         with:
           # commit-back 푸시 권한
           token: ${{ secrets.GITHUB_TOKEN }}
+          # 트리거된 커밋이 아니라 지금의 main 을 받는다.
+          #
+          # 기본값(트리거 SHA)이면 앞 배포가 올려놓은 버전 범프가 빠진 상태로
+          # 시작한다. PR 을 연달아 머지하면 뒤 런이 앞 런과 같은 버전을 다시
+          # 올리려다 "Version already exists" 로 죽는다 (2026-08-02 에 세 개를
+          # 연달아 머지하다 겪음 — 배포 3개 중 1개만 나갔다).
+          #
+          # concurrency 로 직렬화돼 있으니 앞 런이 끝난 뒤 main 을 받는 게 맞다.
+          ref: main
 
       - uses: actions/setup-node@v4
         with:
@@ -79,5 +88,8 @@ jobs:
             echo "버전 변경 없음 — 커밋 생략"
           else
             git commit -m "chore: bump version for Capgo release [skip ci]"
-            git push
+            # 번들은 이미 Capgo 에 올라갔다. 여기서 죽으면 package.json 만
+            # 뒤처져 다음 배포가 같은 버전을 다시 올리려다 깨진다. 그 사이
+            # main 이 움직였으면 받아서 얹고 다시 민다.
+            git push || (git pull --rebase origin main && git push)
           fi
