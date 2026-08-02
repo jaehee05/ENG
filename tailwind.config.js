@@ -44,11 +44,27 @@ export default {
         // HanjaMyeongjo 를 앞에 두는 이유는 index.css 의 @font-face 참고 —
         // 한자만 잡는 unicode-range 라 한글·라틴에는 영향이 없고, 나눔명조가
         // 빈출 한자 몇 자만 싣고 있어 이걸 뒤에 두면 한자끼리 글꼴이 갈린다.
-        myeongjo: ['HanjaMyeongjo', '"Nanum Myeongjo"', 'serif'],
+        // 그 뒤의 AppleMyungjo 는 local() 이 안 잡히는 기기용 보험이다.
+        // 지문에서는 나눔명조 뒤에 둬야 한다 — 앞에 두면 한자뿐 아니라 한글까지
+        // 가져가 지문 글꼴이 통째로 바뀐다.
+        myeongjo: [
+          'HanjaMyeongjo',
+          '"Nanum Myeongjo"',
+          'AppleMyungjo',
+          '"Apple SD Gothic Neo"',
+          'serif',
+        ],
         gothic: ['"Nanum Gothic"', 'sans-serif'],
         // 출제자의 한마디. 폰트가 아직 안 받아졌을 때를 대비해 이미 실려 있는
         // 나눔명조로 떨어지게 둔다 — 둘 다 부리가 있어 덜 튄다.
-        maruburi: ['MaruBuri', 'HanjaMyeongjo', '"Nanum Myeongjo"', 'serif'],
+        maruburi: [
+          'MaruBuri',
+          'HanjaMyeongjo',
+          'AppleMyungjo',
+          '"Nanum Myeongjo"',
+          '"Apple SD Gothic Neo"',
+          'serif',
+        ],
       },
       boxShadow: {
         soft: '0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px -8px rgba(15, 23, 42, 0.08)',
