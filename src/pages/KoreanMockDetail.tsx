@@ -109,6 +109,8 @@ export function KoreanMockDetail() {
   const [explDraft, setExplDraft] = useState('')
   // 선지별 오답 해설 초안. 키는 선택지 번호('1'~'5').
   const [explChoiceDraft, setExplChoiceDraft] = useState<Record<string, string>>({})
+  // 문항별 출제자 한마디 초안.
+  const [explNoteDraft, setExplNoteDraft] = useState('')
   const [explSaving, setExplSaving] = useState(false)
   /** Ctrl+S 로 창을 닫지 않고 저장했을 때 그 시각. 저장됐는지 눈으로 확인용. */
   const [explSavedAt, setExplSavedAt] = useState<string | null>(null)
@@ -275,6 +277,7 @@ export function KoreanMockDetail() {
         : mock.electives?.[group]?.questions[qIdx]
     setExplDraft(q?.explanation ?? '')
     setExplChoiceDraft({ ...(q?.explanationChoices ?? {}) })
+    setExplNoteDraft(q?.examinerNote ?? '')
     setPassageDraft(q?.passage ?? '')
     setPassageKoDraft(q?.passageKo ?? '')
     setGlossDraft(q?.glossary ?? [])
@@ -327,9 +330,10 @@ export function KoreanMockDetail() {
     }
   }
 
-  /** 정답 해설 + 선지별 오답 해설을 함께 저장. clear=true 면 모두 삭제. */
+  /** 정답 해설 + 선지별 오답 해설 + 한마디를 함께 저장. clear=true 면 모두 삭제. */
   async function applyExpl(clear = false, close = true) {
     const correct = clear ? '' : explDraft.trim()
+    const note = clear ? '' : explNoteDraft.trim()
     await saveQuestionPatch((q) => {
       const next = { ...q }
       if (correct) next.explanation = correct
@@ -338,6 +342,9 @@ export function KoreanMockDetail() {
       const choices = clear ? {} : normalizeChoiceDraft(explChoiceDraft, q.answer)
       if (Object.keys(choices).length) next.explanationChoices = choices
       else delete next.explanationChoices
+
+      if (note) next.examinerNote = note
+      else delete next.examinerNote
 
       // 구버전 통짜 오답 해설은 선지별로 갈아탄 시점에 정리한다
       if (clear || Object.keys(choices).length) delete next.explanationWrong
@@ -486,6 +493,7 @@ export function KoreanMockDetail() {
       choiceCompareKey(
         normalizeChoiceDraft(explChoiceDraft, explTargetQuestion.answer),
       ) !== choiceCompareKey(explTargetQuestion.explanationChoices) ||
+      explNoteDraft.trim() !== (explTargetQuestion.examinerNote ?? '').trim() ||
       passageDraft.trim() !== (explTargetQuestion.passage ?? '').trim() ||
       passageKoDraft.trim() !== (explTargetQuestion.passageKo ?? '').trim() ||
       JSON.stringify(glossDraft) !==
@@ -843,12 +851,27 @@ export function KoreanMockDetail() {
                           </div>
                         )}
                       </div>
+
+                      <div>
+                        <p className="text-xs font-medium text-slate-600 mb-1">
+                          출제자의 한마디{' '}
+                          <span className="text-slate-400 font-normal">
+                            — 이 문항에 대해 하고 싶은 말 (선택)
+                          </span>
+                        </p>
+                        <RichTextEditor
+                          value={explNoteDraft}
+                          onChange={setExplNoteDraft}
+                          styles={explStyles}
+                          onStylesChange={saveExplStyles}
+                        />
+                      </div>
                     </>
                   )
                 })()}
 
                 <p className="text-[11px] text-slate-400">
-                  둘 중 하나만 입력해도 됩니다. 비워둔 쪽은 학생 화면에 나오지
+                  셋 중 하나만 입력해도 됩니다. 비워둔 칸은 학생 화면에 나오지
                   않습니다. <b className="font-semibold">Ctrl+S</b> (Mac ⌘S) 로 창을
                   닫지 않고 저장할 수 있습니다.
                 </p>
