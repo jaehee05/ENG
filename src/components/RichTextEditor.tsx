@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ClipboardEvent } from 'react'
 import type { ExplStyle } from '../lib/types'
-import { AUTO_REPLACE } from '../lib/angleBrackets'
+import { AUTO_REPLACE, convertAngleInText } from '../lib/angleBrackets'
 
 const HILITE_COLORS = [
   { name: '노랑', color: '#fff3a0' },
@@ -108,14 +108,47 @@ export function RichTextEditor({
   /**
    * 부등호를 홑화살괄호로 바꿔 넣는다 (AUTO_REPLACE 참고).
    *
-   * React 의 onBeforeInput 이 아니라 네이티브 리스너를 쓰는 이유: contentEditable
-   * 에서는 합성 이벤트가 실제 입력을 못 막을 때가 있다. 한글은 조합 중에
-   * beforeinput 이 여러 번 오는데, 부등호는 조합 대상이 아니라 insertText 로
-   * 한 번에 들어와 끼어들 여지가 없다.
+   * 두 갈래로 잡는다.
+   *
+   * 1. beforeinput 에서 가로채 바꿔 넣기. 조합 중이 아닐 때의 정상 경로다.
+   *    React 의 onBeforeInput 이 아니라 네이티브 리스너를 쓰는 이유는
+   *    contentEditable 에서 합성 이벤트가 실제 입력을 못 막을 때가 있어서다.
+   *
+   * 2. 그러고도 남은 것을 뒤에서 줍기. `〈보기〉` 처럼 한글 바로 뒤에 닫는
+   *    괄호를 칠 때가 문제다 — '기' 가 아직 조합 중이라, 그 입력은 조합을
+   *    끝내면서 함께 들어온다. 그때 beforeinput 은 취소할 수 없는 이벤트로
+   *    오거나 inputType 이 insertText 가 아니어서 1번이 놓친다. 그래서 입력이
+   *    끝난 뒤 커서가 있는 글자만 다시 훑는다.
    */
   useEffect(() => {
     const el = ref.current
     if (!el) return
+
+    /**
+     * 커서가 있는 글자 노드에서 부등호를 바꾼다.
+     * 한 글자가 한 글자로 바뀌므로 커서 위치가 밀리지 않는다.
+     */
+    function fixAtCaret() {
+      const sel = window.getSelection()
+      if (!sel || sel.rangeCount === 0) return
+      const range = sel.getRangeAt(0)
+      const node = range.startContainer
+      if (node.nodeType !== Node.TEXT_NODE) return
+      const text = node as Text
+      const before = text.data
+      const after = convertAngleInText(before)
+      if (after === before) return
+
+      const offset = range.startOffset
+      text.data = after
+      const restored = document.createRange()
+      restored.setStart(text, Math.min(offset, after.length))
+      restored.collapse(true)
+      sel.removeAllRanges()
+      sel.addRange(restored)
+      if (el) onChangeRef.current(el.innerHTML)
+    }
+
     function onBeforeInput(ev: Event) {
       const e = ev as InputEvent
       if (e.inputType !== 'insertText' || !e.data) return
@@ -125,8 +158,21 @@ export function RichTextEditor({
       document.execCommand('insertText', false, next)
       if (el) onChangeRef.current(el.innerHTML)
     }
+
+    // 조합 중에는 글자 노드를 건드리면 조합이 깨진다. 조합이 끝난 뒤에 줍는다.
+    function onInput(ev: Event) {
+      if ((ev as InputEvent).isComposing) return
+      fixAtCaret()
+    }
+
     el.addEventListener('beforeinput', onBeforeInput)
-    return () => el.removeEventListener('beforeinput', onBeforeInput)
+    el.addEventListener('input', onInput)
+    el.addEventListener('compositionend', fixAtCaret)
+    return () => {
+      el.removeEventListener('beforeinput', onBeforeInput)
+      el.removeEventListener('input', onInput)
+      el.removeEventListener('compositionend', fixAtCaret)
+    }
   }, [])
 
   function exec(cmd: string, arg?: string) {
