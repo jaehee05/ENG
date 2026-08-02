@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ClipboardEvent } from 'react'
 import type { ExplStyle } from '../lib/types'
+import { AUTO_REPLACE } from '../lib/angleBrackets'
 
 const HILITE_COLORS = [
   { name: '노랑', color: '#fff3a0' },
@@ -17,20 +18,6 @@ const TEXT_COLORS = [
   { name: '초록', color: '#16a34a' },
   { name: '보라', color: '#7c3aed' },
 ]
-
-/**
- * 치자마자 바꿔 넣는 글자.
- *
- * 국어 해설에서 꺾쇠는 거의 언제나 작품명에 두르는 홑화살괄호다. 그런데 이건
- * 키보드로 바로 못 쳐서 매번 문자표를 뒤져야 했다. 치기 쉬운 부등호로 받아
- * 옳은 글자로 바꿔 넣는다. 부등호 자체를 써야 할 일이 생기면 문자표에
- * 등록해 두고 버튼으로 넣으면 된다 — 되돌리기로는 안 돌아온다(넣은 글자가
- * 지워질 뿐이다).
- */
-const AUTO_REPLACE: Record<string, string> = {
-  '<': '〈',
-  '>': '〉',
-}
 
 function newStyleId(): string {
   const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto

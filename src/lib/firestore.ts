@@ -18,6 +18,7 @@ import {
   writeBatch,
 } from 'firebase/firestore'
 import { db } from './firebase'
+import { convertAngleInHtml, convertAngleInText } from './angleBrackets'
 import type {
   Announcement,
   Assignment,
@@ -946,6 +947,67 @@ export async function updateKoreanMock(
 
 export async function deleteKoreanMock(id: string): Promise<void> {
   await deleteDoc(doc(db, 'koreanMocks', id))
+}
+
+/**
+ * 이미 저장된 해설·한마디의 부등호를 홑화살괄호로 바꾼다.
+ *
+ * 편집기가 치는 즉시 바꿔주기 전에 적어둔 것들을 손보는 일회성 작업이다.
+ * 여러 번 돌려도 안전하다 — 바꿀 게 없는 시험지는 쓰지 않는다.
+ *
+ * 지문(passage)은 건드리지 않는다. 해설과 달리 시험지 원문을 그대로 옮겨둔
+ * 것이라 함부로 글자를 바꿀 자리가 아니다.
+ */
+export async function convertAngleBracketsInKoreanMocks(): Promise<{
+  scanned: number
+  changed: number
+}> {
+  const mocks = await listKoreanMocks()
+  let changed = 0
+
+  const fixQuestion = (q: KoreanMockQuestion): KoreanMockQuestion => {
+    const next = { ...q }
+    if (next.explanation) next.explanation = convertAngleInHtml(next.explanation)
+    if (next.explanationWrong)
+      next.explanationWrong = convertAngleInHtml(next.explanationWrong)
+    if (next.examinerNote) next.examinerNote = convertAngleInHtml(next.examinerNote)
+    if (next.explanationChoices) {
+      const choices: Record<string, string> = {}
+      for (const [k, v] of Object.entries(next.explanationChoices)) {
+        choices[k] = convertAngleInHtml(v)
+      }
+      next.explanationChoices = choices
+    }
+    return next
+  }
+
+  for (const mock of mocks) {
+    const questions = mock.questions.map(fixQuestion)
+    const electives = mock.electives?.map((el) => ({
+      ...el,
+      questions: el.questions.map(fixQuestion),
+    }))
+    const comment = mock.examinerComment
+      ? convertAngleInText(mock.examinerComment)
+      : mock.examinerComment
+
+    // 실제로 달라진 것만 쓴다. 안 그러면 매번 전 시험지를 다시 써서
+    // 손댈 이유가 없는 문서까지 수정 시각이 바뀐다.
+    const same =
+      JSON.stringify(questions) === JSON.stringify(mock.questions) &&
+      JSON.stringify(electives ?? null) === JSON.stringify(mock.electives ?? null) &&
+      comment === mock.examinerComment
+    if (same) continue
+
+    await updateKoreanMock(mock.id, {
+      questions,
+      ...(electives ? { electives } : {}),
+      ...(comment !== undefined ? { examinerComment: comment } : {}),
+    })
+    changed++
+  }
+
+  return { scanned: mocks.length, changed }
 }
 
 export async function createKoreanMockAttempt(input: {
