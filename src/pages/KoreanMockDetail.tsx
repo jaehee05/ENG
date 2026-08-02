@@ -29,6 +29,7 @@ import {
   choiceMark,
   getMockSubject,
   hasMockExplanation,
+  isBlankHtml,
   hasMockPassage,
   MOCK_SUBJECT_LABEL,
   questionPoints,
@@ -68,9 +69,15 @@ function normalizeChoiceDraft(
   const out: Record<string, string> = {}
   for (const [k, html] of Object.entries(draft)) {
     if (Number(k) === answer) continue
-    if (html && html.trim()) out[k] = html.trim()
+    // 다 지운 칸에는 <br> 만 남는다 — 그대로 저장하면 학생 화면에 빈 칸이 뜬다
+    if (!isBlankHtml(html)) out[k] = html.trim()
   }
   return out
+}
+
+/** 비교용 — 보이는 게 없는 HTML 은 빈 문자열과 같게 친다. */
+function blankToEmpty(html: string | undefined): string {
+  return isBlankHtml(html) ? '' : (html ?? '').trim()
 }
 
 /** 키 순서에 흔들리지 않게 비교용 문자열로 만든다. */
@@ -346,8 +353,8 @@ export function KoreanMockDetail() {
 
   /** 정답 해설 + 선지별 오답 해설 + 한마디를 함께 저장. clear=true 면 모두 삭제. */
   async function applyExpl(clear = false, close = true) {
-    const correct = clear ? '' : explDraft.trim()
-    const note = clear ? '' : explNoteDraft.trim()
+    const correct = clear || isBlankHtml(explDraft) ? '' : explDraft.trim()
+    const note = clear || isBlankHtml(explNoteDraft) ? '' : explNoteDraft.trim()
     await saveQuestionPatch((q) => {
       const next = { ...q }
       if (correct) next.explanation = correct
@@ -501,13 +508,13 @@ export function KoreanMockDetail() {
         : mock.electives?.[explTarget.group]?.questions[explTarget.qIdx]
       : undefined
   const explDirty = explTargetQuestion
-    ? explDraft.trim() !== (explTargetQuestion.explanation ?? '').trim() ||
+    ? blankToEmpty(explDraft) !== blankToEmpty(explTargetQuestion.explanation) ||
       // 저장되는 형태로 맞춰 비교한다. 비운 칸이 초안에 ''로 남아 있으면
       // 방금 저장했는데도 "저장되지 않습니다" 가 뜬다.
       choiceCompareKey(
         normalizeChoiceDraft(explChoiceDraft, explTargetQuestion.answer),
       ) !== choiceCompareKey(explTargetQuestion.explanationChoices) ||
-      explNoteDraft.trim() !== (explTargetQuestion.examinerNote ?? '').trim() ||
+      blankToEmpty(explNoteDraft) !== blankToEmpty(explTargetQuestion.examinerNote) ||
       passageDraft.trim() !== (explTargetQuestion.passage ?? '').trim() ||
       passageKoDraft.trim() !== (explTargetQuestion.passageKo ?? '').trim() ||
       JSON.stringify(glossDraft) !==

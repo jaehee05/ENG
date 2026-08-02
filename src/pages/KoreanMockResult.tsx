@@ -11,6 +11,7 @@ import {
   choiceMark,
   gradeFromScore,
   hasMockExplanation,
+  isBlankHtml,
   hasMockPassage,
   mockWrongChoiceEntries,
   MOCK_SUBJECT_LABEL,
@@ -645,7 +646,7 @@ export function KoreanMockResult() {
                       하는 문제인지 짚어주고 해설로 들어가는 순서다. 따옴표로
                       감싸는 건 결과 화면 위쪽의 시험 전체 한마디와 같은 모양 —
                       같은 사람의 말이라는 걸 생김새로 알아보게. */}
-                  {explQ?.examinerNote && (
+                  {!isBlankHtml(explQ?.examinerNote) && explQ?.examinerNote && (
                     <div className="rounded-xl bg-slate-50 p-4">
                       <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white text-slate-400 overflow-hidden">
                         <span className="font-serif text-3xl leading-none translate-y-[0.18em]">
@@ -669,7 +670,7 @@ export function KoreanMockResult() {
                     </div>
                   )}
 
-                  {explQ?.explanation && (
+                  {!isBlankHtml(explQ?.explanation) && explQ?.explanation && (
                     <div>
                       <p className="text-xs font-semibold text-slate-500 mb-1.5">
                         정답 해설{' '}
@@ -709,7 +710,9 @@ export function KoreanMockResult() {
                   )}
 
                   {/* 선지별로 나누기 전 형식으로 입력된 오답 해설 (그대로 표시) */}
-                  {explQ?.explanationWrong && wrongEntries.length === 0 && (
+                  {!isBlankHtml(explQ?.explanationWrong) &&
+                    explQ?.explanationWrong &&
+                    wrongEntries.length === 0 && (
                     <div>
                       <p className="text-xs font-semibold text-slate-500 mb-1.5">
                         오답 해설
