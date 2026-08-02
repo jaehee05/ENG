@@ -21,6 +21,26 @@
   font-display: swap;
 }
 
+/*
+ * 한자 전용 대타.
+ *
+ * 마루 부리에는 한자가 한 자도 없다(한글 11,172자, 한자 0자). 그럼 다음
+ * 글꼴로 넘어가는데, 나눔명조 웹폰트도 빈출 한자 몇 자만 subset 에 실려 있어
+ * 나머지는 기기 기본 글꼴로 떨어진다. 그래서 한 문장 안에서도 어떤 한자는
+ * 명조로, 어떤 한자는 딴 글꼴로 나와 들쭉날쭉해 보인다.
+ *
+ * 한자 구간만 통째로 기기의 명조에 맡겨 한 벌로 보이게 한다. AppleMyungjo 는
+ * iOS·macOS 기본 탑재이고 한자를 4,600여 자 담고 있다. 셋 다 없는 기기라면
+ * 이 선언은 조용히 건너뛰어지고 지금과 같아진다 — 나빠질 일은 없다.
+ *
+ * unicode-range 는 한자만 잡는다. 한글·라틴·문장부호는 마루 부리 그대로.
+ */
+@font-face {
+  font-family: 'HanjaMyeongjo';
+  src: local('AppleMyungjo'), local('NanumMyeongjo'), local('Nanum Myeongjo');
+  unicode-range: U+2E80-2EFF, U+2F00-2FDF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF;
+}
+
 /* 리치텍스트 에디터/렌더 */
 .rte-content:empty::before {
   content: attr(data-placeholder);
@@ -44,7 +64,7 @@
    인라인 스타일은 선택자로는 못 이기므로 여기서 덮는다. 이미 저장된 해설도
    다시 손대지 않고 바로잡힌다. */
 .rte-content, .rte-content *, .rte-view, .rte-view * {
-  font-family: 'MaruBuri', 'Nanum Myeongjo', serif !important;
+  font-family: 'MaruBuri', 'HanjaMyeongjo', 'Nanum Myeongjo', serif !important;
 }
 .rte-content td, .rte-content th, .rte-view td, .rte-view th { text-align: left; }
 .rte-view blockquote { margin-left: 1.5rem; }
