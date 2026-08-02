@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import {
+  convertAngleBracketsInKoreanMocks,
   deleteKoreanMock,
   formatDate,
   listAssignmentsForStudent,
@@ -30,6 +31,27 @@ export function KoreanMockList({ manage = false }: { manage?: boolean }) {
   const { profile } = useAuth()
   const isAdmin = profile?.role === 'admin'
   const canManage = isAdmin && manage
+  const [angleBusy, setAngleBusy] = useState(false)
+  const [angleResult, setAngleResult] = useState<string | null>(null)
+
+  async function runAngleFix() {
+    if (!window.confirm('저장된 해설과 출제자의 한마디에서 < > 를 〈 〉 로 바꿉니다. 계속할까요?'))
+      return
+    setAngleBusy(true)
+    setAngleResult(null)
+    try {
+      const { scanned, changed } = await convertAngleBracketsInKoreanMocks()
+      setAngleResult(
+        changed
+          ? `시험지 ${scanned}개 중 ${changed}개를 바꿨습니다.`
+          : `시험지 ${scanned}개를 살펴봤고 바꿀 것이 없었습니다.`,
+      )
+    } catch (e) {
+      setAngleResult(e instanceof Error ? e.message : '변환에 실패했습니다.')
+    } finally {
+      setAngleBusy(false)
+    }
+  }
   const [mocks, setMocks] = useState<KoreanMock[]>([])
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [loading, setLoading] = useState(true)
@@ -128,14 +150,34 @@ export function KoreanMockList({ manage = false }: { manage?: boolean }) {
           </p>
         </div>
         {canManage && (
-          <Link
-            to="/admin/korean-mocks/new"
-            className="rounded-md bg-slate-900 text-white text-xs font-medium px-3 py-1.5 hover:bg-slate-800"
-          >
-            + 새 모의고사
-          </Link>
+          <div className="flex items-center gap-2">
+            {/* 편집기가 치는 즉시 바꿔주기 전에 부등호로 적어둔 해설을 손보는
+                일회성 작업. 여러 번 눌러도 안전하다 — 바꿀 게 없는 시험지는
+                건드리지 않는다. */}
+            <button
+              type="button"
+              onClick={runAngleFix}
+              disabled={angleBusy}
+              title="이미 저장된 해설·한마디의 < > 를 〈 〉 로 바꿉니다"
+              className="rounded-md border border-slate-300 text-slate-600 text-xs font-medium px-2.5 py-1.5 hover:bg-slate-100 disabled:opacity-50"
+            >
+              {angleBusy ? '바꾸는 중…' : '< > → 〈 〉'}
+            </button>
+            <Link
+              to="/admin/korean-mocks/new"
+              className="rounded-md bg-slate-900 text-white text-xs font-medium px-3 py-1.5 hover:bg-slate-800"
+            >
+              + 새 모의고사
+            </Link>
+          </div>
         )}
       </header>
+
+      {angleResult && (
+        <p className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-md px-3 py-2">
+          {angleResult}
+        </p>
+      )}
 
       {!singleSubject && (
         <div className="flex items-center gap-1 text-xs">
