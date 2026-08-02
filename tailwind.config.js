@@ -43,6 +43,9 @@ export default {
         ],
         myeongjo: ['"Nanum Myeongjo"', 'serif'],
         gothic: ['"Nanum Gothic"', 'sans-serif'],
+        // 출제자의 한마디. 폰트가 아직 안 받아졌을 때를 대비해 이미 실려 있는
+        // 나눔명조로 떨어지게 둔다 — 둘 다 부리가 있어 덜 튄다.
+        maruburi: ['MaruBuri', '"Nanum Myeongjo"', 'serif'],
       },
       boxShadow: {
         soft: '0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px -8px rgba(15, 23, 42, 0.08)',

@@ -4,6 +4,23 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 마루 부리 — 출제자의 한마디 본문. 나눔 계열과 달리 웹폰트 CDN 에 없어
+   파일을 직접 들고 있다. 출처·라이선스는 public/fonts/README.md 참고. */
+@font-face {
+  font-family: 'MaruBuri';
+  src: url('/fonts/MaruBuri-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'MaruBuri';
+  src: url('/fonts/MaruBuri-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* 리치텍스트 에디터/렌더 */
 .rte-content:empty::before {
   content: attr(data-placeholder);
