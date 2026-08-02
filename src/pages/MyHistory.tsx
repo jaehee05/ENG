@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
+import { BackLink } from '../components/BackLink'
 import { deleteAttempt, listAttemptsForUser } from '../lib/firestore'
 import { WORDBOOK_ENABLED } from '../lib/features'
 import { MOCK_SUBJECT_LABEL, type Attempt, type MockSubject } from '../lib/types'
@@ -143,6 +144,7 @@ export function MyHistory() {
 
   return (
     <div className="space-y-5 max-w-4xl mx-auto">
+      <BackLink to="/more" label="더보기" />
       <header>
         <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
           나의 학습

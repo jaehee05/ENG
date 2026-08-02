@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
+import { BackLink } from '../components/BackLink'
 import {
   clearAllVocabAttemptLimits,
   deleteVocabSet,
@@ -242,6 +243,8 @@ export function VocabList({ manage = false }: { manage?: boolean }) {
 
   return (
     <div className="space-y-5 max-w-4xl mx-auto">
+      {/* 관리 목록은 관리 허브에서 들어온다 */}
+      <BackLink to={canManage ? '/admin' : '/vocab'} label={canManage ? '관리' : '단어 시험지'} />
       <header className="flex items-end justify-between gap-2 flex-wrap">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
