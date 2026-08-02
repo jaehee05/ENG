@@ -18,6 +18,20 @@ const TEXT_COLORS = [
   { name: '보라', color: '#7c3aed' },
 ]
 
+/**
+ * 치자마자 바꿔 넣는 글자.
+ *
+ * 국어 해설에서 꺾쇠는 거의 언제나 작품명에 두르는 홑화살괄호다. 그런데 이건
+ * 키보드로 바로 못 쳐서 매번 문자표를 뒤져야 했다. 치기 쉬운 부등호로 받아
+ * 옳은 글자로 바꿔 넣는다. 부등호 자체를 써야 할 일이 생기면 문자표에
+ * 등록해 두고 버튼으로 넣으면 된다 — 되돌리기로는 안 돌아온다(넣은 글자가
+ * 지워질 뿐이다).
+ */
+const AUTO_REPLACE: Record<string, string> = {
+  '<': '〈',
+  '>': '〉',
+}
+
 function newStyleId(): string {
   const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto
   return c?.randomUUID ? c.randomUUID() : `s${Date.now()}${Math.floor(Math.random() * 1000)}`
@@ -96,6 +110,37 @@ export function RichTextEditor({
   function emit() {
     if (ref.current) onChange(ref.current.innerHTML)
   }
+
+  // 최신 onChange 를 들고 있는다. 아래 beforeinput 은 네이티브 리스너라 한 번만
+  // 걸리는데, 부모가 매번 새 함수를 넘기면 처음 것에 붙잡히기 때문이다.
+  const onChangeRef = useRef(onChange)
+  useEffect(() => {
+    onChangeRef.current = onChange
+  }, [onChange])
+
+  /**
+   * 부등호를 홑화살괄호로 바꿔 넣는다 (AUTO_REPLACE 참고).
+   *
+   * React 의 onBeforeInput 이 아니라 네이티브 리스너를 쓰는 이유: contentEditable
+   * 에서는 합성 이벤트가 실제 입력을 못 막을 때가 있다. 한글은 조합 중에
+   * beforeinput 이 여러 번 오는데, 부등호는 조합 대상이 아니라 insertText 로
+   * 한 번에 들어와 끼어들 여지가 없다.
+   */
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    function onBeforeInput(ev: Event) {
+      const e = ev as InputEvent
+      if (e.inputType !== 'insertText' || !e.data) return
+      const next = AUTO_REPLACE[e.data]
+      if (!next) return
+      e.preventDefault()
+      document.execCommand('insertText', false, next)
+      if (el) onChangeRef.current(el.innerHTML)
+    }
+    el.addEventListener('beforeinput', onBeforeInput)
+    return () => el.removeEventListener('beforeinput', onBeforeInput)
+  }, [])
 
   function exec(cmd: string, arg?: string) {
     ref.current?.focus()
