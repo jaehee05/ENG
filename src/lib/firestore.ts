@@ -717,6 +717,38 @@ export async function createVocabAttempt(input: {
   return ref.id
 }
 
+/**
+ * 관리자가 점수만 손으로 넣는 단어 시험 기록.
+ *
+ * 앱에서 푼 것이 아니라 종이로 본 결과 등을 옮겨 적는 용도다. 어느 단어를
+ * 맞고 틀렸는지는 알 수 없으므로 vocabResults 를 지어내지 않는다 — 넣으면
+ * 결과 화면에서 학생이 틀리지도 않은 단어를 틀렸다고 보게 된다.
+ * 정답률·통과 판정은 correct/total 로 계산되므로 그대로 동작한다.
+ */
+export async function createManualVocabAttempt(input: {
+  studentUid: string
+  studentName: string
+  refId: string
+  refTitle: string
+  total: number
+  correct: number
+}): Promise<string> {
+  const total = Math.max(0, Math.trunc(input.total))
+  const correct = Math.min(total, Math.max(0, Math.trunc(input.correct)))
+  const ref = await addDoc(collection(db, 'attempts'), {
+    studentUid: input.studentUid,
+    studentName: input.studentName,
+    type: 'vocab',
+    refId: input.refId,
+    refTitle: input.refTitle,
+    total,
+    correct,
+    manual: true,
+    createdAt: serverTimestamp(),
+  })
+  return ref.id
+}
+
 export async function createWordbookAttempt(input: {
   studentUid: string
   studentName: string
