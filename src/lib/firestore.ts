@@ -807,6 +807,16 @@ export async function setExplStyles(list: ExplStyle[]): Promise<void> {
   await setDoc(doc(db, 'settings', 'explStyles'), { list })
 }
 
+// ───── 해설 문자표 (관리자가 미리 등록해 두는 기호, 전체 공통) ─────
+export async function getExplChars(): Promise<string[]> {
+  const snap = await getDoc(doc(db, 'settings', 'explChars'))
+  const list = snap.exists() ? (snap.data() as { list?: string[] }).list : null
+  return Array.isArray(list) ? list.filter((c) => typeof c === 'string') : []
+}
+export async function setExplChars(list: string[]): Promise<void> {
+  await setDoc(doc(db, 'settings', 'explChars'), { list })
+}
+
 export async function listKoreanMocks(): Promise<KoreanMock[]> {
   const snap = await getDocs(
     query(collection(db, 'koreanMocks'), orderBy('createdAt', 'desc')),

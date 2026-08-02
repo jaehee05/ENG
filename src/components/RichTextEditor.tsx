@@ -40,6 +40,8 @@ export function RichTextEditor({
   placeholder = '해설을 입력하세요…',
   styles,
   onStylesChange,
+  chars,
+  onCharsChange,
 }: {
   value: string
   onChange: (html: string) => void
@@ -48,6 +50,10 @@ export function RichTextEditor({
   styles?: ExplStyle[]
   /** 있으면 스타일 관리(추가/수정/삭제) UI가 표시됨. */
   onStylesChange?: (list: ExplStyle[]) => void
+  /** 미리 등록해 둔 문자표. 있으면 눌러서 넣는 버튼이 표시됨. */
+  chars?: string[]
+  /** 있으면 문자표 관리(추가/삭제) UI가 표시됨. */
+  onCharsChange?: (list: string[]) => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -55,6 +61,8 @@ export function RichTextEditor({
   const [handle, setHandle] = useState<{ left: number; top: number } | null>(null)
   const [mgr, setMgr] = useState(false)
   const [draft, setDraft] = useState<ExplStyle | null>(null)
+  const [charMgr, setCharMgr] = useState(false)
+  const [charDraft, setCharDraft] = useState('')
 
   useEffect(() => {
     if (ref.current && ref.current.innerHTML !== value) {
@@ -244,6 +252,28 @@ export function RichTextEditor({
     if (draft?.id === id) setDraft(null)
   }
 
+  // ── 문자표 ──
+  /** 커서 자리에 그대로 넣는다. 서식이 아니라 글자라 insertText 를 쓴다. */
+  function insertChar(ch: string) {
+    ref.current?.focus()
+    document.execCommand('insertText', false, ch)
+    emit()
+  }
+  function addChar() {
+    if (!onCharsChange) return
+    // 한 번에 여러 개를 붙여넣는 경우가 있다 — 공백으로 갈라 따로 등록한다.
+    const added = charDraft.split(/\s+/).filter(Boolean)
+    if (added.length === 0) return
+    const list = chars ?? []
+    // 이미 있는 건 넣지 않는다. 같은 버튼이 두 번 생기면 헷갈리기만 한다.
+    onCharsChange([...list, ...added.filter((c) => !list.includes(c))])
+    setCharDraft('')
+  }
+  function removeChar(ch: string) {
+    if (!onCharsChange) return
+    onCharsChange((chars ?? []).filter((c) => c !== ch))
+  }
+
   function onPaste(e: ClipboardEvent<HTMLDivElement>) {
     const html = e.clipboardData.getData('text/html')
     if (html) {
@@ -344,6 +374,92 @@ export function RichTextEditor({
               ⚙ 관리
             </button>
           )}
+        </div>
+      )}
+
+      {/* 문자표 — 미리 등록해 둔 기호를 눌러서 넣는다 */}
+      {(chars?.length || onCharsChange) && (
+        <div
+          className="flex flex-wrap items-center gap-1 px-1.5 py-1.5 border-b border-slate-200 bg-white"
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          <span className="text-[11px] text-slate-400 mr-0.5">문자</span>
+          {(chars ?? []).map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => insertChar(c)}
+              title={`${c} 넣기`}
+              className="h-7 min-w-[1.75rem] px-1.5 inline-flex items-center justify-center rounded-md border border-slate-300 text-sm hover:bg-slate-100 active:bg-slate-200"
+            >
+              {c}
+            </button>
+          ))}
+          {!chars?.length && onCharsChange && (
+            <span className="text-[11px] text-slate-400">등록된 문자 없음</span>
+          )}
+          {onCharsChange && (
+            <button
+              type="button"
+              onClick={() => setCharMgr((v) => !v)}
+              className="h-7 px-2 inline-flex items-center rounded-md border border-dashed border-slate-300 text-xs text-slate-500 hover:bg-slate-100"
+              title="문자표 관리"
+            >
+              ⚙ 관리
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* 문자표 관리 패널 */}
+      {charMgr && onCharsChange && (
+        <div className="border-b border-slate-200 bg-slate-50 px-2.5 py-2.5 space-y-2">
+          {(chars ?? []).length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {(chars ?? []).map((c) => (
+                <span
+                  key={c}
+                  className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white pl-2 pr-1 py-1 text-sm"
+                >
+                  {c}
+                  <button
+                    type="button"
+                    onClick={() => removeChar(c)}
+                    className="text-slate-400 hover:text-red-600 text-xs px-0.5"
+                    aria-label={`${c} 삭제`}
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <input
+              value={charDraft}
+              onChange={(e) => setCharDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  addChar()
+                }
+              }}
+              placeholder="넣을 문자 (예: ㉠ ㉡ ⇒ ∴) — 띄어쓰면 여러 개"
+              className="flex-1 min-w-0 rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-400"
+            />
+            <button
+              type="button"
+              onClick={addChar}
+              disabled={!charDraft.trim()}
+              className="shrink-0 rounded-md bg-brand-600 text-white text-xs font-medium px-3 py-1.5 hover:bg-brand-700 disabled:opacity-50"
+            >
+              추가
+            </button>
+          </div>
+          <p className="text-[11px] text-slate-400">
+            등록해 두면 모든 해설 입력칸에서 같은 버튼이 뜹니다. 키보드로 치기
+            번거로운 기호를 넣어두세요.
+          </p>
         </div>
       )}
 
