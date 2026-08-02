@@ -449,6 +449,12 @@ export interface KoreanMockQuestion {
    */
   explanationWrong?: string
   /**
+   * 이 문항에 대한 출제자 한마디 (HTML, 관리자 입력). 해설 아래에 따옴표로
+   * 감싸 보여준다. 시험 전체에 대한 한마디는 KoreanMock.examinerComment 로
+   * 따로 있다 — 이건 문항 하나에 붙는 말이다.
+   */
+  examinerNote?: string
+  /**
    * 오답 리뷰용 지문 원문. 모의고사는 종이 시험지로 풀기 때문에 응시 중에는
    * 쓰이지 않고, 채점 후 학생이 "틀린" 문항을 열었을 때만 펼쳐 보여준다.
    */
@@ -478,11 +484,12 @@ export function choiceSetMap(v: VocabSet): Map<string, VocabChoice> {
   return m
 }
 
-/** 정답/오답 어느 쪽이든 해설이 있는지. */
+/** 정답/오답/한마디 중 어느 하나라도 있는지 — 학생에게 보여줄 게 있는지. */
 export function hasMockExplanation(q: KoreanMockQuestion): boolean {
   return Boolean(
     q.explanation?.trim() ||
       q.explanationWrong?.trim() ||
+      q.examinerNote?.trim() ||
       mockWrongChoiceEntries(q).length > 0,
   )
 }
