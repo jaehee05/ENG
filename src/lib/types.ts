@@ -484,13 +484,33 @@ export function choiceSetMap(v: VocabSet): Map<string, VocabChoice> {
   return m
 }
 
+/**
+ * 태그만 남고 눈에 보이는 건 없는 HTML인지.
+ *
+ * 리치텍스트 입력칸을 다 지워도 브라우저가 `<br>` 이나 `<div><br></div>` 를
+ * 남긴다. 그대로 두면 trim() 이 빈 문자열이 아니라서 "해설 있음" 으로 저장되고,
+ * 학생 화면에는 제목만 있고 내용이 없는 칸이 뜬다.
+ *
+ * 글자가 없어도 이미지·표가 있으면 보여줄 게 있는 것이다.
+ */
+export function isBlankHtml(html: string | undefined | null): boolean {
+  if (!html) return true
+  if (/<(img|table|hr|video|iframe|svg)\b/i.test(html)) return false
+  const text = html
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;|&#160;|&#xa0;/gi, ' ')
+    // 눈에 안 보이는 공백들 — 줄바꿈 없는 공백, 폭 없는 공백, BOM
+    .replace(/[\u00a0\u200b\ufeff]/g, ' ')
+  return text.trim().length === 0
+}
+
 /** 정답/오답/한마디 중 어느 하나라도 있는지 — 학생에게 보여줄 게 있는지. */
 export function hasMockExplanation(q: KoreanMockQuestion): boolean {
-  return Boolean(
-    q.explanation?.trim() ||
-      q.explanationWrong?.trim() ||
-      q.examinerNote?.trim() ||
-      mockWrongChoiceEntries(q).length > 0,
+  return (
+    !isBlankHtml(q.explanation) ||
+    !isBlankHtml(q.explanationWrong) ||
+    !isBlankHtml(q.examinerNote) ||
+    mockWrongChoiceEntries(q).length > 0
   )
 }
 
@@ -510,7 +530,7 @@ export function mockWrongChoiceEntries(
         Number.isFinite(e.choice) &&
         e.choice !== q.answer &&
         typeof e.html === 'string' &&
-        e.html.trim().length > 0,
+        !isBlankHtml(e.html),
     )
     .sort((a, b) => a.choice - b.choice)
     .map((e) => ({ choice: e.choice, mark: choiceMark(e.choice), html: e.html }))
