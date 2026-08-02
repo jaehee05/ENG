@@ -17,6 +17,7 @@ import {
 } from 'firebase/firestore'
 import { db } from './firebase'
 import { formatPhoneKR } from './phone'
+import { normalizeSchool } from './school'
 import type { MockSubject, UserAccount, UserStatus } from './types'
 
 export function validatePassword(pw: string): void {
@@ -106,7 +107,7 @@ export async function updateAccountProfile(
   await updateDoc(doc(db, 'users', id), {
     displayName,
     email,
-    school: (patch.school ?? '').trim(),
+    school: normalizeSchool(patch.school),
     phone: formatPhoneKR(patch.phone),
     parentPhone: formatPhoneKR(patch.parentPhone),
   })
@@ -132,7 +133,7 @@ export async function signUpAccount(input: {
   validatePassword(input.password)
   const email = input.email.trim().toLowerCase()
   const displayName = input.displayName.trim()
-  const school = (input.school ?? '').trim()
+  const school = normalizeSchool(input.school)
   const phone = formatPhoneKR(input.phone)
   const parentPhone = formatPhoneKR(input.parentPhone)
 
@@ -245,7 +246,7 @@ export async function createPreregisteredStudent(input: {
     preregistered: true,
     createdAt: serverTimestamp(),
   }
-  const school = (input.school ?? '').trim()
+  const school = normalizeSchool(input.school)
   const parentPhone = formatPhoneKR(input.parentPhone)
   if (school) payload.school = school
   if (parentPhone) payload.parentPhone = parentPhone
