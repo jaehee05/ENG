@@ -2,12 +2,17 @@ import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import { formatPhoneKR } from '../lib/phone'
+import { normalizeSchool } from '../lib/school'
 
 export function Signup() {
   const { signUp } = useAuth()
   const navigate = useNavigate()
   const [displayName, setDisplayName] = useState('')
   const [school, setSchool] = useState('')
+  // 줄여 적은 학교 이름은 저장할 때 정식 명칭으로 펴진다(lib/school.ts).
+  const normalizedSchool = normalizeSchool(school)
+  const schoolPreview =
+    normalizedSchool && normalizedSchool !== school.trim() ? normalizedSchool : ''
   const [phone, setPhone] = useState('')
   const [parentPhone, setParentPhone] = useState('')
   const [email, setEmail] = useState('')
@@ -24,7 +29,7 @@ export function Signup() {
         email,
         password,
         displayName: displayName.trim(),
-        school: school.trim(),
+        school,
         phone: phone.trim(),
         parentPhone: parentPhone.trim(),
       })
@@ -80,9 +85,16 @@ export function Signup() {
               type="text"
               value={school}
               onChange={(e) => setSchool(e.target.value)}
-              placeholder="예: 한솔고등학교"
+              placeholder="예: 한솔고 (한솔고등학교로 저장됩니다)"
               className={inputCls}
             />
+            {/* 저장할 이름을 미리 보여 준다. 줄여 적었는데 목록에 다르게
+                뜨면 잘못 들어간 줄 안다. */}
+            {schoolPreview && (
+              <p className="text-[11px] text-slate-500">
+                <span className="text-slate-400">저장될 이름</span> {schoolPreview}
+              </p>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1.5">
