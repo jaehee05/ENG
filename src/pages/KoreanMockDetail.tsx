@@ -5,11 +5,13 @@ import {
   deleteAttempt,
   deleteKoreanMock,
   formatDate,
+  getExplChars,
   getExplStyles,
   getKoreanMock,
   listAttemptsForUser,
   listKoreanMockAttempts,
   regradeKoreanMockAttempts,
+  setExplChars,
   setExplStyles,
   updateKoreanMock,
 } from '../lib/firestore'
@@ -115,6 +117,8 @@ export function KoreanMockDetail() {
   /** Ctrl+S 로 창을 닫지 않고 저장했을 때 그 시각. 저장됐는지 눈으로 확인용. */
   const [explSavedAt, setExplSavedAt] = useState<string | null>(null)
   const [explStyles, setExplStylesState] = useState<ExplStyle[]>([])
+  // 미리 등록해 둔 문자표 (전체 공통). 스타일과 같은 자리에서 관리한다.
+  const [explChars, setExplCharsState] = useState<string[]>([])
   // 같은 모달 안에서 해설 / 오답 리뷰 지문을 탭으로 전환
   const [explTab, setExplTab] = useState<'expl' | 'passage'>('expl')
   const [passageDraft, setPassageDraft] = useState('')
@@ -159,6 +163,7 @@ export function KoreanMockDetail() {
   useEffect(() => {
     if (!isAdmin) return
     getExplStyles().then(setExplStylesState).catch(() => {})
+    getExplChars().then(setExplCharsState).catch(() => {})
   }, [isAdmin])
 
   async function saveExplStyles(list: ExplStyle[]) {
@@ -167,6 +172,15 @@ export function KoreanMockDetail() {
       await setExplStyles(list)
     } catch {
       // 실패 시 다음 열람 때 서버 값으로 복원됨
+    }
+  }
+
+  async function saveExplChars(list: string[]) {
+    setExplCharsState(list)
+    try {
+      await setExplChars(list)
+    } catch {
+      // 스타일과 같다 — 실패해도 다음 열람 때 서버 값으로 복원된다
     }
   }
 
@@ -800,6 +814,8 @@ export function KoreanMockDetail() {
                           onChange={setExplNoteDraft}
                           styles={explStyles}
                           onStylesChange={saveExplStyles}
+                          chars={explChars}
+                          onCharsChange={saveExplChars}
                         />
                       </div>
 
@@ -815,6 +831,8 @@ export function KoreanMockDetail() {
                           onChange={setExplDraft}
                           styles={explStyles}
                           onStylesChange={saveExplStyles}
+                          chars={explChars}
+                          onCharsChange={saveExplChars}
                         />
                       </div>
 
@@ -842,6 +860,8 @@ export function KoreanMockDetail() {
                                 }
                                 styles={explStyles}
                                 onStylesChange={saveExplStyles}
+                                chars={explChars}
+                                onCharsChange={saveExplChars}
                               />
                             </div>
                           ))}
