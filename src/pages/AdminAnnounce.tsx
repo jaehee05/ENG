@@ -1,6 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useAuth } from '../contexts/useAuth'
-import { BackLink } from '../components/BackLink'
 import { listAccounts } from '../lib/account'
 import {
   createAnnouncement,
@@ -170,7 +169,6 @@ export function AdminAnnounce() {
 
   return (
     <div className="space-y-5 max-w-4xl mx-auto">
-      <BackLink to="/admin" label="관리" />
       <header className="flex items-end justify-between gap-3 flex-wrap">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">

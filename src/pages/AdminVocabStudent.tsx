@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { BackLink } from '../components/BackLink'
 import { getAccount } from '../lib/account'
 import {
   createManualVocabAttempt,
@@ -180,8 +179,6 @@ export function AdminVocabStudent() {
 
   return (
     <div className="space-y-5 max-w-4xl mx-auto">
-      <BackLink to="/vocab" label="학생 목록" />
-
       <header className="flex items-end justify-between gap-2 flex-wrap">
         <div>
           <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">

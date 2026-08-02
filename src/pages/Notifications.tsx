@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import {
   deleteAllNotificationsForUser,
@@ -71,7 +71,6 @@ const kindOf = (k?: string): KindCfg => KIND[k ?? 'system'] ?? KIND.system
 
 export function Notifications() {
   const { profile } = useAuth()
-  const navigate = useNavigate()
   const [items, setItems] = useState<UserNotification[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -130,16 +129,9 @@ export function Notifications() {
 
   return (
     <div className="max-w-lg mx-auto">
+      {/* 뒤로가기는 헤더가 그린다 — 화면마다 자리와 모양이 달라지지 않게. */}
       <header className="flex items-center gap-2 mb-2">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          aria-label="뒤로"
-          className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-slate-100 text-slate-600"
-        >
-          ‹
-        </button>
-        <h1 className="flex-1 text-center text-base font-bold text-slate-900">알림</h1>
+        <h1 className="flex-1 text-base font-bold text-slate-900">알림</h1>
         {items.length > 0 ? (
           <button
             type="button"

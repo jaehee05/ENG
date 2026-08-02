@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
+import { useBackNav } from '../contexts/useBackNav'
 import { createKoreanMockAttempt, getKoreanMock } from '../lib/firestore'
 import {
   getMockSubject,
@@ -206,12 +207,22 @@ export function KoreanMockTake() {
         mockSubject: getMockSubject(mock),
         mockElectiveName: chosenElective?.name,
       })
-      navigate(`/korean-mocks/${mock.id}/result/${attemptId}`)
+      // replace — 제출한 시험을 기록에서 지운다 (VocabTake 와 같은 이유).
+      navigate(`/korean-mocks/${mock.id}/result/${attemptId}`, { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : '제출 실패')
       setSubmitting(false)
     }
   }
+
+  // 단어 시험 응시와 같은 규칙 — 답을 골라 둔 게 있으면 나가기 전에 묻는다.
+  // 인트로(!started)에서는 잃을 게 없으므로 그냥 나간다.
+  useBackNav({
+    confirmMessage:
+      started && answers.some((a) => a > 0)
+        ? '지금 나가면 표시한 답이 저장되지 않습니다. 나갈까요?'
+        : undefined,
+  })
 
   if (loading) return <p className="text-slate-500 text-sm">불러오는 중…</p>
   if (error) return <p className="text-red-600 text-sm">{error}</p>
