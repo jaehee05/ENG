@@ -63,8 +63,14 @@
    박아 넣고(WebKit), 한글·워드에서 붙여넣은 조각도 제 글꼴을 달고 온다.
    인라인 스타일은 선택자로는 못 이기므로 여기서 덮는다. 이미 저장된 해설도
    다시 손대지 않고 바로잡힌다. */
+/* AppleMyungjo 를 스택에 이름으로 직접 적어 두는 이유: 위 @font-face 의
+   local() 이 WKWebView 에서 안 잡히는 경우가 있다. 이름으로 적으면 일반 글꼴
+   조회를 타서 @font-face 지원 여부와 상관없이 닿는다. 나눔명조보다 앞에 두는
+   건 앞과 같은 이유 — 뒤에 두면 나눔명조가 싣고 있는 몇 자만 갈린다. 한글은
+   마루 부리가 다 갖고 있어 여기까지 내려오지 않는다. */
 .rte-content, .rte-content *, .rte-view, .rte-view * {
-  font-family: 'MaruBuri', 'HanjaMyeongjo', 'Nanum Myeongjo', serif !important;
+  font-family: 'MaruBuri', 'HanjaMyeongjo', 'AppleMyungjo', 'Nanum Myeongjo',
+    'Apple SD Gothic Neo', serif !important;
 }
 .rte-content td, .rte-content th, .rte-view td, .rte-view th { text-align: left; }
 .rte-view blockquote { margin-left: 1.5rem; }
