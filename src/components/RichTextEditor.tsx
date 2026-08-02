@@ -31,7 +31,29 @@ function cleanPastedHtml(html: string): string {
     .replace(/<(style|script|title|xml|head)[\s\S]*?<\/\1>/gi, '')
     .replace(/<\/?(meta|link|html|body|head|xml|o:p)[^>]*>/gi, '')
     .replace(/<!--[\s\S]*?-->/g, '')
-  return frag
+  return stripFontFamily(frag)
+}
+
+/**
+ * 글꼴 지정만 걷어낸다. 볼드·색 같은 서식은 그대로 둔다.
+ *
+ * 한글·워드에서 붙여넣으면 조각마다 제 글꼴이 인라인으로 따라온다. 그대로
+ * 두면 해설 안에서 글자체가 들쭉날쭉해진다 — 해설 글꼴은 앱이 정한다.
+ * (문자열 치환 대신 DOM 으로 지우는 이유: font-family 값에 따옴표가 섞여 있어
+ *  정규식으로 자르면 `"맑은 고딕"` 같은 찌꺼기가 남는다.)
+ */
+function stripFontFamily(html: string): string {
+  try {
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    doc.body.querySelectorAll<HTMLElement>('[style]').forEach((el) => {
+      el.style.removeProperty('font-family')
+      if (!el.getAttribute('style')?.trim()) el.removeAttribute('style')
+    })
+    doc.body.querySelectorAll('font[face]').forEach((el) => el.removeAttribute('face'))
+    return doc.body.innerHTML
+  } catch {
+    return html
+  }
 }
 
 export function RichTextEditor({
