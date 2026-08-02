@@ -34,6 +34,10 @@
    쓰면서 보는 모양과 학생이 보는 모양이 어긋나지 않는다.
    표 칸은 좁아서 양쪽 정렬하면 자간이 벌어지므로 왼쪽으로 되돌린다. */
 .rte-content, .rte-view { text-align: justify; }
+/* 해설 본문 글자체도 마루 부리. 출제자의 한마디와 같은 목소리로 읽히고,
+   시험지 지문(나눔명조)과도 결이 맞는다. 편집기까지 거는 건 위와 같은 이유 —
+   폰트가 아직 안 받아졌으면 이미 실려 있는 나눔명조로 떨어진다. */
+.rte-content, .rte-view { font-family: 'MaruBuri', 'Nanum Myeongjo', serif; }
 .rte-content td, .rte-content th, .rte-view td, .rte-view th { text-align: left; }
 .rte-view blockquote { margin-left: 1.5rem; }
 .rte-view p { margin: 0 0 0.35rem; }
