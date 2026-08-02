@@ -639,6 +639,34 @@ export function KoreanMockResult() {
                     <MockPassageReview question={passageQ} subject={subj} />
                   )}
 
+                  {/* 문항별 출제자 한마디. 해설보다 먼저 온다 — 어떻게 봐야
+                      하는 문제인지 짚어주고 해설로 들어가는 순서다. 따옴표로
+                      감싸는 건 결과 화면 위쪽의 시험 전체 한마디와 같은 모양 —
+                      같은 사람의 말이라는 걸 생김새로 알아보게. */}
+                  {explQ?.examinerNote && (
+                    <div className="rounded-xl bg-slate-50 p-4">
+                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white text-slate-400 overflow-hidden">
+                        <span className="font-serif text-3xl leading-none translate-y-[0.18em]">
+                          &ldquo;
+                        </span>
+                      </span>
+                      <p className="mt-2 text-sm font-bold text-slate-900">
+                        출제자의 한마디
+                      </p>
+                      <div
+                        className="rte-view mt-1 text-sm text-slate-600"
+                        dangerouslySetInnerHTML={{ __html: explQ.examinerNote }}
+                      />
+                      <div className="flex justify-end mt-1">
+                        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white text-slate-400 overflow-hidden">
+                          <span className="font-serif text-3xl leading-none translate-y-[0.18em]">
+                            &rdquo;
+                          </span>
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
                   {explQ?.explanation && (
                     <div>
                       <p className="text-xs font-semibold text-slate-500 mb-1.5">
@@ -688,34 +716,6 @@ export function KoreanMockResult() {
                         className="rte-view text-sm text-slate-800"
                         dangerouslySetInnerHTML={{ __html: explQ.explanationWrong }}
                       />
-                    </div>
-                  )}
-
-                  {/* 문항별 출제자 한마디. 해설을 다 읽은 뒤에 오는 말이라
-                      맨 아래에 둔다. 따옴표로 감싸는 건 결과 화면 위쪽의
-                      시험 전체 한마디와 같은 모양 — 같은 사람의 말이라는 걸
-                      생김새로 알아보게. */}
-                  {explQ?.examinerNote && (
-                    <div className="rounded-xl bg-slate-50 p-4">
-                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white text-slate-400 overflow-hidden">
-                        <span className="font-serif text-3xl leading-none translate-y-[0.18em]">
-                          &ldquo;
-                        </span>
-                      </span>
-                      <p className="mt-2 text-sm font-bold text-slate-900">
-                        출제자의 한마디
-                      </p>
-                      <div
-                        className="rte-view mt-1 text-sm text-slate-600"
-                        dangerouslySetInnerHTML={{ __html: explQ.examinerNote }}
-                      />
-                      <div className="flex justify-end mt-1">
-                        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white text-slate-400 overflow-hidden">
-                          <span className="font-serif text-3xl leading-none translate-y-[0.18em]">
-                            &rdquo;
-                          </span>
-                        </span>
-                      </div>
                     </div>
                   )}
 
