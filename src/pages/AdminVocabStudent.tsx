@@ -10,6 +10,7 @@ import {
   listVocabSets,
 } from '../lib/firestore'
 import { sheetStatuses, summarizeVocab } from '../lib/vocabStatus'
+import { parseVocabResultTable } from '../lib/parseVocabResultTable'
 import {
   isVisibleToStudent,
   type Attempt,
@@ -41,6 +42,8 @@ export function AdminVocabStudent() {
   const [manualFor, setManualFor] = useState<string | null>(null)
   const [manualCorrect, setManualCorrect] = useState('')
   const [manualSaving, setManualSaving] = useState(false)
+  /** 지난 결과표를 붙여넣는 칸. 비어 있으면 '맞은 개수' 만으로 기록한다. */
+  const [manualPaste, setManualPaste] = useState('')
 
   useEffect(() => {
     if (!uid) return
@@ -108,13 +111,28 @@ export function AdminVocabStudent() {
     }
   }
 
+  const parsedPaste = useMemo(
+    () => (manualPaste.trim() ? parseVocabResultTable(manualPaste) : null),
+    [manualPaste],
+  )
+
   async function handleManualSave(set: VocabSet) {
     if (!account) return
-    const total = set.words?.length ?? 0
-    const n = Number.parseInt(manualCorrect, 10)
-    if (!Number.isFinite(n) || n < 0 || n > total) {
-      setError(`맞은 개수는 0 ~ ${total} 사이여야 합니다.`)
-      return
+    const rows = parsedPaste?.rows ?? []
+    const setTotal = set.words?.length ?? 0
+    let total = setTotal
+    let n = 0
+    if (rows.length > 0) {
+      // 붙여넣은 표가 있으면 그것이 곧 문항 수다. 시험지 단어 수와 달라도
+      // (문항 범위를 좁혀 봤거나 교재가 그 뒤 바뀌었거나) 본 대로 남긴다.
+      total = rows.length
+      n = rows.filter((r) => r.correct).length
+    } else {
+      n = Number.parseInt(manualCorrect, 10)
+      if (!Number.isFinite(n) || n < 0 || n > setTotal) {
+        setError(`맞은 개수는 0 ~ ${setTotal} 사이여야 합니다.`)
+        return
+      }
     }
     setManualSaving(true)
     setError(null)
@@ -124,6 +142,7 @@ export function AdminVocabStudent() {
         studentName: account.displayName,
         refId: set.id,
         refTitle: set.title,
+        vocabResults: rows.length > 0 ? rows : undefined,
         total,
         correct: n,
       })
@@ -140,12 +159,14 @@ export function AdminVocabStudent() {
           total,
           correct: n,
           manual: true,
+          ...(rows.length > 0 ? { vocabResults: rows } : {}),
           createdAt: null,
         },
         ...prev,
       ])
       setManualFor(null)
       setManualCorrect('')
+      setManualPaste('')
     } catch (e) {
       setError(e instanceof Error ? e.message : '결과 입력 실패')
     } finally {
@@ -254,6 +275,7 @@ export function AdminVocabStudent() {
                           onClick={() => {
                             setManualFor(r.set.id)
                             setManualCorrect('')
+                            setManualPaste('')
                           }}
                           className="text-[11px] text-brand-700 hover:underline"
                         >
@@ -267,39 +289,88 @@ export function AdminVocabStudent() {
 
               {/* 앱에서 풀지 않고 종이로 본 결과를 옮겨 적는 자리 */}
               {manualFor === r.set.id && (
-                <div className="mt-2.5 pt-2.5 border-t border-slate-100 flex items-center gap-2 flex-wrap">
-                  <label className="text-[11px] text-slate-500">맞은 개수</label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={r.set.words?.length ?? 0}
-                    value={manualCorrect}
-                    onChange={(e) => setManualCorrect(e.target.value)}
-                    autoFocus
-                    className="w-20 rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  />
-                  <span className="text-[11px] text-slate-400">
-                    / {r.set.words?.length ?? 0}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => handleManualSave(r.set)}
-                    disabled={manualSaving}
-                    className="rounded-md bg-slate-900 text-white text-[11px] font-medium px-2.5 py-1 hover:bg-slate-800 disabled:opacity-50"
-                  >
-                    {manualSaving ? '저장 중…' : '저장'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setManualFor(null)}
-                    className="text-[11px] text-slate-500 hover:text-slate-900"
-                  >
-                    취소
-                  </button>
-                  <p className="w-full text-[10px] text-slate-400">
-                    앱에서 푼 기록이 아니라 점수만 남습니다. 어느 단어를 틀렸는지는
-                    기록되지 않습니다.
-                  </p>
+                <div className="mt-2.5 pt-2.5 border-t border-slate-100 space-y-2">
+                  <div>
+                    <label className="block text-[11px] text-slate-500 mb-1">
+                      지난 결과표 붙여넣기{' '}
+                      <span className="text-slate-400">
+                        (영단어 · 내 답 · 정답 · 결과 순서. 머리글이 있어도 됩니다)
+                      </span>
+                    </label>
+                    <textarea
+                      value={manualPaste}
+                      onChange={(e) => setManualPaste(e.target.value)}
+                      rows={4}
+                      autoFocus
+                      placeholder={'1\nsharpen\n날을 갈다\n날카롭게 하다\n정답\n…'}
+                      className="w-full rounded border border-slate-300 px-2 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    />
+                    {parsedPaste && (
+                      <p className="text-[11px] mt-1">
+                        {parsedPaste.rows.length > 0 ? (
+                          <span className="text-brand-700">
+                            {parsedPaste.rows.length}문항 인식 · 정답{' '}
+                            {parsedPaste.rows.filter((x) => x.correct).length}개
+                            {parsedPaste.rows.length !== (r.set.words?.length ?? 0) &&
+                              ` (시험지는 ${r.set.words?.length ?? 0}단어)`}
+                          </span>
+                        ) : (
+                          <span className="text-amber-700">
+                            읽어낸 문항이 없습니다. 각 줄 끝이 정답/오답인지 확인하세요.
+                          </span>
+                        )}
+                        {parsedPaste.skipped > 0 && (
+                          <span className="text-amber-700">
+                            {' '}· 건너뛴 줄 {parsedPaste.skipped}개
+                          </span>
+                        )}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* 표가 없을 때만 점수로 받는다 — 둘 다 넣으면 뭐가 이겼는지 헷갈린다 */}
+                  {(parsedPaste?.rows.length ?? 0) === 0 && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <label className="text-[11px] text-slate-500">
+                        표가 없으면 맞은 개수만
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={r.set.words?.length ?? 0}
+                        value={manualCorrect}
+                        onChange={(e) => setManualCorrect(e.target.value)}
+                        className="w-20 rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                      />
+                      <span className="text-[11px] text-slate-400">
+                        / {r.set.words?.length ?? 0}
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        · 어느 단어를 틀렸는지는 기록되지 않습니다
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleManualSave(r.set)}
+                      disabled={manualSaving}
+                      className="rounded-md bg-slate-900 text-white text-[11px] font-medium px-2.5 py-1 hover:bg-slate-800 disabled:opacity-50"
+                    >
+                      {manualSaving ? '저장 중…' : '저장'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setManualFor(null)}
+                      className="text-[11px] text-slate-500 hover:text-slate-900"
+                    >
+                      취소
+                    </button>
+                    <span className="text-[10px] text-slate-400">
+                      앱에서 푼 기록이 아니라 옮겨 적은 기록으로 표시됩니다.
+                    </span>
+                  </div>
                 </div>
               )}
 

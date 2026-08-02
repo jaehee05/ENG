@@ -718,24 +718,35 @@ export async function createVocabAttempt(input: {
 }
 
 /**
- * 관리자가 점수만 손으로 넣는 단어 시험 기록.
+ * 관리자가 손으로 넣는 단어 시험 기록. 앱에서 푼 것이 아니라 지난 결과를
+ * 옮겨 적는 용도다.
  *
- * 앱에서 푼 것이 아니라 종이로 본 결과 등을 옮겨 적는 용도다. 어느 단어를
- * 맞고 틀렸는지는 알 수 없으므로 vocabResults 를 지어내지 않는다 — 넣으면
- * 결과 화면에서 학생이 틀리지도 않은 단어를 틀렸다고 보게 된다.
- * 정답률·통과 판정은 correct/total 로 계산되므로 그대로 동작한다.
+ * 두 가지로 쓴다.
+ * - 결과표를 붙여넣은 경우: vocabResults 를 그대로 담는다. 총점·정답 수는
+ *   거기서 세므로 total/correct 는 받지 않는다.
+ * - 점수만 아는 경우: total/correct 만 넣고 vocabResults 는 비운다.
+ *   어느 단어를 틀렸는지 모르는 채로 지어내면, 학생이 결과 화면에서
+ *   틀리지도 않은 단어를 틀렸다고 보게 된다.
+ *
+ * 어느 쪽이든 manual 로 표시해 앱에서 푼 기록과 구분한다.
  */
 export async function createManualVocabAttempt(input: {
   studentUid: string
   studentName: string
   refId: string
   refTitle: string
-  total: number
-  correct: number
+  /** 결과표를 붙여넣은 경우. 있으면 total/correct 는 무시된다. */
+  vocabResults?: VocabResult[]
+  total?: number
+  correct?: number
 }): Promise<string> {
-  const total = Math.max(0, Math.trunc(input.total))
-  const correct = Math.min(total, Math.max(0, Math.trunc(input.correct)))
-  const ref = await addDoc(collection(db, 'attempts'), {
+  const rows = input.vocabResults ?? []
+  const total = rows.length > 0 ? rows.length : Math.max(0, Math.trunc(input.total ?? 0))
+  const correct =
+    rows.length > 0
+      ? rows.filter((r) => r.correct).length
+      : Math.min(total, Math.max(0, Math.trunc(input.correct ?? 0)))
+  const payload: Record<string, unknown> = {
     studentUid: input.studentUid,
     studentName: input.studentName,
     type: 'vocab',
@@ -745,7 +756,9 @@ export async function createManualVocabAttempt(input: {
     correct,
     manual: true,
     createdAt: serverTimestamp(),
-  })
+  }
+  if (rows.length > 0) payload.vocabResults = rows
+  const ref = await addDoc(collection(db, 'attempts'), payload)
   return ref.id
 }
 
