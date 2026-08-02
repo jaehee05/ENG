@@ -628,6 +628,11 @@ export interface Attempt {
   correct: number
   /** True when this attempt is a 연습(practice) run — excluded from maxAttempts limit. */
   practice?: boolean
+  /**
+   * 관리자가 점수만 손으로 넣은 기록. 학생이 앱에서 푼 것이 아니라
+   * 종이로 본 결과 등을 옮겨 적은 것이라, 문항별 내역(vocabResults)이 없다.
+   */
+  manual?: boolean
   vocabResults?: VocabResult[]
   readingResults?: ReadingResult[]
   koreanMockResults?: KoreanMockResult[]

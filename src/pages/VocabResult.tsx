@@ -89,6 +89,13 @@ export function VocabResult() {
           <div className="col-span-3">정답</div>
           <div className="col-span-1 text-center">결과</div>
         </div>
+        {results.length === 0 && (
+          <p className="px-4 py-6 text-center text-sm text-slate-500">
+            {attempt?.manual
+              ? '관리자가 점수만 입력한 기록이라 문항별 내역이 없습니다.'
+              : '문항별 내역이 없습니다.'}
+          </p>
+        )}
         {results.map((r, i) => (
           <div key={i} className={r.correct ? '' : 'bg-red-50/40'}>
           <div

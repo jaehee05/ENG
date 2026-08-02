@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { BackLink } from '../components/BackLink'
 import { getAccount } from '../lib/account'
 import {
+  createManualVocabAttempt,
   deleteAttempt,
   formatDate,
   listAttemptsForUser,
@@ -36,6 +37,10 @@ export function AdminVocabStudent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  /** 점수를 손으로 넣는 중인 시험지 id. 종이로 본 결과를 옮겨 적을 때 쓴다. */
+  const [manualFor, setManualFor] = useState<string | null>(null)
+  const [manualCorrect, setManualCorrect] = useState('')
+  const [manualSaving, setManualSaving] = useState(false)
 
   useEffect(() => {
     if (!uid) return
@@ -100,6 +105,51 @@ export function AdminVocabStudent() {
       setError(e instanceof Error ? e.message : '기록 삭제 실패')
     } finally {
       setDeletingId(null)
+    }
+  }
+
+  async function handleManualSave(set: VocabSet) {
+    if (!account) return
+    const total = set.words?.length ?? 0
+    const n = Number.parseInt(manualCorrect, 10)
+    if (!Number.isFinite(n) || n < 0 || n > total) {
+      setError(`맞은 개수는 0 ~ ${total} 사이여야 합니다.`)
+      return
+    }
+    setManualSaving(true)
+    setError(null)
+    try {
+      const id = await createManualVocabAttempt({
+        studentUid: account.id,
+        studentName: account.displayName,
+        refId: set.id,
+        refTitle: set.title,
+        total,
+        correct: n,
+      })
+      // 목록을 다시 읽지 않고 로컬에 얹는다. createdAt 은 서버 시각이라
+      // 아직 모르지만, 화면에서는 '방금' 자리에 두면 된다.
+      setAttempts((prev) => [
+        {
+          id,
+          studentUid: account.id,
+          studentName: account.displayName,
+          type: 'vocab',
+          refId: set.id,
+          refTitle: set.title,
+          total,
+          correct: n,
+          manual: true,
+          createdAt: null,
+        },
+        ...prev,
+      ])
+      setManualFor(null)
+      setManualCorrect('')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '결과 입력 실패')
+    } finally {
+      setManualSaving(false)
     }
   }
 
@@ -194,12 +244,64 @@ export function AdminVocabStudent() {
                       </p>
                     </>
                   ) : (
-                    <span className="inline-block rounded-full bg-slate-100 text-slate-500 text-[11px] font-medium px-2 py-0.5">
-                      미응시
-                    </span>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="inline-block rounded-full bg-slate-100 text-slate-500 text-[11px] font-medium px-2 py-0.5">
+                        미응시
+                      </span>
+                      {manualFor !== r.set.id && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setManualFor(r.set.id)
+                            setManualCorrect('')
+                          }}
+                          className="text-[11px] text-brand-700 hover:underline"
+                        >
+                          결과 입력
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
+
+              {/* 앱에서 풀지 않고 종이로 본 결과를 옮겨 적는 자리 */}
+              {manualFor === r.set.id && (
+                <div className="mt-2.5 pt-2.5 border-t border-slate-100 flex items-center gap-2 flex-wrap">
+                  <label className="text-[11px] text-slate-500">맞은 개수</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={r.set.words?.length ?? 0}
+                    value={manualCorrect}
+                    onChange={(e) => setManualCorrect(e.target.value)}
+                    autoFocus
+                    className="w-20 rounded border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                  <span className="text-[11px] text-slate-400">
+                    / {r.set.words?.length ?? 0}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleManualSave(r.set)}
+                    disabled={manualSaving}
+                    className="rounded-md bg-slate-900 text-white text-[11px] font-medium px-2.5 py-1 hover:bg-slate-800 disabled:opacity-50"
+                  >
+                    {manualSaving ? '저장 중…' : '저장'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setManualFor(null)}
+                    className="text-[11px] text-slate-500 hover:text-slate-900"
+                  >
+                    취소
+                  </button>
+                  <p className="w-full text-[10px] text-slate-400">
+                    앱에서 푼 기록이 아니라 점수만 남습니다. 어느 단어를 틀렸는지는
+                    기록되지 않습니다.
+                  </p>
+                </div>
+              )}
 
               {/* 연습도 함께 — 지울 수 있어야 하므로 목록에 낸다 */}
               {[...r.tries, ...r.practiceTries].length > 0 && (
@@ -212,6 +314,12 @@ export function AdminVocabStudent() {
                       {a.practice && (
                         <span className="shrink-0 rounded bg-amber-50 text-amber-700 border border-amber-200 px-1 py-0.5 text-[10px]">
                           연습
+                        </span>
+                      )}
+                      {/* 점수만 옮겨 적은 기록. 앱에서 푼 것과 구분한다. */}
+                      {a.manual && (
+                        <span className="shrink-0 rounded bg-slate-100 text-slate-600 border border-slate-200 px-1 py-0.5 text-[10px]">
+                          수동 입력
                         </span>
                       )}
                       <span className="text-slate-600">
