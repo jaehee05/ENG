@@ -326,8 +326,10 @@ export function KoreanMockResult() {
               &ldquo;
             </span>
           </span>
-          <p className="mt-3 text-base font-bold text-slate-900">출제자의 한마디</p>
-          <p className="mt-1.5 text-sm text-slate-500 leading-relaxed whitespace-pre-wrap">
+          <p className="mt-3 text-base font-bold text-slate-900 font-maruburi">
+            출제자의 한마디
+          </p>
+          <p className="mt-1.5 text-sm text-slate-500 leading-loose whitespace-pre-wrap font-maruburi">
             {mock.examinerComment}
           </p>
           <div className="flex justify-end mt-2">
@@ -650,11 +652,11 @@ export function KoreanMockResult() {
                           &ldquo;
                         </span>
                       </span>
-                      <p className="mt-2 text-sm font-bold text-slate-900">
+                      <p className="mt-2 text-sm font-bold text-slate-900 font-maruburi">
                         출제자의 한마디
                       </p>
                       <div
-                        className="rte-view mt-1 text-sm text-slate-600"
+                        className="rte-view mt-1 text-sm text-slate-600 leading-loose font-maruburi"
                         dangerouslySetInnerHTML={{ __html: explQ.examinerNote }}
                       />
                       <div className="flex justify-end mt-1">
