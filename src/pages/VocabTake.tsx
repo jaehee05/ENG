@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
+import { useBackNav } from '../contexts/useBackNav'
 import {
   createVocabAttempt,
   getVocabSet,
@@ -8,7 +9,6 @@ import {
 } from '../lib/firestore'
 import { gradeVocabAnswers } from '../lib/grading'
 import { reshuffleChoices } from '../lib/vocabChoices'
-import { BackLink } from '../components/BackLink'
 import { highlightHead } from '../lib/highlightWord'
 import {
   getVocabFormat,
@@ -176,12 +176,23 @@ export function VocabTake() {
         refTitle: set.title,
         vocabResults: results,
       })
-      navigate(`/vocab/${set.id}/result/${attemptId}`)
+      // replace — 제출한 시험지를 기록에서 지운다. 안 그러면 결과에서
+      // 뒤로가기(또는 스와이프)로 방금 낸 시험으로 되돌아간다.
+      navigate(`/vocab/${set.id}/result/${attemptId}`, { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : '제출에 실패했습니다.')
       setSubmitting(false)
     }
   }
+
+  // 답을 하나라도 썼으면 나가기 전에 확인을 받는다. 목적지(시험지 상세)는
+  // 라우트 표에 있으므로 여기선 문구만 얹는다.
+  useBackNav({
+    confirmMessage:
+      answered > 0
+        ? '지금 나가면 입력한 답이 저장되지 않습니다. 나갈까요?'
+        : undefined,
+  })
 
   if (loading) return <p className="text-slate-500 text-sm">불러오는 중...</p>
   if (error) return <p className="text-red-600 text-sm">{error}</p>
@@ -212,15 +223,6 @@ export function VocabTake() {
     // 문제 글자를 못 집게 한다 — 길게 눌러 사전을 띄우면 시험이 아니다.
     // 답 입력칸은 index.css 에서 도로 켜 둔다.
     <div className="space-y-5 max-w-3xl mx-auto exam-noselect">
-      <BackLink
-        to={`/vocab/${set.id}`}
-        label="시험지"
-        confirmMessage={
-          answered > 0
-            ? '지금 나가면 입력한 답이 저장되지 않습니다. 나갈까요?'
-            : undefined
-        }
-      />
       <header className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BackLink } from '../components/BackLink'
 import { useAuth } from '../contexts/useAuth'
+import { useBackNav } from '../contexts/useBackNav'
 import { createWordbookAttempt } from '../lib/firestore'
 import { gradeVocabAnswers } from '../lib/grading'
 import { listMyWordbook } from '../lib/wordbook'
@@ -50,12 +50,21 @@ export function WordbookTake() {
         studentName: profile.displayName,
         vocabResults: results,
       })
-      navigate(`/wordbook/result/${attemptId}`)
+      // replace — 제출한 시험을 기록에서 지운다 (VocabTake 와 같은 이유).
+      navigate(`/wordbook/result/${attemptId}`, { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : '제출에 실패했습니다.')
       setSubmitting(false)
     }
   }
+
+  // 단어 시험지 응시와 같은 이유 — 쓴 답이 있으면 나가기 전에 한 번 묻는다.
+  useBackNav({
+    confirmMessage:
+      answered > 0
+        ? '지금 나가면 입력한 답이 저장되지 않습니다. 나갈까요?'
+        : undefined,
+  })
 
   if (loading) return <p className="text-slate-500 text-sm">불러오는 중...</p>
   if (error) return <p className="text-red-600 text-sm">{error}</p>
@@ -76,15 +85,6 @@ export function WordbookTake() {
   return (
     // 단어 시험지와 같은 이유로 글자를 못 집게 한다 (사전 띄우기 방지).
     <div className="space-y-5 max-w-3xl mx-auto exam-noselect">
-      <BackLink
-        to="/wordbook"
-        label="내 단어장"
-        confirmMessage={
-          answered > 0
-            ? '지금 나가면 입력한 답이 저장되지 않습니다. 나갈까요?'
-            : undefined
-        }
-      />
       <header>
         <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
           단어 시험

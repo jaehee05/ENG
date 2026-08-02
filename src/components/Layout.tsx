@@ -3,7 +3,13 @@ import { Link, NavLink, Outlet, useNavigate, useLocation } from 'react-router-do
 import { Capacitor } from '@capacitor/core'
 import { FirebaseMessaging } from '@capacitor-firebase/messaging'
 import { useAuth } from '../contexts/useAuth'
+import {
+  BackNavContext,
+  type BackOverride,
+} from '../contexts/backNavContextValue'
 import { unreadNotificationCount } from '../lib/firestore'
+import { resolveBackTarget } from '../lib/backNav'
+import { NAV_QUERY, useMediaQuery } from '../lib/useMediaQuery'
 import { accountSubjects } from '../lib/types'
 import { WORDBOOK_ENABLED } from '../lib/features'
 
@@ -81,6 +87,21 @@ const moreIcon = (
   </svg>
 )
 
+const backIcon = (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M15 18l-7-6 7-6" />
+  </svg>
+)
+
 const adminGearIcon = (
   <svg {...iconProps}>
     <circle cx="12" cy="12" r="3" />
@@ -126,6 +147,7 @@ export function Layout() {
   const location = useLocation()
   const isAdmin = profile?.role === 'admin'
   const [unread, setUnread] = useState(0)
+  const [backOverride, setBackOverride] = useState<BackOverride | null>(null)
 
   useEffect(() => {
     if (!profile) return
@@ -211,18 +233,78 @@ export function Layout() {
         bottomTabs[3],
       ])
 
+  // ── 헤더 뒤로가기 ──
+  // 지금 떠 있는 네비에 그 경로가 있으면 뒤로가기를 감춘다 — 한 번에 닿는
+  // 곳에 뒤로가기를 다는 건 군더더기다. 화면 폭에 따라 네비가 달라지므로
+  // (아이폰은 탭 5개, 아이패드부터는 전체 메뉴) 판정도 폭을 따라간다.
+  // 예: '기록'은 아이패드에선 탭이라 뒤로가기가 없고, 아이폰에선 '더보기'
+  // 안에 있으므로 '← 더보기'가 붙는다.
+  const wideNav = useMediaQuery(NAV_QUERY)
+  const visibleNav = wideNav ? desktopNav : mobileNav
+  const isNavRoot = visibleNav.some((i) => i.to === location.pathname)
+
+  // location.key 가 'default' 인 건 앱에 들어와 처음 그린 화면일 때뿐이다.
+  // 푸시 알림으로 바로 열렸거나 링크를 직접 열었거나 새로고침한 경우로,
+  // 되돌아갈 앱 내부 기록이 없다. 그때만 표의 경로로 보낸다.
+  const hasHistory = location.key !== 'default'
+
+  const fallbackBack = resolveBackTarget(location.pathname, isAdmin)
+  const backTo = backOverride?.to ?? fallbackBack?.to
+  // 이름은 실제로 눌렀을 때 가는 곳을 말해야 한다. 기록을 되짚어 갈 땐 어디로
+  // 가는지 알 길이 없으므로(라우터가 알려주지 않는다) 그냥 '뒤로' 라고 쓴다.
+  // 목적지 이름은 표의 경로로 보내는 경우 — 기록이 없을 때 — 에만 쓴다.
+  // 예: 기록에서 결과로 들어오면 '뒤로'(→기록), 푸시로 결과가 바로 열리면
+  // '시험지'(→시험지 상세).
+  const back =
+    !isNavRoot && backTo
+      ? {
+          to: backTo,
+          label: hasHistory
+            ? '뒤로'
+            : (backOverride?.label ?? fallbackBack?.label ?? '뒤로'),
+          confirmMessage: backOverride?.confirmMessage,
+        }
+      : null
+
+  function goBack() {
+    if (!back) return
+    if (back.confirmMessage && !window.confirm(back.confirmMessage)) return
+    if (hasHistory) navigate(-1)
+    else navigate(back.to)
+  }
+
   return (
     <div className="h-dvh flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
       {/* 상단 미니멀 헤더 */}
       <header className="bg-white border-b border-slate-200 safe-top safe-x">
         <div className="max-w-6xl xl:max-w-7xl 2xl:max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-3">
-          <Link
-            to="/"
-            className="text-[15px] font-semibold tracking-tight text-slate-900 flex items-center gap-1.5"
-          >
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-brand-500" />
-            KJHEDU
-          </Link>
+          {/* 뒤로가기가 있는 화면에선 로고 자리를 내준다 — 아이폰 폭에서 둘을
+              같이 두면 이름이 잘린다. 로고는 어차피 홈으로 가는 링크였고,
+              홈은 탭바에 있다. */}
+          {back ? (
+            <button
+              type="button"
+              onClick={goBack}
+              className="-ml-2 h-11 pl-1.5 pr-3 min-w-0 inline-flex items-center gap-0.5 rounded-lg text-[15px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 active:bg-slate-100 transition"
+            >
+              {/* 목적지 이름만 적힌 경우('시험지') 읽어주는 기기에는 그게 뒤로
+                  가는 버튼이라는 걸 따로 알려준다. 이름이 이미 '뒤로' 면
+                  덧붙이지 않는다 — "뒤로가기 뒤로" 로 읽힌다. */}
+              {back.label !== '뒤로' && <span className="sr-only">뒤로가기 </span>}
+              <span className="shrink-0" aria-hidden>
+                {backIcon}
+              </span>
+              <span className="truncate">{back.label}</span>
+            </button>
+          ) : (
+            <Link
+              to="/"
+              className="text-[15px] font-semibold tracking-tight text-slate-900 flex items-center gap-1.5"
+            >
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-brand-500" />
+              KJHEDU
+            </Link>
+          )}
 
           <div className="flex items-center gap-1.5">
             <span className="hidden sm:inline text-xs text-slate-500">
@@ -253,7 +335,9 @@ export function Layout() {
       {/* 본문 */}
       <main className="flex-1 overflow-y-auto overscroll-contain safe-x">
         <div className="max-w-6xl xl:max-w-7xl 2xl:max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7 pb-6">
-          <Outlet />
+          <BackNavContext.Provider value={setBackOverride}>
+            <Outlet />
+          </BackNavContext.Provider>
         </div>
       </main>
 

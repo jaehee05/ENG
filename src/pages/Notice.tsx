@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { listAnnouncements } from '../lib/firestore'
-import { BackLink } from '../components/BackLink'
 import type { Announcement } from '../lib/types'
 
 function fmtDate(ts: { toDate: () => Date } | null | undefined): string {
@@ -38,7 +37,6 @@ export function Notice() {
 
   return (
     <div className="space-y-5 max-w-3xl mx-auto">
-      <BackLink to="/more" label="더보기" />
       <header>
         <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
           KJHEDU

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { BackLink } from '../components/BackLink'
 import {
   getAttempt,
   getReading,
@@ -225,7 +224,6 @@ export function ReadingResult() {
 
   return (
     <div className="space-y-5 max-w-3xl mx-auto">
-      <BackLink to="/reading" label="지문 목록" />
       <header>
         <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
           결과

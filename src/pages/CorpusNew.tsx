@@ -1,6 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BackLink } from '../components/BackLink'
 import { useAuth } from '../contexts/useAuth'
 import { createVocabSeries } from '../lib/firestore'
 import { parseWordList, type WordEntry } from '../lib/types'
@@ -117,7 +116,6 @@ export function CorpusNew() {
 
   return (
     <div className="space-y-5 max-w-3xl mx-auto">
-      <BackLink to="/vocab/corpora" label="교재 관리" />
       <header>
         <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
           관리자 · 단어 교재

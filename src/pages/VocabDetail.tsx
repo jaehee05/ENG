@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { BackLink } from '../components/BackLink'
 import { useAuth } from '../contexts/useAuth'
+import { useBackNav } from '../contexts/useBackNav'
 import {
   deleteAttempt,
   deleteVocabSet,
@@ -194,17 +194,20 @@ export function VocabDetail() {
     }
   }
 
+  // 교재에서 만든 DAY 시험지면 그 교재의 DAY 목록으로 돌아간다. 교재 소속은
+  // 문서를 읽어야 알 수 있어 라우트 표로는 정할 수 없다. 아직 읽는 중이면
+  // undefined 로 둬서 표의 기본값(단어 시험지 목록)이 쓰이게 한다.
+  useBackNav({
+    to: set?.seriesId ? `/vocab/series/${set.seriesId}` : undefined,
+    label: set?.seriesId ? '교재' : undefined,
+  })
+
   if (loading) return <p className="text-slate-500 text-sm">불러오는 중...</p>
   if (error) return <p className="text-red-600 text-sm">{error}</p>
   if (!set) return null
 
   return (
     <div className="space-y-5 max-w-3xl mx-auto">
-      {/* 교재에서 만든 DAY 시험지면 그 교재의 DAY 목록으로 돌아간다 */}
-      <BackLink
-        to={set?.seriesId ? `/vocab/series/${set.seriesId}` : '/vocab'}
-        label={set?.seriesId ? '교재' : '단어 시험지'}
-      />
       <header className="flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import { listAccounts } from '../lib/account'
-import { BackLink } from '../components/BackLink'
 import {
   cleanupDuplicatePushTokens,
   createPushSchedule,
@@ -725,7 +724,6 @@ export function AdminNotify() {
 
   return (
     <div className="space-y-6">
-      <BackLink to="/admin" label="관리" />
       <div>
         <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
           관리자
