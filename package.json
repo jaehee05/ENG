@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "rules:check": "node scripts/syncFirestoreRules.mjs",
+    "rules:sync": "node scripts/syncFirestoreRules.mjs --write",
+    "prebuild": "npm run rules:check",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
