@@ -36,7 +36,9 @@ export function Support() {
 
   return (
     // 개인정보 처리방침과 같은 이유로 Layout(헤더·탭바) 밖에 있다.
-    <div className="min-h-dvh bg-white">
+    // 네이티브 앱은 body 스크롤을 막아 둔다(index.css 의 .native-app). Layout 은
+    // 자기 안에 스크롤 영역을 두는데 이 화면은 Layout 밖이라, 여기서 직접 만든다.
+    <div className="h-dvh overflow-y-auto overscroll-contain bg-white">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-5 safe-top space-y-6 pb-10">
         <button
           type="button"
