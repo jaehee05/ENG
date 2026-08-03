@@ -351,9 +351,10 @@ const actions = {
     const me = await requireAccount(token);
     const target = String(id);
     if (me.id !== target && me.role !== "admin") throw httpError(403, "권한이 없습니다.");
+    const removed = await purgeStudentData(target);
     await db().doc(`users/${target}`).delete();
     await dropSessionsFor(target);
-    return { ok: true };
+    return { ok: true, removed };
   },
 
   /** 푸시 토큰은 본인 것만. */
@@ -483,6 +484,66 @@ async function activate(snap, { hashed, email, displayName, school, phone, paren
   await snap.ref.update(patch);
   const after = await snap.ref.get();
   return { token: await createSession(snap.id), account: toAccount(after) };
+}
+
+/**
+ * 탈퇴한 학생의 흔적을 지운다.
+ *
+ * 계정 문서만 지우면 응시 기록·과제·알림에 이름과 uid 가 그대로 남는다.
+ * 개인정보처리방침에 "탈퇴 시 파기한다" 고 적으려면 실제로 지워야 한다.
+ *
+ * **결제·수납 기록(payments)은 남긴다.** 학원 운영상 거래 증빙이라 관련 법령에
+ * 따라 보존해야 하는 쪽에 가깝다. 이건 판단이 필요한 지점이라 방침에도 그렇게
+ * 적어야 하고, 같이 지우기로 정하면 아래 목록에 payments 를 더하면 된다.
+ */
+const OWNED_BY_STUDENT = [
+  { collection: "attempts", field: "studentUid" },
+  { collection: "assignments", field: "studentUid" },
+  { collection: "classSessions", field: "studentUid" },
+  { collection: "todos", field: "studentUid" },
+  { collection: "notifications", field: "recipientUid" },
+];
+
+/** 시험지를 볼 수 있는 학생 목록에서 이름을 빼야 하는 곳. */
+const AUDIENCE_LISTS = ["vocabSets", "vocabSeries"];
+
+async function purgeStudentData(uid) {
+  const removed = {};
+
+  for (const { collection, field } of OWNED_BY_STUDENT) {
+    const snap = await db().collection(collection).where(field, "==", uid).get();
+    await deleteInChunks(snap.docs);
+    if (snap.size) removed[collection] = snap.size;
+  }
+
+  // 단어장은 계정 문서 아래 서브컬렉션이다. 부모 문서를 지워도 같이 안 지워진다.
+  const words = await db().collection(`users/${uid}/wordLookups`).get();
+  await deleteInChunks(words.docs);
+  if (words.size) removed.wordLookups = words.size;
+
+  for (const collection of AUDIENCE_LISTS) {
+    const snap = await db()
+      .collection(collection)
+      .where("studentUids", "array-contains", uid)
+      .get();
+    for (const d of snap.docs) {
+      await d.ref.update({
+        studentUids: admin.firestore.FieldValue.arrayRemove(uid),
+      });
+    }
+    if (snap.size) removed[collection] = snap.size;
+  }
+
+  return removed;
+}
+
+/** 배치 하나에 500 개까지만 담긴다. */
+async function deleteInChunks(docs) {
+  for (let i = 0; i < docs.length; i += 400) {
+    const batch = db().batch();
+    docs.slice(i, i + 400).forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+  }
 }
 
 async function dropSessionsFor(uid) {

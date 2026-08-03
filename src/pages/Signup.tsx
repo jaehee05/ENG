@@ -168,6 +168,19 @@ export function Signup() {
           >
             {submitting ? '가입 중…' : '가입하기'}
           </button>
+
+          {/* 가입 전에 무엇을 수집하는지 읽을 수 있어야 한다. 방침 화면은
+              로그인 밖에 있어 여기서도 바로 열린다. */}
+          <p className="text-[11px] text-slate-400 text-center leading-relaxed">
+            가입하면{' '}
+            <Link
+              to="/privacy"
+              className="text-slate-600 underline underline-offset-2"
+            >
+              개인정보 처리방침
+            </Link>
+            에 동의하는 것으로 봅니다.
+          </p>
         </form>
 
         <p className="mt-6 text-xs text-slate-500 text-center">
