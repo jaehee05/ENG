@@ -33,6 +33,17 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // settings 를 통째로 닫았더니 앱 기능 셋이 같이 멎었다 — 홈 D-day, 해설
+    // 문자표, 해설 스타일. 정작 가려야 할 것은 알림톡 API 키(ppurio)와 관리자
+    // 비밀키(notifyConfig) 이고 그건 Cloud Functions 만 쓴다. 그래서 문서
+    // 이름을 하나씩 적어 필요한 것만 연다. 여기 없는 settings 문서는 닫힌다.
+    //
+    // 새 settings 문서를 만들어 클라이언트에서 쓰려면 여기에 이름을 적어야
+    // 한다. 열쇠나 개인정보를 담는 것이면 적지 말고 Functions 를 거칠 것.
+    match /settings/dday       { allow read, write: if true; }
+    match /settings/explStyles { allow read, write: if true; }
+    match /settings/explChars  { allow read, write: if true; }
+
     // ───── 여는 것 ─────
     // 손으로 적지 않는다. 소스에서 쓰는 컬렉션을 훑어 자동으로 채운다.
     // 새 컬렉션을 만들면 `npm run rules:sync` 로 맞추고 규칙을 배포하면 된다.
