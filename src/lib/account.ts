@@ -1,21 +1,16 @@
-import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  getDoc,
-  getDocs,
-  limit,
-  orderBy,
-  query,
-  serverTimestamp,
-  Timestamp,
-  updateDoc,
-  where,
-  type QueryDocumentSnapshot,
-  type DocumentSnapshot,
-} from 'firebase/firestore'
-import { db } from './firebase'
+/**
+ * 계정 관련 동작.
+ *
+ * 예전에는 여기서 Firestore 의 users 를 직접 읽고 썼다. 지금은 보안 규칙으로
+ * 닫혀 있어 전부 Cloud Functions 의 authApi 를 거친다 (functions/auth.js).
+ * 화면이 부르던 이름과 인자는 그대로 두어 페이지들은 손대지 않았다.
+ *
+ * 다듬기(이메일 소문자화, 전화번호 형식, 학교 이름 정규화)는 여전히 여기서
+ * 한다 — 화면에서 보이는 값과 저장되는 값을 같게 두려는 것이고, 서버도 받은
+ * 값을 그대로 믿지 않고 자기 검사를 한 번 더 한다.
+ */
+
+import { callAuth, callAuthed, toAccount, type WireAccount } from './authApi'
 import { formatPhoneKR } from './phone'
 import { normalizeSchool } from './school'
 import type { MockSubject, UserAccount, UserStatus } from './types'
@@ -29,44 +24,24 @@ export function validatePassword(pw: string): void {
   }
 }
 
-function fromSnap(snap: QueryDocumentSnapshot | DocumentSnapshot): UserAccount {
-  const d = snap.data() ?? {}
-  const rawSubjects = Array.isArray(d.subjects) ? d.subjects : undefined
-  const subjects = rawSubjects
-    ? (rawSubjects.filter(
-        (x: unknown) => x === 'korean' || x === 'english',
-      ) as MockSubject[])
-    : undefined
-  return {
-    id: snap.id,
-    email: d.email ?? '',
-    password: d.password,
-    displayName: d.displayName ?? '',
-    role: d.role === 'admin' ? 'admin' : 'student',
-    status: (d.status === 'active' || d.status === 'rejected') ? d.status : 'pending',
-    school: d.school,
-    phone: d.phone,
-    parentPhone: d.parentPhone,
-    subjects,
-    readingAccess: d.readingAccess === true ? true : undefined,
-    colorKey: typeof d.colorKey === 'string' ? d.colorKey : undefined,
-    preregistered: d.preregistered === true ? true : undefined,
-    createdAt: (d.createdAt as Timestamp | undefined) ?? null,
-  }
+/** 로그인·가입 결과. 세션 토큰은 AuthContext 가 보관한다. */
+export interface AuthResult {
+  token: string
+  account: UserAccount
 }
 
 export async function updateAccountColorKey(
   id: string,
   colorKey: string,
 ): Promise<void> {
-  await updateDoc(doc(db, 'users', id), { colorKey })
+  await callAuthed('setColorKey', { id, colorKey })
 }
 
 export async function updateAccountSubjects(
   id: string,
   subjects: MockSubject[],
 ): Promise<void> {
-  await updateDoc(doc(db, 'users', id), { subjects })
+  await callAuthed('setSubjects', { id, subjects })
 }
 
 export interface AccountProfilePatch {
@@ -78,14 +53,14 @@ export interface AccountProfilePatch {
 }
 
 /**
- * 관리자가 학생의 기본 정보를 고친다.
+ * 학생의 기본 정보를 고친다. 본인이거나 관리자만 된다(서버에서 확인).
  *
- * 회원가입과 같은 규칙으로 다듬어 저장한다 — 이메일은 소문자 trim, 전화는
+ * 회원가입과 같은 규칙으로 다듬어 보낸다 — 이메일은 소문자 trim, 전화는
  * formatPhoneKR. 화면마다 형식이 다르면 사전 등록 자동 연결(이름+전화 대조)이
  * 어긋나고, 같은 사람이 두 계정으로 갈린다.
  *
- * 이메일은 로그인 아이디라 다른 계정이 쓰고 있으면 막는다. 비밀번호·상태·
- * 역할은 여기서 안 건드린다 — 각각 setAccountPassword/setAccountStatus 가 있다.
+ * 이메일은 로그인 아이디라 다른 계정이 쓰고 있으면 서버가 막는다. 비밀번호·
+ * 상태·역할은 여기서 안 건드린다 — 각각 따로 있다.
  */
 export async function updateAccountProfile(
   id: string,
@@ -96,30 +71,30 @@ export async function updateAccountProfile(
   const email = patch.email.trim().toLowerCase()
   if (!email) throw new Error('이메일을 입력하세요.')
 
-  // limit(2) — 자기 자신이 걸릴 수 있어 하나로는 남의 것인지 못 가린다.
-  const hits = await getDocs(
-    query(collection(db, 'users'), where('email', '==', email), limit(2)),
-  )
-  if (hits.docs.some((d) => d.id !== id)) {
-    throw new Error('이미 사용 중인 이메일입니다.')
-  }
-
-  await updateDoc(doc(db, 'users', id), {
-    displayName,
-    email,
-    school: normalizeSchool(patch.school),
-    phone: formatPhoneKR(patch.phone),
-    parentPhone: formatPhoneKR(patch.parentPhone),
+  const { account } = await callAuthed<{ account: WireAccount }>('updateProfile', {
+    id,
+    patch: {
+      displayName,
+      email,
+      school: normalizeSchool(patch.school),
+      phone: formatPhoneKR(patch.phone),
+      parentPhone: formatPhoneKR(patch.parentPhone),
+    },
   })
-  const after = await getAccount(id)
-  if (!after) throw new Error('저장한 계정을 다시 읽지 못했습니다.')
-  return after
+  return toAccount(account)
 }
 
 export async function getAccount(id: string): Promise<UserAccount | null> {
-  const snap = await getDoc(doc(db, 'users', id))
-  if (!snap.exists()) return null
-  return fromSnap(snap)
+  const { account } = await callAuthed<{ account: WireAccount | null }>('getAccount', {
+    id,
+  })
+  return account ? toAccount(account) : null
+}
+
+/** 세션 토큰만으로 내 계정을 받아온다. 앱을 다시 열었을 때 쓴다. */
+export async function fetchMe(): Promise<UserAccount> {
+  const { account } = await callAuthed<{ account: WireAccount }>('me')
+  return toAccount(account)
 }
 
 export async function signUpAccount(input: {
@@ -129,89 +104,20 @@ export async function signUpAccount(input: {
   school?: string
   phone?: string
   parentPhone?: string
-}): Promise<UserAccount> {
+}): Promise<AuthResult> {
   validatePassword(input.password)
-  const email = input.email.trim().toLowerCase()
-  const displayName = input.displayName.trim()
-  const school = normalizeSchool(input.school)
-  const phone = formatPhoneKR(input.phone)
-  const parentPhone = formatPhoneKR(input.parentPhone)
-
-  // 1) 같은 이메일 사용자 조회 — 사전 등록이면 활성화, 아니면 중복 오류.
-  const emailHits = await getDocs(
-    query(collection(db, 'users'), where('email', '==', email), limit(1)),
-  )
-  if (!emailHits.empty) {
-    const existing = fromSnap(emailHits.docs[0])
-    if (!existing.preregistered) {
-      throw new Error('이미 가입된 이메일입니다.')
-    }
-    return await activatePreregistered(existing, {
-      email,
-      password: input.password,
-      displayName,
-      school,
-      phone,
-      parentPhone,
-    })
-  }
-
-  // 2) 이메일이 새 값이더라도 (이름 + 전화) 로 사전 등록된 계정이 있는지 확인 → 연결.
-  if (displayName && phone) {
-    const prereg = await getDocs(
-      query(
-        collection(db, 'users'),
-        where('preregistered', '==', true),
-        where('displayName', '==', displayName),
-        where('phone', '==', phone),
-        limit(1),
-      ),
-    )
-    if (!prereg.empty) {
-      const existing = fromSnap(prereg.docs[0])
-      return await activatePreregistered(existing, {
-        email,
-        password: input.password,
-        displayName,
-        school,
-        phone,
-        parentPhone,
-      })
-    }
-  }
-
-  const any = await getDocs(query(collection(db, 'users'), limit(1)))
-  const isFirst = any.empty
-
-  const role: 'admin' | 'student' = isFirst ? 'admin' : 'student'
-  const status: UserStatus = isFirst ? 'active' : 'pending'
-
-  const ref = await addDoc(collection(db, 'users'), {
-    email,
+  const r = await callAuth<{ token: string; account: WireAccount }>('signUp', {
+    email: input.email.trim().toLowerCase(),
     password: input.password,
-    displayName,
-    role,
-    status,
-    school,
-    phone,
-    parentPhone,
-    createdAt: serverTimestamp(),
+    displayName: input.displayName.trim(),
+    school: normalizeSchool(input.school),
+    phone: formatPhoneKR(input.phone),
+    parentPhone: formatPhoneKR(input.parentPhone),
   })
-  return {
-    id: ref.id,
-    email,
-    password: input.password,
-    displayName,
-    role,
-    status,
-    school,
-    phone,
-    parentPhone,
-    createdAt: null,
-  }
+  return { token: r.token, account: toAccount(r.account) }
 }
 
-/** 관리자가 학생 회원가입 전에 미리 계정을 만들어둔다. 학생이 같은 (이름, 전화)로 signUp 하면 자동 활성화. */
+/** 관리자가 학생 회원가입 전에 미리 계정을 만들어둔다. 학생이 같은 (이름, 전화)로 가입하면 자동 활성화. */
 export async function createPreregisteredStudent(input: {
   displayName: string
   phone: string
@@ -224,118 +130,65 @@ export async function createPreregisteredStudent(input: {
   const phone = formatPhoneKR(input.phone)
   if (!phone) throw new Error('학생 전화번호를 입력하세요. (가입 시 매칭에 필요)')
 
-  // (이름, 전화) 조합이 이미 있으면 중복 방지
-  const dup = await getDocs(
-    query(
-      collection(db, 'users'),
-      where('displayName', '==', displayName),
-      where('phone', '==', phone),
-      limit(1),
-    ),
-  )
-  if (!dup.empty) {
-    throw new Error('같은 이름·전화의 계정이 이미 존재합니다.')
-  }
-
-  const payload: Record<string, unknown> = {
-    email: '',
+  const { account } = await callAuthed<{ account: WireAccount }>('createPreregistered', {
     displayName,
     phone,
-    role: 'student',
-    status: 'pending',
-    preregistered: true,
-    createdAt: serverTimestamp(),
-  }
-  const school = normalizeSchool(input.school)
-  const parentPhone = formatPhoneKR(input.parentPhone)
-  if (school) payload.school = school
-  if (parentPhone) payload.parentPhone = parentPhone
-  if (input.subjects && input.subjects.length > 0) payload.subjects = input.subjects
-
-  const ref = await addDoc(collection(db, 'users'), payload)
-  return {
-    id: ref.id,
-    email: '',
-    displayName,
-    role: 'student',
-    status: 'pending',
-    preregistered: true,
-    school: school || undefined,
-    phone,
-    parentPhone: parentPhone || undefined,
-    subjects: input.subjects,
-    createdAt: null,
-  }
+    school: normalizeSchool(input.school),
+    parentPhone: formatPhoneKR(input.parentPhone),
+    subjects: input.subjects ?? [],
+  })
+  return toAccount(account)
 }
 
-async function activatePreregistered(
-  existing: UserAccount,
-  input: {
-    email: string
-    password: string
-    displayName: string
-    school: string
-    phone: string
-    parentPhone: string
-  },
-): Promise<UserAccount> {
-  const patch: Record<string, unknown> = {
-    password: input.password,
-    status: 'active',
-    preregistered: false,
-  }
-  // 학생 입력값이 있으면 관리자가 넣어둔 값을 덮어씀 (본인이 정정 가능하도록)
-  if (input.email) patch.email = input.email
-  if (input.displayName) patch.displayName = input.displayName
-  if (input.school) patch.school = input.school
-  if (input.phone) patch.phone = input.phone
-  if (input.parentPhone) patch.parentPhone = input.parentPhone
-  await updateDoc(doc(db, 'users', existing.id), patch)
-  return {
-    ...existing,
-    email: input.email || existing.email,
-    password: input.password,
-    status: 'active',
-    preregistered: undefined,
-    displayName: input.displayName || existing.displayName,
-    school: input.school || existing.school,
-    phone: input.phone || existing.phone,
-    parentPhone: input.parentPhone || existing.parentPhone,
-  }
+export async function signInAccount(
+  email: string,
+  password: string,
+): Promise<AuthResult> {
+  const r = await callAuth<{ token: string; account: WireAccount }>('signIn', {
+    email: email.trim().toLowerCase(),
+    password,
+  })
+  return { token: r.token, account: toAccount(r.account) }
 }
 
-export async function signInAccount(email: string, password: string): Promise<UserAccount> {
-  const e = email.trim().toLowerCase()
-  const snap = await getDocs(
-    query(collection(db, 'users'), where('email', '==', e), limit(1)),
-  )
-  if (snap.empty) throw new Error('이메일 또는 비밀번호가 일치하지 않습니다.')
-  const acc = fromSnap(snap.docs[0])
-  if (acc.password !== password) {
-    throw new Error('이메일 또는 비밀번호가 일치하지 않습니다.')
-  }
-  return acc
+export async function signOutSession(): Promise<void> {
+  await callAuthed('signOut').catch(() => {
+    // 이미 끊긴 세션이면 그만이다. 로그아웃을 막을 이유가 없다.
+  })
 }
 
 export async function listAccounts(): Promise<UserAccount[]> {
-  const snap = await getDocs(query(collection(db, 'users'), orderBy('createdAt', 'desc')))
-  return snap.docs.map(fromSnap)
+  const { accounts } = await callAuthed<{ accounts: WireAccount[] }>('listAccounts')
+  return accounts.map(toAccount)
 }
 
 export async function setAccountStatus(id: string, status: UserStatus): Promise<void> {
-  await updateDoc(doc(db, 'users', id), { status })
+  await callAuthed('setStatus', { id, status })
 }
 
 /** 지문 문제풀이 접근 권한 설정. */
 export async function setReadingAccess(id: string, allowed: boolean): Promise<void> {
-  await updateDoc(doc(db, 'users', id), { readingAccess: allowed })
+  await callAuthed('setReadingAccess', { id, allowed })
 }
 
 export async function setAccountPassword(id: string, password: string): Promise<void> {
   validatePassword(password)
-  await updateDoc(doc(db, 'users', id), { password })
+  await callAuthed('setPassword', { id, password })
 }
 
 export async function deleteAccount(id: string): Promise<void> {
-  await deleteDoc(doc(db, 'users', id))
+  await callAuthed('deleteAccount', { id })
+}
+
+/**
+ * 아직 평문으로 남아 있는 비밀번호를 한꺼번에 해시로 바꾼다 (관리자).
+ * 여러 번 눌러도 안전하다 — 이미 해시인 것은 건너뛴다.
+ */
+export async function hashAllPasswords(): Promise<{
+  total: number
+  hashed: number
+  already: number
+  empty: number
+}> {
+  return callAuthed('hashAllPasswords')
 }

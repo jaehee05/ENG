@@ -5,6 +5,7 @@ const { onRequest } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const { sendOne } = require("./ppurio");
+const { actions: authActions, verifyPassword } = require("./auth");
 
 setGlobalOptions({ region: "asia-northeast3", retry: false, maxInstances: 10 });
 
@@ -70,6 +71,29 @@ function normalizeManualDefaults(raw) {
   };
 }
 
+/**
+ * 계정 API. users 컬렉션을 만지는 유일한 통로다 (functions/auth.js 참고).
+ * 보안 규칙에서 users 를 닫았기 때문에 클라이언트는 반드시 여기를 거친다.
+ */
+exports.authApi = onRequest({ invoker: "public" }, async (req, res) => {
+  setCors(res);
+  if (req.method === "OPTIONS") return res.status(204).send("");
+  if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
+
+  const { action, payload } = req.body || {};
+  const fn = authActions[action];
+  if (!fn) return res.status(400).json({ error: `알 수 없는 요청: ${action}` });
+
+  try {
+    return res.json(await fn(payload || {}));
+  } catch (e) {
+    const status = e && e.status ? e.status : 500;
+    // 500 만 로그에 남긴다. 비밀번호 틀림 같은 건 오류가 아니라 정상 흐름이다.
+    if (status === 500) console.error("authApi", action, e);
+    return res.status(status).json({ error: (e && e.message) || "요청 처리 실패" });
+  }
+});
+
 exports.ppurioAdmin = onRequest({ invoker: "public" }, async (req, res) => {
   setCors(res);
   if (req.method === "OPTIONS") return res.status(204).send("");
@@ -89,7 +113,12 @@ exports.ppurioAdmin = onRequest({ invoker: "public" }, async (req, res) => {
       }
       const userSnap = await admin.firestore().doc(`users/${uid}`).get();
       const user = userSnap.exists ? userSnap.data() : null;
-      if (!user || user.password !== password || user.role !== "admin") {
+      // 평문 비교였다. 지금은 해시라 verifyPassword 를 쓴다 (아직 평문인 계정도
+      // 받아주고 그 자리에서 해시로 갈아끼운다).
+      if (!user || user.role !== "admin") {
+        return res.status(401).json({ error: "관리자 인증 실패" });
+      }
+      if (!(await verifyPassword(uid, user.password, password))) {
         return res.status(401).json({ error: "관리자 인증 실패" });
       }
       const cfgSnap = await admin.firestore().doc("settings/notifyConfig").get();

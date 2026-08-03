@@ -1,6 +1,5 @@
 import {
   addDoc,
-  arrayRemove,
   collection,
   deleteDoc,
   deleteField,
@@ -19,6 +18,7 @@ import {
 } from 'firebase/firestore'
 import { db } from './firebase'
 import { convertAngleInHtml, convertAngleInText } from './angleBrackets'
+import { callAuthed } from './authApi'
 import type {
   Announcement,
   Assignment,
@@ -1322,36 +1322,8 @@ export async function cleanupDuplicatePushTokens(): Promise<{
   tokens: number
   accounts: number
 }> {
-  const snap = await getDocs(collection(db, 'users'))
-  const owners = new Map<string, string[]>()
-  for (const d of snap.docs) {
-    const arr = (d.data() as { fcmTokens?: unknown }).fcmTokens
-    if (!Array.isArray(arr)) continue
-    for (const t of arr) {
-      if (typeof t !== 'string' || !t) continue
-      const list = owners.get(t) ?? []
-      list.push(d.id)
-      owners.set(t, list)
-    }
-  }
-  // 두 계정 이상이 들고 있는 토큰만 대상
-  const dupes = [...owners.entries()].filter(([, uids]) => uids.length > 1)
-  if (dupes.length === 0) return { tokens: 0, accounts: 0 }
-
-  const removeByUid = new Map<string, string[]>()
-  for (const [token, uids] of dupes) {
-    for (const uid of uids) {
-      const list = removeByUid.get(uid) ?? []
-      list.push(token)
-      removeByUid.set(uid, list)
-    }
-  }
-  const batch = writeBatch(db)
-  for (const [uid, tokens] of removeByUid) {
-    batch.update(doc(db, 'users', uid), { fcmTokens: arrayRemove(...tokens) })
-  }
-  await batch.commit()
-  return { tokens: dupes.length, accounts: removeByUid.size }
+  // users 는 규칙으로 닫혀 있어 서버에서 처리한다 (functions/auth.js).
+  return callAuthed('cleanupDuplicateTokens')
 }
 
 /** 모든 vocabSets + vocabSeries의 maxAttempts 필드를 일괄 삭제. 관리자 전용. */

@@ -1,21 +1,52 @@
 rules_version = '2';
 
-// IMPORTANT: This project intentionally bypasses Firebase Authentication.
-// Account credentials live in the `users` collection as PLAINTEXT (by
-// explicit user request), and all sessions are local-only (localStorage).
-// As a consequence, Firestore Security Rules cannot enforce per-user
-// access at the rule layer (there is no request.auth). Anyone with the
-// Firebase web config — which is public — can read or write the entire
-// database. Do not store anything sensitive here.
+// 이 프로젝트는 Firebase Authentication 을 쓰지 않는다. 세션은 Cloud Functions
+// (authApi) 가 발급한 토큰으로 잡고, 규칙 계층에는 request.auth 가 없다.
+// 그래서 규칙으로 가를 수 있는 것은 "클라이언트가 직접 만질 수 있는가" 뿐이다.
+//
+// ⚠ 규칙은 OR 로 합쳐진다. 하나라도 allow 가 걸리면 통과다. `if false` 는
+// 막는 게 아니라 "여기서는 안 열어준다" 는 뜻일 뿐이라, 아래에 열린 규칙이
+// 하나라도 겹치면 무력해진다. 예전에 있던 `match /{document=**}` 전체 허용이
+// 딱 그랬다 — settings 를 `if false` 로 적어놨지만 실제로는 열려 있었다.
+// 그래서 지금은 전체 허용을 없애고 열 컬렉션만 하나씩 적는다.
+// 새 컬렉션을 만들면 여기에 적어야 앱에서 보인다.
+//
+// 아직 열려 있는 것(알고 하는 선택): 성적·응시기록·모의고사·해설·단어 시험지는
+// Firebase 설정만 있으면 누구나 읽고 쓸 수 있다. 설정값은 앱 번들에 들어가므로
+// 사실상 공개다. 여기까지 닫으려면 앱의 모든 읽기·쓰기를 Functions 로 옮겨야
+// 해서 이번 범위에서 뺐다. 계정 정보와 비밀번호만 먼저 막는다.
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // settings/* 는 클라이언트 접근 차단. Cloud Functions(Admin SDK)만 접근.
-    match /settings/{doc=**} {
-      allow read, write: if false;
-    }
-    match /{document=**} {
+
+    // ───── 닫는 것 ─────
+    // users        이름·이메일·전화·학부모 전화·비밀번호 해시
+    // sessions     로그인 토큰. 하나 읽히면 그 사람으로 행세할 수 있다
+    // settings     알림톡 API 키, 관리자 비밀키
+    // 셋 다 아래에 규칙을 안 적는 것으로 닫힌다 (기본이 거부).
+    // 손대야 할 때는 Cloud Functions 의 Admin SDK 가 규칙을 우회한다.
+
+    // 단어장(내가 찾아본 영단어)만 예외로 연다. 개인을 식별할 정보가 아니고,
+    // users 를 못 읽으니 남의 uid 를 훑어낼 방법도 없다. 서버로 옮기면 단어
+    // 탭이 눈에 띄게 느려진다.
+    match /users/{uid}/wordLookups/{doc} {
       allow read, write: if true;
     }
+
+    // ───── 여는 것 ─────
+    match /announcements/{doc=**} { allow read, write: if true; }
+    match /assignments/{doc=**}   { allow read, write: if true; }
+    match /attempts/{doc=**}      { allow read, write: if true; }
+    match /categories/{doc=**}    { allow read, write: if true; }
+    match /classSessions/{doc=**} { allow read, write: if true; }
+    match /koreanMocks/{doc=**}   { allow read, write: if true; }
+    match /meta/{doc=**}          { allow read, write: if true; }
+    match /notifications/{doc=**} { allow read, write: if true; }
+    match /payments/{doc=**}      { allow read, write: if true; }
+    match /pushSchedules/{doc=**} { allow read, write: if true; }
+    match /readings/{doc=**}      { allow read, write: if true; }
+    match /todos/{doc=**}         { allow read, write: if true; }
+    match /vocabSeries/{doc=**}   { allow read, write: if true; }
+    match /vocabSets/{doc=**}     { allow read, write: if true; }
   }
 }

@@ -6,7 +6,6 @@ export type UserStatus = 'pending' | 'active' | 'rejected'
 export interface UserAccount {
   id: string
   email: string
-  password?: string
   displayName: string
   role: UserRole
   status: UserStatus
