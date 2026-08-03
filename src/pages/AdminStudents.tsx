@@ -5,6 +5,7 @@ import { formatPhoneKR } from '../lib/phone'
 import {
   createPreregisteredStudent,
   deleteAccount,
+  hashAllPasswords,
   listAccounts,
   setAccountPassword,
   setAccountStatus,
@@ -365,6 +366,35 @@ export function AdminStudents() {
   const [search, setSearch] = useState('')
   const [busyAction, setBusyAction] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<{ kind: 'ok' | 'err'; msg: string } | null>(null)
+  const [hashBusy, setHashBusy] = useState(false)
+
+  /** 평문으로 남아 있는 비밀번호를 한 번에 해시로 바꾼다. 여러 번 눌러도 안전. */
+  async function runHashPasswords() {
+    if (
+      !window.confirm(
+        '아직 평문으로 저장된 비밀번호를 모두 암호화합니다. 학생들이 쓰던 비밀번호는 그대로 쓸 수 있습니다. 계속할까요?',
+      )
+    )
+      return
+    setHashBusy(true)
+    setFeedback(null)
+    try {
+      const r = await hashAllPasswords()
+      setFeedback({
+        kind: 'ok',
+        msg: r.hashed
+          ? `${r.hashed}개를 암호화했습니다. (이미 암호화됨 ${r.already} · 비밀번호 없음 ${r.empty} · 전체 ${r.total})`
+          : `평문으로 남은 비밀번호가 없습니다. (전체 ${r.total} · 이미 암호화됨 ${r.already})`,
+      })
+    } catch (e) {
+      setFeedback({
+        kind: 'err',
+        msg: e instanceof Error ? e.message : '암호화에 실패했습니다.',
+      })
+    } finally {
+      setHashBusy(false)
+    }
+  }
 
   async function loadAll() {
     setLoading(true)
@@ -516,16 +546,29 @@ export function AdminStudents() {
 
   return (
     <div className="space-y-5">
-      <header>
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-          관리자
-        </p>
-        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
-          학생 관리
-        </h1>
-        <p className="text-xs text-slate-500 mt-1">
-          전체 {others.length}명 · 활성 {activeCount} · 승인 대기 {pendingCount}
-        </p>
+      <header className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+            관리자
+          </p>
+          <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
+            학생 관리
+          </h1>
+          <p className="text-xs text-slate-500 mt-1">
+            전체 {others.length}명 · 활성 {activeCount} · 승인 대기 {pendingCount}
+          </p>
+        </div>
+        {/* 평문으로 저장돼 있던 비밀번호를 해시로 바꾸는 일회성 작업. 여러 번
+            눌러도 안전하다 — 이미 해시인 것은 건너뛴다. */}
+        <button
+          type="button"
+          onClick={runHashPasswords}
+          disabled={hashBusy}
+          title="아직 평문으로 남아 있는 비밀번호를 모두 암호화합니다"
+          className="rounded-md border border-slate-300 text-slate-600 text-xs font-medium px-2.5 py-1.5 hover:bg-slate-100 disabled:opacity-50"
+        >
+          {hashBusy ? '암호화 중…' : '비밀번호 일괄 암호화'}
+        </button>
       </header>
 
       {feedback && (
