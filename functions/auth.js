@@ -340,10 +340,19 @@ const actions = {
     return { account: toAccount(await ref.get()) };
   },
 
+  /**
+   * 본인 탈퇴이거나 관리자면 지운다.
+   *
+   * 관리자 전용으로 두면 안 된다 — 더보기 화면의 회원탈퇴가 학생 본인 손으로
+   * 도는 길이고, App Store 는 계정을 만들 수 있는 앱에 앱 안에서의 계정 삭제를
+   * 요구한다(5.1.1(v)).
+   */
   async deleteAccount({ token, id }) {
-    await requireAdmin(token);
-    await db().doc(`users/${String(id)}`).delete();
-    await dropSessionsFor(String(id));
+    const me = await requireAccount(token);
+    const target = String(id);
+    if (me.id !== target && me.role !== "admin") throw httpError(403, "권한이 없습니다.");
+    await db().doc(`users/${target}`).delete();
+    await dropSessionsFor(target);
     return { ok: true };
   },
 

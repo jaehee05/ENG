@@ -72,7 +72,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		CC22500A2FE66800003D5508 /* Exceptions for "KJHEDULiveActivity" folder in "KJHEDULiveActivityExtension" target */ = {
+		CC22500A2FE66800003D5508 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -82,7 +82,7 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		CC224FC42FE666D4003D5508 /* KJHEDULiveActivity */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (CC22500A2FE66800003D5508 /* Exceptions for "KJHEDULiveActivity" folder in "KJHEDULiveActivityExtension" target */, ); explicitFileTypes = {}; explicitFolders = (); path = KJHEDULiveActivity; sourceTree = "<group>"; };
+		CC224FC42FE666D4003D5508 /* KJHEDULiveActivity */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (CC22500A2FE66800003D5508 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = KJHEDULiveActivity; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -499,7 +499,7 @@
 				INFOPLIST_FILE = KJHEDULiveActivity/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = KJHEDULiveActivity;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -542,7 +542,7 @@
 				INFOPLIST_FILE = KJHEDULiveActivity/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = KJHEDULiveActivity;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
