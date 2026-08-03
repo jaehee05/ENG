@@ -43,6 +43,7 @@ import { AdminAvailability } from './pages/AdminAvailability'
 import { More } from './pages/More'
 import { Profile } from './pages/Profile'
 import { Privacy } from './pages/Privacy'
+import { Support } from './pages/Support'
 
 function App() {
   return (
@@ -56,6 +57,7 @@ function App() {
           {/* 로그인 없이 열려야 한다 — App Store Connect 에 넣는 공개 URL 이고,
               가입 전에 읽을 수 있어야 한다. */}
           <Route path="/privacy" element={<Privacy />} />
+          <Route path="/support" element={<Support />} />
 
           <Route element={<ProtectedRoute />}>
             <Route element={<Layout />}>

@@ -166,6 +166,7 @@ export function More() {
       <Card>
         <LinkRow to="/notice" label="공지사항 및 이벤트" />
         <LinkRow to="/privacy" label="개인정보 처리방침" />
+        <LinkRow to="/support" label="고객지원 · 문의" />
       </Card>
 
       {/* 학습 콘텐츠 (하단탭에서 빠진 항목들) */}
