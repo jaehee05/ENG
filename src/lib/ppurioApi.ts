@@ -1,3 +1,4 @@
+import { callAuthed } from './authApi'
 // Cloud Run 2세대 함수의 직접 URL. VITE_PPURIO_ADMIN_URL이 지정되면 그것을 우선.
 const DEFAULT_URL = 'https://ppurioadmin-cfq2cexd2a-du.a.run.app'
 const ENDPOINT_URL =
@@ -73,30 +74,14 @@ export function setAdminSecret(s: string): void {
   else sessionStorage.removeItem(SS_SECRET)
 }
 
-/** uid + password 로 인증해서 adminSecret + manualDefaults를 DB에서 받아옴. */
-export async function bootstrapAdmin(
-  uid: string,
-  password: string,
-): Promise<BootstrapResult> {
-  const res = await fetch(ENDPOINT_URL, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      action: 'bootstrap',
-      payload: { uid, password },
-    }),
-  })
-  if (!res.ok) {
-    let msg = `bootstrap 실패 (HTTP ${res.status})`
-    try {
-      const body = (await res.json()) as { error?: string }
-      if (body.error) msg = body.error
-    } catch {
-      // ignore
-    }
-    throw new Error(msg)
-  }
-  return (await res.json()) as BootstrapResult
+/**
+ * adminSecret + manualDefaults 를 DB 에서 받아온다.
+ *
+ * 예전에는 uid + 평문 비밀번호로 인증했다. 비밀번호가 해시로 바뀌어 클라이언트가
+ * 평문을 들고 있을 수 없게 되면서, 이미 로그인한 세션을 근거로 받아온다.
+ */
+export async function bootstrapAdmin(): Promise<BootstrapResult> {
+  return callAuthed<BootstrapResult>('adminBootstrap')
 }
 
 async function call<T>(action: string, payload?: unknown): Promise<T> {
