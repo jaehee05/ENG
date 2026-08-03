@@ -150,9 +150,10 @@ export function More() {
         />
       </Card>
 
-      {/* 공지 */}
+      {/* 공지 · 약관 */}
       <Card>
         <LinkRow to="/notice" label="공지사항 및 이벤트" />
+        <LinkRow to="/privacy" label="개인정보 처리방침" />
       </Card>
 
       {/* 학습 콘텐츠 (하단탭에서 빠진 항목들) */}
