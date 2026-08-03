@@ -34,6 +34,10 @@ service cloud.firestore {
     }
 
     // ───── 여는 것 ─────
+    // 손으로 적지 않는다. 소스에서 쓰는 컬렉션을 훑어 자동으로 채운다.
+    // 새 컬렉션을 만들면 `npm run rules:sync` 로 맞추고 규칙을 배포하면 된다.
+    // 빌드 전에 검사하므로, 적는 걸 잊은 채로는 배포가 나가지 않는다.
+    // ── 여기부터 자동 생성 (scripts/syncFirestoreRules.mjs) ──
     match /announcements/{doc=**} { allow read, write: if true; }
     match /assignments/{doc=**}   { allow read, write: if true; }
     match /attempts/{doc=**}      { allow read, write: if true; }
@@ -48,5 +52,6 @@ service cloud.firestore {
     match /todos/{doc=**}         { allow read, write: if true; }
     match /vocabSeries/{doc=**}   { allow read, write: if true; }
     match /vocabSets/{doc=**}     { allow read, write: if true; }
+    // ── 자동 생성 끝 ──
   }
 }
