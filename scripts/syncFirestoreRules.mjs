@@ -77,10 +77,35 @@ if (start === -1 || stop === -1) {
 const next = rules.slice(0, start) + buildBlock(open) + rules.slice(stop + END.length)
 const write = process.argv.includes('--write')
 
+/**
+ * CLOSED 인데 소스에서 쓰는 컬렉션을 눈에 띄게 알린다.
+ *
+ * 이게 조용하면 사고가 난다. settings 를 통째로 닫았을 때 홈 D-day·해설
+ * 문자표·해설 스타일이 같이 멎었는데, 스크립트는 "닫은 것 settings" 라고
+ * 한 줄 적고 지나가서 아무도 눈치채지 못했다. 문서 단위로 열어둔 예외가
+ * 규칙 파일에 있는지까지 같이 보여준다.
+ */
+function reportClosedInUse() {
+  if (!closedInUse.length) return
+  for (const c of closedInUse) {
+    // 한 줄짜리(`match /settings/dday { allow ... }`)와 여러 줄짜리
+    // (`match /users/{uid}/wordLookups/{doc} {\n  allow ...`) 를 모두 잡는다.
+    const exceptions = [
+      ...rules.matchAll(new RegExp(`match /${c}/([^\\s{]*(?:\\{[^}]*\\}[^\\s{]*)*)\\s*\\{`, 'g')),
+    ]
+      .map((m) => m[1])
+      .filter((path) => path && !path.startsWith('{doc=**}'))
+    const tail = exceptions.length
+      ? `문서 단위로 열어둔 것: ${exceptions.join(', ')}`
+      : '열어둔 예외 없음 — 클라이언트에서 쓰면 403 이 난다'
+    console.warn(`⚠ ${c} 는 소스에서 쓰는데 규칙에서 닫혀 있다. ${tail}`)
+  }
+  console.warn('  Functions 를 거치거나, 민감하지 않은 문서만 이름을 적어 열 것.')
+}
+
 if (next === rules) {
-  console.log(
-    `firestore.rules 최신 상태 — 열린 컬렉션 ${open.length}개, 닫은 것 ${closedInUse.join(', ') || '없음'}`,
-  )
+  console.log(`firestore.rules 최신 상태 — 열린 컬렉션 ${open.length}개`)
+  reportClosedInUse()
   process.exit(0)
 }
 
