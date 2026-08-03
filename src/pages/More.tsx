@@ -1,33 +1,10 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import { WORDBOOK_ENABLED } from '../lib/features'
 import { deleteAccount } from '../lib/account'
 import { accountSubjects } from '../lib/types'
-
-/** 로컬 저장 토글 (알림/마케팅 수신 선호). */
-function useLocalToggle(key: string, initial = true) {
-  const [on, setOn] = useState<boolean>(() => {
-    try {
-      const v = localStorage.getItem(key)
-      return v === null ? initial : v === '1'
-    } catch {
-      return initial
-    }
-  })
-  const toggle = () => {
-    setOn((prev) => {
-      const next = !prev
-      try {
-        localStorage.setItem(key, next ? '1' : '0')
-      } catch {
-        // ignore
-      }
-      return next
-    })
-  }
-  return [on, toggle] as const
-}
+import { Capacitor } from '@capacitor/core'
 
 function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   return (
@@ -95,8 +72,43 @@ export function More() {
   const showEnglish = subj.english || isAdmin
   const showMock = isAdmin || subj.korean
 
-  const [noti, toggleNoti] = useLocalToggle('pref_noti', true)
-  const [marketing, toggleMarketing] = useLocalToggle('pref_marketing', true)
+  // 알림은 이 기기의 FCM 토큰을 계정에 붙였다 떼는 것으로 켜고 끈다.
+  // 예전에는 localStorage 에만 적어둬서 꺼도 푸시가 그대로 왔다.
+  const isNative = Capacitor.isNativePlatform()
+  const [noti, setNoti] = useState(false)
+  const [notiBusy, setNotiBusy] = useState(false)
+  const [notiHint, setNotiHint] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isNative) return
+    let alive = true
+    void import('../lib/pushSetup').then(async (m) => {
+      const on = await m.canReceivePush()
+      if (alive) setNoti(on)
+    })
+    return () => {
+      alive = false
+    }
+  }, [isNative])
+
+  async function toggleNoti() {
+    if (notiBusy) return
+    const next = !noti
+    setNotiBusy(true)
+    setNotiHint(null)
+    try {
+      const m = await import('../lib/pushSetup')
+      const applied = await m.setPushEnabledForUser(next)
+      setNoti(applied)
+      // 켰는데 안 켜졌다면 기기 설정에서 알림이 막혀 있는 것이다. 앱 안에서는
+      // 풀 수 없어서 어디를 봐야 하는지 알려준다.
+      if (next && !applied) {
+        setNotiHint('기기 설정 > 알림에서 KJHEDU 알림을 허용해 주세요.')
+      }
+    } finally {
+      setNotiBusy(false)
+    }
+  }
 
   async function handleLogout() {
     await logOut()
@@ -140,15 +152,15 @@ export function More() {
         <LinkRow to="/profile" label="내 정보 관리" />
       </Card>
 
-      {/* 알림 설정 */}
-      <Card>
-        <ToggleRow label="알림" on={noti} onToggle={toggleNoti} />
-        <ToggleRow
-          label="마케팅 정보 알림"
-          on={marketing}
-          onToggle={toggleMarketing}
-        />
-      </Card>
+      {/* 알림 설정 — 앱에서만. 웹은 푸시를 받지 않아 켤 것이 없다. */}
+      {isNative && (
+        <Card>
+          <ToggleRow label="알림" on={noti} onToggle={toggleNoti} />
+          {notiHint && (
+            <p className="px-4 pb-3 -mt-1 text-[11px] text-slate-500">{notiHint}</p>
+          )}
+        </Card>
+      )}
 
       {/* 공지 · 약관 */}
       <Card>
