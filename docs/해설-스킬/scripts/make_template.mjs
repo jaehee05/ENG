@@ -1,6 +1,4 @@
-// 기존 '정답 및 해설' hwpx → 내용을 비운 템플릿(assets/해설-템플릿.hwpx) 생성.
-// 판형을 바꾸고 싶을 때만 쓴다. 원본 hwpx 를 unz/ 에 풀어 두고 실행:
-//   unzip -q 원본.hwpx -d unz && node make_template.mjs
+// 김도윤 제4회 해설 hwpx → 내용을 비운 템플릿 hwpx 생성
 import fs from 'node:fs'
 import { execSync } from 'node:child_process'
 
@@ -109,5 +107,8 @@ execSync('rm -rf tpl && cp -R unz tpl')
 fs.writeFileSync('tpl/Contents/section0.xml', head + newBody + tailXml)
 fs.rmSync('tpl/Preview/PrvText.txt', { force: true })
 fs.rmSync('tpl/Preview/PrvImage.png', { force: true })
-execSync('cd tpl && rm -f ../template.hwpx && zip -q -X -r ../template.hwpx mimetype . -x mimetype')
+// hwpx 는 mimetype 이 압축 없이 맨 앞 항목이어야 한글이 알아본다.
+execSync('rm -f template.hwpx')
+execSync('cd tpl && zip -q -X -0 ../template.hwpx mimetype')
+execSync("cd tpl && zip -q -X -D -r ../template.hwpx . -x mimetype 'Preview/*'")
 console.log('\n템플릿 생성 완료:', fs.statSync('template.hwpx').size, 'bytes')
