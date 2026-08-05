@@ -231,11 +231,14 @@ def main():
     out = Path(args.output)
     if out.exists():
         out.unlink()
+    if "mimetype" not in files:
+        sys.exit("템플릿에 mimetype 항목이 없다 — 이대로 만들면 한글이 hwpx 로 알아보지 못한다.")
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
-        # mimetype 은 압축 없이 맨 앞에
-        if "mimetype" in files:
-            z.writestr(zipfile.ZipInfo("mimetype"), files.pop("mimetype"), zipfile.ZIP_STORED)
+        # hwpx 는 mimetype 이 '압축 없이 맨 앞' 항목이어야 한글이 알아본다
+        z.writestr(zipfile.ZipInfo("mimetype"), files.pop("mimetype"), zipfile.ZIP_STORED)
         for n, data in files.items():
+            if n.endswith("/"):      # 디렉터리 항목은 넣지 않는다
+                continue
             z.writestr(n, data)
 
     total = sum(len(v) for v in sections.values())
