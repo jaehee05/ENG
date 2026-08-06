@@ -27,6 +27,8 @@
     이 표시는 정답표의 배점 칸으로만 들어가고, 본문 유형 라벨에는 찍히지 않는다.
   · 정답 해설 줄은 반드시 '정답 해설 : ⑤ ' 로 시작한다(원문자가 정답).
   · 오답 해설은 원문자로 시작하는 줄 하나가 선지 하나다. 이어지는 줄은 앞 선지에 붙는다.
+  · 유형 라벨 바로 아래의 '* …' 한 줄은 문항 총평이다.
+  · '→ …' 줄은 바로 앞 해설(정답 해설 또는 그 선지)에 딸린 보충 코멘트로, 별도 문단이 된다.
 """
 
 import argparse
@@ -38,6 +40,8 @@ from pathlib import Path
 SECTION = "Contents/section0.xml"
 TEMPLATE_NAME = "해설-템플릿.hwpx"
 CIRCLED = "①②③④⑤"
+ARROWS = "→➔⇨"          # 원고에서 허용하는 보충 코멘트 머리표
+ARROW = "→"             # 문서에는 이걸로 통일해 찍는다
 SECTION_NAMES = ["공통과목", "화법과 작문", "언어와 매체"]
 
 
@@ -72,13 +76,19 @@ def parse(text):
                 "no": int(m.group(1)),
                 "type": m.group(2),
                 "points": 3 if m.group(3) else 2,
+                "summary": "",     # 유형 라벨 아래 '* …' 문항 총평
                 "answer": "",
                 "correct": "",
-                "wrong": [],       # [(원문자, 본문)]
+                "notes": [],       # 정답 해설 아래 '→ …' 보충
+                "wrong": [],       # [{sym, text, notes}]
             }
             mode = None
             continue
         if cur_item is None:
+            continue
+        # 문항 총평 — 유형 라벨과 정답 해설 사이의 '* …' 한 줄
+        if s.startswith("*") and not s.startswith("**") and mode is None:
+            cur_item["summary"] = s.lstrip("*").strip()
             continue
         m = re.match(r"^정답\s*해설\s*[:：]\s*([①-⑤])\s*(.*)$", s)
         if m:
@@ -89,13 +99,21 @@ def parse(text):
         if re.match(r"^오답\s*해설\s*$", s):
             mode = "wrong"
             continue
+        # 보충 코멘트 — 바로 앞 해설에 딸린 별도 문단
+        if s[0] in ARROWS:
+            note = ARROW + " " + s[1:].strip()
+            if mode == "wrong" and cur_item["wrong"]:
+                cur_item["wrong"][-1]["notes"].append(note)
+            else:
+                cur_item["notes"].append(note)
+            continue
         if mode == "correct":
             cur_item["correct"] = (cur_item["correct"] + " " + s).strip()
         elif mode == "wrong":
             if s[0] in CIRCLED:
-                cur_item["wrong"].append([s[0], s[1:].strip()])
+                cur_item["wrong"].append({"sym": s[0], "text": s[1:].strip(), "notes": []})
             elif cur_item["wrong"]:
-                cur_item["wrong"][-1][1] += " " + s
+                cur_item["wrong"][-1]["text"] += " " + s
     flush()
 
     if not title:
@@ -125,15 +143,23 @@ def fill(para, placeholder, value):
 
 
 def build_items(arch, items):
+    """총평(*)·보충(→)은 본문 문단 서식을 그대로 쓰되 각각 별도 문단으로 낸다."""
     out = []
+    body = lambda txt: fill(arch["wrong"], "{{WRONG}}", txt)  # noqa: E731
     for it in sorted(items, key=lambda x: x["no"]):
         label = f"{it['no']:02d}. [<hp:fwSpace/>{esc(it['type'])}<hp:fwSpace/>]"
         out.append(fill(arch["label"], "{{LABEL}}", label))
+        if it["summary"]:
+            out.append(body(f"* {esc(it['summary'])}"))
         out.append(fill(arch["answer"], "{{ANSWER}}", f" {it['answer']} {esc(it['correct'])}"))
+        for note in it["notes"]:
+            out.append(body(esc(note)))
         if it["wrong"]:
             out.append(arch["wrong_label"])
-            for sym, txt in it["wrong"]:
-                out.append(fill(arch["wrong"], "{{WRONG}}", f"{sym} {esc(txt)}"))
+            for w in it["wrong"]:
+                out.append(body(f"{w['sym']} {esc(w['text'])}"))
+                for note in w["notes"]:
+                    out.append(body(esc(note)))
         out.append(arch["blank"])
     return "".join(out)
 
