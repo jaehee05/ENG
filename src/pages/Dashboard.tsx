@@ -41,15 +41,18 @@ function fmtDDayDate(iso: string): string {
   return `${y}년 ${m}월 ${d}일`
 }
 
+/** 과제 줄을 눌렀을 때 갈 곳. 과제 탭(Assignments)과 규칙을 맞춘다. */
 function assignmentPath(a: Assignment): string | null {
   if (a.type === 'vocab') return `/vocab/${a.refId}`
   if (a.type === 'reading') return `/reading/${a.refId}`
+  if (a.type === 'korean_mock') return `/korean-mocks/${a.refId}`
   return null
 }
 
 function assignmentLabel(a: Assignment): string {
   if (a.type === 'vocab') return '단어 시험지'
   if (a.type === 'reading') return '지문'
+  if (a.type === 'korean_mock') return '모의고사'
   return '외부 과제'
 }
 
