@@ -1446,7 +1446,17 @@ export function AdminStudentDetail() {
 
   const mockScoresPanel = (
     <div className="space-y-4">
-      <MockScoreTrend scores={mockScores} />
+      <p className="text-xs text-slate-500">
+        여기서 성적을 넣고 어느 회차를 추이에 넣을지 정합니다. 그래프는{' '}
+        <button
+          type="button"
+          onClick={() => setTab('metrics')}
+          className="font-medium text-brand-700 hover:underline"
+        >
+          학습 지표
+        </button>{' '}
+        탭에 있습니다.
+      </p>
 
       <form
         onSubmit={handleSaveMockScore}
@@ -1616,6 +1626,9 @@ export function AdminStudentDetail() {
           {progressCards}
         </>
       )}
+      {/* 추이 그래프는 지표를 보는 자리에 둔다. 어느 회차를 넣고 뺄지는
+          '모의고사 성적' 탭에서 정한다 — 보는 곳과 고치는 곳을 나눈다. */}
+      <MockScoreTrend scores={mockScores} />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <StatCard
           label="단어 시험지 평균"
