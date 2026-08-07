@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import { ScheduleManager } from '../components/ScheduleManager'
+import { MockScoreTrend } from '../components/MockScoreTrend'
 import { DESKTOP_QUERY, useMediaQuery } from '../lib/useMediaQuery'
 import { WORDBOOK_ENABLED } from '../lib/features'
 import {
@@ -17,16 +18,20 @@ import {
 } from '../lib/studentColor'
 import {
   createAssignment,
+  createMockScore,
   deleteAssignment,
   deleteAttempt,
+  deleteMockScore,
   ensureDefaultCategories,
   listAssignmentsForStudent,
   listAttemptsForUser,
   listKoreanMocks,
+  listMockScores,
   listReadings,
   listVocabSets,
   setAssignmentManualStatus,
   updateAssignment,
+  updateMockScore,
 } from '../lib/firestore'
 import { sendPushNotification } from '../lib/ppurioApi'
 import { buildWeeklyReportVars } from '../lib/weeklyReport'
@@ -44,6 +49,7 @@ import {
   type CategoryConfig,
   type DDayView,
   type KoreanMock,
+  type MockScore,
   type MockSubject,
   MOCK_SUBJECT_LABEL,
   type Reading,
@@ -92,6 +98,16 @@ function defaultCategoryKey(type: AssignmentType): AssignmentCategory {
   if (type === 'reading') return 'problem'
   if (type === 'korean_mock') return 'mock'
   return 'etc'
+}
+
+/** 오늘 날짜(KST) 'YYYY-MM-DD'. 날짜 입력칸 기본값. */
+function todayISOKST(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date())
 }
 
 function fmtDate(ts: { toDate: () => Date } | null | undefined): string {
@@ -149,6 +165,7 @@ const ATTEMPT_FILTERS: readonly TypeFilter[] = [
 type TabKey =
   | 'assignments'
   | 'attempts'
+  | 'mockScores'
   | 'metrics'
   | 'schedule'
   | 'wordbook'
@@ -236,6 +253,15 @@ export function AdminStudentDetail() {
   const [vocabSets, setVocabSets] = useState<VocabSet[]>([])
   const [readings, setReadings] = useState<Reading[]>([])
   const [koreanMocks, setKoreanMocks] = useState<KoreanMock[]>([])
+  const [mockScores, setMockScores] = useState<MockScore[]>([])
+  const [msEditId, setMsEditId] = useState<string | null>(null)
+  const [msTitle, setMsTitle] = useState('')
+  const [msDate, setMsDate] = useState(todayISOKST())
+  const [msRaw, setMsRaw] = useState('')
+  const [msGrade, setMsGrade] = useState('')
+  const [msMemo, setMsMemo] = useState('')
+  const [msSaving, setMsSaving] = useState(false)
+  const [msError, setMsError] = useState<string | null>(null)
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -278,8 +304,9 @@ export function AdminStudentDetail() {
       listKoreanMocks(),
       listAssignmentsForStudent(id),
       ensureDefaultCategories(),
+      listMockScores(id),
     ])
-      .then(([acc, atts, wb, vs, rd, km, asn, cats]) => {
+      .then(([acc, atts, wb, vs, rd, km, asn, cats, ms]) => {
         if (cancelled) return
         if (!acc) {
           setError('학생을 찾을 수 없습니다.')
@@ -293,6 +320,7 @@ export function AdminStudentDetail() {
         setKoreanMocks(km)
         setAssignments(asn)
         setCategories(cats)
+        setMockScores(ms)
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : '불러오기에 실패했습니다.')
@@ -720,6 +748,7 @@ export function AdminStudentDetail() {
   const tabs: { key: TabKey; label: string; badge?: number }[] = [
     { key: 'assignments', label: '과제', badge: pending.length },
     { key: 'attempts', label: '시험 이력', badge: attempts.length },
+    { key: 'mockScores', label: '모의고사 성적', badge: mockScores.length },
     { key: 'metrics', label: '학습 지표' },
     { key: 'schedule', label: '일정' },
     { key: 'settings', label: '설정' },
@@ -1315,6 +1344,269 @@ export function AdminStudentDetail() {
     </div>
   )
 
+  // ── 모의고사 성적 (관리자 전용) ─────────────────────────────────────────
+  //
+  // 학생 화면은 mockScores 를 읽지 않으므로 여기 적은 성적은 학생에게 보이지
+  // 않는다. 응시일은 저장 시각이 아니라 관리자가 직접 지정한 날짜를 쓴다.
+
+  function resetMsForm() {
+    setMsEditId(null)
+    setMsTitle('')
+    setMsDate(todayISOKST())
+    setMsRaw('')
+    setMsGrade('')
+    setMsMemo('')
+    setMsError(null)
+  }
+
+  function startEditMockScore(m: MockScore) {
+    setMsEditId(m.id)
+    setMsTitle(m.title)
+    setMsDate(m.dateISO)
+    setMsRaw(m.raw == null ? '' : String(m.raw))
+    setMsGrade(m.grade == null ? '' : String(m.grade))
+    setMsMemo(m.memo ?? '')
+    setMsError(null)
+  }
+
+  async function handleSaveMockScore(e: React.FormEvent) {
+    e.preventDefault()
+    if (!account) return
+    const title = msTitle.trim()
+    if (!title) {
+      setMsError('시험 이름을 적어 주세요.')
+      return
+    }
+    if (!msDate) {
+      setMsError('응시일을 지정해 주세요.')
+      return
+    }
+    const raw = msRaw.trim() === '' ? null : Number(msRaw)
+    const grade = msGrade.trim() === '' ? null : Number(msGrade)
+    if (raw != null && (!Number.isFinite(raw) || raw < 0 || raw > 100)) {
+      setMsError('원점수는 0에서 100 사이로 적어 주세요.')
+      return
+    }
+    if (raw == null && grade == null) {
+      setMsError('원점수나 등급 중 하나는 있어야 합니다.')
+      return
+    }
+    setMsSaving(true)
+    setMsError(null)
+    try {
+      if (msEditId) {
+        await updateMockScore(msEditId, {
+          title,
+          dateISO: msDate,
+          raw,
+          grade,
+          memo: msMemo.trim(),
+        })
+      } else {
+        await createMockScore({
+          studentUid: account.id,
+          title,
+          dateISO: msDate,
+          raw,
+          grade,
+          memo: msMemo.trim(),
+        })
+      }
+      setMockScores(await listMockScores(account.id))
+      resetMsForm()
+    } catch (err) {
+      setMsError(err instanceof Error ? err.message : '저장에 실패했습니다.')
+    } finally {
+      setMsSaving(false)
+    }
+  }
+
+  async function handleToggleTrend(m: MockScore) {
+    const next = !m.inTrend
+    setMockScores((prev) =>
+      prev.map((x) => (x.id === m.id ? { ...x, inTrend: next } : x)),
+    )
+    try {
+      await updateMockScore(m.id, { inTrend: next })
+    } catch {
+      // 실패하면 되돌린다 — 화면과 저장된 값이 어긋난 채로 두지 않는다.
+      setMockScores((prev) =>
+        prev.map((x) => (x.id === m.id ? { ...x, inTrend: m.inTrend } : x)),
+      )
+    }
+  }
+
+  async function handleDeleteMockScore(m: MockScore) {
+    if (!account) return
+    if (!confirm(`'${m.title}' 성적을 지울까요?`)) return
+    await deleteMockScore(m.id)
+    if (msEditId === m.id) resetMsForm()
+    setMockScores(await listMockScores(account.id))
+  }
+
+  const mockScoresPanel = (
+    <div className="space-y-4">
+      <MockScoreTrend scores={mockScores} />
+
+      <form
+        onSubmit={handleSaveMockScore}
+        className="rounded-lg border border-slate-200 bg-white p-3 space-y-3"
+      >
+        <div className="flex items-baseline justify-between gap-2">
+          <h3 className="text-sm font-semibold text-slate-800">
+            {msEditId ? '성적 수정' : '성적 입력'}
+          </h3>
+          {msEditId && (
+            <button
+              type="button"
+              onClick={resetMsForm}
+              className="text-xs text-slate-500 hover:text-slate-900"
+            >
+              새로 입력
+            </button>
+          )}
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-2">
+          <label className="block sm:col-span-2">
+            <span className="text-xs text-slate-500">시험 이름</span>
+            <input
+              value={msTitle}
+              onChange={(e) => setMsTitle(e.target.value)}
+              placeholder="2027학년도 6월 모의평가"
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs text-slate-500">응시일</span>
+            <input
+              type="date"
+              value={msDate}
+              onChange={(e) => setMsDate(e.target.value)}
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            />
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block">
+              <span className="text-xs text-slate-500">원점수</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={100}
+                value={msRaw}
+                onChange={(e) => setMsRaw(e.target.value)}
+                placeholder="88"
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs text-slate-500">등급</span>
+              <select
+                value={msGrade}
+                onChange={(e) => setMsGrade(e.target.value)}
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm bg-white"
+              >
+                <option value="">-</option>
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((g) => (
+                  <option key={g} value={g}>
+                    {g}등급
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <label className="block sm:col-span-2">
+            <span className="text-xs text-slate-500">메모 (선택)</span>
+            <input
+              value={msMemo}
+              onChange={(e) => setMsMemo(e.target.value)}
+              placeholder="화작 선택, 독서 3문항 실수"
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+            />
+          </label>
+        </div>
+
+        {msError && <p className="text-xs text-red-600">{msError}</p>}
+
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[11px] text-slate-400">
+            여기 적은 성적은 학생 화면에 나오지 않습니다.
+          </p>
+          <button
+            type="submit"
+            disabled={msSaving}
+            className="rounded-md bg-slate-900 text-white text-xs font-medium px-4 py-2 touch:py-2.5 hover:bg-slate-800 disabled:opacity-50"
+          >
+            {msSaving ? '저장 중...' : msEditId ? '수정' : '저장'}
+          </button>
+        </div>
+      </form>
+
+      {mockScores.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+          입력한 성적이 없습니다.
+        </div>
+      ) : (
+        <ul className="space-y-2">
+          {[...mockScores]
+            .sort((a, b) => b.dateISO.localeCompare(a.dateISO))
+            .map((m) => (
+              <li
+                key={m.id}
+                className="rounded-lg border border-slate-200 bg-white p-3 flex items-start gap-3"
+              >
+                <label className="flex items-center gap-2 shrink-0 pt-0.5">
+                  <input
+                    type="checkbox"
+                    checked={m.inTrend}
+                    onChange={() => handleToggleTrend(m)}
+                    className="h-4 w-4 rounded border-slate-300"
+                  />
+                  <span className="text-[11px] text-slate-500">추이</span>
+                </label>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-slate-900 break-words">
+                    {m.title}
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {m.dateISO}
+                    {m.memo ? ` · ${m.memo}` : ''}
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-sm font-semibold text-slate-900 tabular-nums">
+                    {m.raw != null ? `${m.raw}점` : '-'}
+                    {m.grade != null && (
+                      <span className="ml-1.5 text-xs font-medium text-brand-700">
+                        {m.grade}등급
+                      </span>
+                    )}
+                  </p>
+                  <div className="flex items-center justify-end gap-2 mt-1">
+                    <button
+                      type="button"
+                      onClick={() => startEditMockScore(m)}
+                      className="text-[11px] text-slate-400 hover:text-slate-900 py-1"
+                    >
+                      수정
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteMockScore(m)}
+                      className="text-[11px] text-slate-400 hover:text-red-600 py-1"
+                    >
+                      삭제
+                    </button>
+                  </div>
+                </div>
+              </li>
+            ))}
+        </ul>
+      )}
+    </div>
+  )
+
   const metricsPanel = (
     <div className="space-y-4">
       {/* 데스크탑에선 이 둘이 사이드바에 상시 노출되므로 탭에서 뺀다. */}
@@ -1405,6 +1697,7 @@ export function AdminStudentDetail() {
   const panels: Record<TabKey, React.ReactNode> = {
     assignments: assignmentsPanel,
     attempts: attemptsPanel,
+    mockScores: mockScoresPanel,
     metrics: metricsPanel,
     schedule: <ScheduleManager studentUid={account.id} />,
     wordbook: wordbookPanel,

@@ -892,6 +892,50 @@ export function assignmentCategory(a: Assignment): AssignmentCategory {
   return 'etc'
 }
 
+/**
+ * 관리자가 손으로 적어 두는 국어 모의고사 성적.
+ *
+ * 앱에서 응시한 기록(attempts)과 컬렉션을 나눠 둔다. 학생 화면은 attempts 만
+ * 읽으므로, 여기 적힌 성적은 구조적으로 학생에게 보이지 않는다. 학생에게
+ * 보여줄 성적이라면 이 컬렉션이 아니라 attempts 에 넣어야 한다.
+ */
+export interface MockScore {
+  id: string
+  studentUid: string
+  /** 시험 이름. 예: '2027학년도 6월 모의평가' */
+  title: string
+  /** 응시일 'YYYY-MM-DD'. 저장 시각과 무관하게 관리자가 직접 지정한다. */
+  dateISO: string
+  /** 원점수 0~100. 모르면 비운다. */
+  raw?: number | null
+  /** 등급 1~9. 모르면 비운다. */
+  grade?: number | null
+  memo?: string
+  /** 추이 그래프에 넣을지. 기본 true. */
+  inTrend: boolean
+  createdAt: Timestamp | null
+}
+
+/** 추이 그래프에서 고를 수 있는 지표. 입력 항목이 둘뿐이라 둘만 있다. */
+export type MockScoreMetric = 'grade' | 'raw'
+
+export const MOCK_SCORE_METRIC_LABEL: Record<MockScoreMetric, string> = {
+  grade: '등급',
+  raw: '원점수',
+}
+
+/** 그래프에 실제로 그릴 수 있는 성적만. 지표 값이 없는 기록은 점이 될 수 없다. */
+export function trendPoints(
+  scores: MockScore[],
+  metric: MockScoreMetric,
+): { score: MockScore; value: number }[] {
+  return scores
+    .filter((s) => s.inTrend)
+    .map((s) => ({ score: s, value: (metric === 'grade' ? s.grade : s.raw) ?? NaN }))
+    .filter((p) => Number.isFinite(p.value))
+    .sort((a, b) => a.score.dateISO.localeCompare(b.score.dateISO))
+}
+
 /** 학생이 직접 관리하는 '기타' 카테고리의 개인 할 일. */
 export interface PersonalTodo {
   id: string
