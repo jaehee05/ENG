@@ -56,6 +56,7 @@ service cloud.firestore {
     match /classSessions/{doc=**} { allow read, write: if true; }
     match /koreanMocks/{doc=**}   { allow read, write: if true; }
     match /meta/{doc=**}          { allow read, write: if true; }
+    match /mockScores/{doc=**}    { allow read, write: if true; }
     match /notifications/{doc=**} { allow read, write: if true; }
     match /payments/{doc=**}      { allow read, write: if true; }
     match /pushSchedules/{doc=**} { allow read, write: if true; }

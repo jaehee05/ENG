@@ -38,6 +38,7 @@ import type {
   MockSubject,
   NotificationKind,
   Payment,
+  MockScore,
   PersonalTodo,
   PushSchedule,
   Reading,
@@ -1402,6 +1403,59 @@ export async function listAllAttempts(): Promise<Attempt[]> {
 
 export async function deleteAssignment(id: string): Promise<void> {
   await deleteDoc(doc(db, 'assignments', id))
+}
+
+// ───── 모의고사 성적 (관리자가 손으로 적는 것) ─────
+//
+// 학생 화면은 이 컬렉션을 읽지 않는다. 관리자 화면(AdminStudentDetail)에서만
+// 쓴다 — 학생에게 보여줄 성적이면 attempts 에 넣어야 한다.
+//
+// 정렬은 서버가 아니라 여기서 한다. where + orderBy 를 같이 걸면 복합 색인이
+// 필요한데, 학생 한 명의 성적은 많아야 수십 건이라 색인을 만들 이유가 없다.
+
+export async function listMockScores(studentUid: string): Promise<MockScore[]> {
+  const snap = await getDocs(
+    query(collection(db, 'mockScores'), where('studentUid', '==', studentUid)),
+  )
+  const items = snap.docs.map((d) => {
+    const data = d.data() as Omit<MockScore, 'id'>
+    // inTrend 가 없던 시기의 기록은 포함으로 본다.
+    return { id: d.id, ...data, inTrend: data.inTrend !== false }
+  })
+  return items.sort((a, b) => a.dateISO.localeCompare(b.dateISO))
+}
+
+export async function createMockScore(input: {
+  studentUid: string
+  title: string
+  dateISO: string
+  raw?: number | null
+  grade?: number | null
+  memo?: string
+  inTrend?: boolean
+}): Promise<string> {
+  const ref = await addDoc(collection(db, 'mockScores'), {
+    studentUid: input.studentUid,
+    title: input.title.trim(),
+    dateISO: input.dateISO,
+    raw: input.raw ?? null,
+    grade: input.grade ?? null,
+    memo: input.memo?.trim() ?? '',
+    inTrend: input.inTrend ?? true,
+    createdAt: serverTimestamp(),
+  })
+  return ref.id
+}
+
+export async function updateMockScore(
+  id: string,
+  patch: Partial<Pick<MockScore, 'title' | 'dateISO' | 'raw' | 'grade' | 'memo' | 'inTrend'>>,
+): Promise<void> {
+  await updateDoc(doc(db, 'mockScores', id), patch)
+}
+
+export async function deleteMockScore(id: string): Promise<void> {
+  await deleteDoc(doc(db, 'mockScores', id))
 }
 
 // ───── 학생 개인 할 일 (기타 카테고리) ─────
