@@ -25,9 +25,19 @@ const GRID = '#eef2f7'
 const AXIS_INK = '#94a3b8'
 const LABEL_INK = '#334155'
 
-// 오른쪽은 마지막 회차 값을 선 끝에 적을 자리를 비워 둔다.
-const PAD = { top: 20, right: 48, bottom: 28, left: 32 }
+/**
+ * 여백. 넓은 화면에서는 오른쪽에 마지막 회차 값을 적을 자리를 비우고,
+ * 폰처럼 좁은 화면에서는 그 자리를 그래프에 돌려주고 값을 점 위로 올린다.
+ * 좁은 화면에서 오른쪽 48px 을 비우면 그릴 폭이 4분의 1 넘게 깎인다.
+ */
+const COMPACT_AT = 420
+function padFor(width: number) {
+  const compact = width < COMPACT_AT
+  return { top: 22, right: compact ? 16 : 48, bottom: 28, left: compact ? 26 : 32, compact }
+}
 const HEIGHT = 216
+/** x축 날짜 하나가 겹치지 않고 앉으려면 필요한 폭. '10/15' 기준. */
+const TICK_GAP = 62
 
 /** 'YYYY-MM-DD' → 'M/D'. */
 function fmtTick(iso: string): string {
@@ -144,6 +154,7 @@ export function MockScoreTrend({ scores }: { scores: MockScore[] }) {
           return [Math.max(0, Math.floor(min - room)), Math.min(100, Math.ceil(max + room))]
         })()
 
+  const PAD = padFor(width)
   const innerW = width - PAD.left - PAD.right
   const innerH = HEIGHT - PAD.top - PAD.bottom
   const x = (i: number) =>
@@ -174,10 +185,12 @@ export function MockScoreTrend({ scores }: { scores: MockScore[] }) {
     0,
   )
 
-  // x축 라벨이 겹치지 않을 만큼만 남긴다.
-  const maxTicks = Math.max(2, Math.floor(innerW / 52))
+  // x축 라벨은 겹치지 않을 만큼만 남긴다. 마지막 회차는 늘 적되, 그 바로
+  // 앞자리는 지운다 — 안 그러면 좁은 화면에서 '9/3 10/15' 가 붙어 버린다.
+  const maxTicks = Math.max(2, Math.floor(innerW / TICK_GAP))
   const step = Math.ceil(points.length / maxTicks)
-  const showTick = (i: number) => i === lastIdx || i % step === 0
+  const showTick = (i: number) =>
+    i === lastIdx || (i % step === 0 && lastIdx - i >= step)
 
   const line = points.map((p, i) => `${x(i)},${y(p.value)}`).join(' ')
   const area = `${PAD.left},${PAD.top + innerH} ${line} ${x(lastIdx)},${PAD.top + innerH}`
@@ -185,6 +198,13 @@ export function MockScoreTrend({ scores }: { scores: MockScore[] }) {
   /** i 번째 점이 나타날 시각(초). 선이 그 자리를 지날 때 맞춰 붙는다. */
   const dotDelay = (i: number) =>
     points.length === 1 ? 0.1 : 0.1 + (0.8 * i) / (points.length - 1)
+
+  /**
+   * 좁은 화면에서 마지막 값을 점 위에 둘지 아래에 둘지.
+   * 선이 올라오며 끝나면 위가 비고, 내려오며 끝나면 아래가 빈다.
+   */
+  const lastLabelAbove =
+    points.length < 2 || y(points[lastIdx - 1].value) >= y(points[lastIdx].value)
 
   const hovered = hover != null ? points[hover] : null
 
@@ -287,9 +307,13 @@ export function MockScoreTrend({ scores }: { scores: MockScore[] }) {
               />
               {i === lastIdx && (
                 <text
-                  x={x(i) + 11}
-                  y={y(p.value) + 4}
-                  textAnchor="start"
+                  x={PAD.compact ? x(i) + 4 : x(i) + 11}
+                  y={
+                    PAD.compact
+                      ? y(p.value) + (lastLabelAbove ? -13 : 19)
+                      : y(p.value) + 4
+                  }
+                  textAnchor={PAD.compact ? 'end' : 'start'}
                   fontSize={13}
                   fontWeight={600}
                   fill={LABEL_INK}
