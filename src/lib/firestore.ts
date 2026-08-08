@@ -1405,6 +1405,39 @@ export async function deleteAssignment(id: string): Promise<void> {
   await deleteDoc(doc(db, 'assignments', id))
 }
 
+// ───── 단어 시험지 평균의 기준 시험지 ─────
+//
+// 학생별로 "이 시험지부터 평균을 낸다"를 정해 둔다. 재수강·교재 교체 전의
+// 성적이 평균을 끌고 다니지 않게 하려는 것이다.
+//
+// users 는 규칙으로 닫혀 있어 Functions 를 거쳐야 하므로, 화면 설정 하나를
+// 위해 서버를 고치는 대신 열려 있는 meta 문서에 uid → 기준 시험지로 담는다.
+// 학생 수가 수십 명이라 문서 하나로 충분하다.
+
+export interface VocabAvgBase {
+  refId: string
+  refTitle: string
+}
+
+const VOCAB_AVG_BASE_DOC = 'vocabAvgBase'
+
+export async function getVocabAvgBase(uid: string): Promise<VocabAvgBase | null> {
+  const snap = await getDoc(doc(db, 'meta', VOCAB_AVG_BASE_DOC))
+  const data = snap.data() as Record<string, VocabAvgBase> | undefined
+  return data?.[uid] ?? null
+}
+
+export async function setVocabAvgBase(
+  uid: string,
+  base: VocabAvgBase | null,
+): Promise<void> {
+  await setDoc(
+    doc(db, 'meta', VOCAB_AVG_BASE_DOC),
+    { [uid]: base ?? deleteField() },
+    { merge: true },
+  )
+}
+
 // ───── 모의고사 성적 (관리자가 손으로 적는 것) ─────
 //
 // 학생 화면은 이 컬렉션을 읽지 않는다. 관리자 화면(AdminStudentDetail)에서만
