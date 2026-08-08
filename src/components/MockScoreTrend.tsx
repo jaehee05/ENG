@@ -53,7 +53,23 @@ function niceTicks(lo: number, hi: number, count: number): number[] {
   return out
 }
 
-export function MockScoreTrend({ scores }: { scores: MockScore[] }) {
+export function MockScoreTrend({
+  scores,
+  metric: fixedMetric,
+  subtitle = '직접 입력한 성적 · 관리자만 볼 수 있음',
+  caption,
+  animate = true,
+}: {
+  scores: MockScore[]
+  /** 지표를 고정한다. 주면 전환 버튼이 사라진다 (성적표 출력용). */
+  metric?: MockScoreMetric
+  /** 제목 아래 설명. null 이면 숨긴다. */
+  subtitle?: string | null
+  /** 그래프 아래 문구. 없으면 회차 수를 적는다. null 이면 숨긴다. */
+  caption?: string | null
+  /** 등장 애니메이션. 인쇄할 때는 끈다 — 그리는 중에 찍히면 안 된다. */
+  animate?: boolean
+}) {
   const has = useMemo(
     () => ({
       grade: scores.some((s) => s.inTrend && s.grade != null),
@@ -63,7 +79,8 @@ export function MockScoreTrend({ scores }: { scores: MockScore[] }) {
   )
   const [metric, setMetric] = useState<MockScoreMetric>('grade')
   // 고른 지표에 값이 하나도 없으면 값이 있는 쪽으로 넘어간다.
-  const active: MockScoreMetric = has[metric] ? metric : has.grade ? 'grade' : 'raw'
+  const active: MockScoreMetric =
+    fixedMetric ?? (has[metric] ? metric : has.grade ? 'grade' : 'raw')
   const points = useMemo(() => trendPoints(scores, active), [scores, active])
 
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -108,11 +125,9 @@ export function MockScoreTrend({ scores }: { scores: MockScore[] }) {
         <h3 className="text-sm font-semibold text-slate-900">
           국어 {MOCK_SCORE_METRIC_LABEL[active]} 추이
         </h3>
-        <p className="text-[11px] text-slate-400 mt-0.5">
-          직접 입력한 성적 · 관리자만 볼 수 있음
-        </p>
+        {subtitle && <p className="text-[11px] text-slate-400 mt-0.5">{subtitle}</p>}
       </div>
-      {(has.grade || has.raw) && metricToggle}
+      {!fixedMetric && (has.grade || has.raw) && metricToggle}
     </div>
   )
 
@@ -207,8 +222,16 @@ export function MockScoreTrend({ scores }: { scores: MockScore[] }) {
           key={active}
           width={width}
           height={HEIGHT}
+          /* viewBox 를 함께 두면 화면에서는 1:1 로 그려지고, 인쇄처럼 폭이 좁아진
+             지면에서는 잘리는 대신 비례해서 줄어든다. */
+          viewBox={`0 0 ${width} ${HEIGHT}`}
           className="block touch-none select-none font-sans"
-          style={{ fontFamily: 'inherit', fontVariantNumeric: 'tabular-nums' }}
+          style={{
+            fontFamily: 'inherit',
+            fontVariantNumeric: 'tabular-nums',
+            maxWidth: '100%',
+            height: 'auto',
+          }}
           onPointerMove={handleMove}
           onPointerLeave={() => setHover(null)}
           role="img"
@@ -246,7 +269,7 @@ export function MockScoreTrend({ scores }: { scores: MockScore[] }) {
           ))}
 
           {points.length > 1 && (
-            <polygon points={area} fill="url(#mockTrendFill)" className="trend-area" />
+            <polygon points={area} fill="url(#mockTrendFill)" className={animate ? 'trend-area' : undefined} />
           )}
 
           {hovered && (
@@ -269,7 +292,7 @@ export function MockScoreTrend({ scores }: { scores: MockScore[] }) {
               strokeWidth={2}
               strokeLinejoin="round"
               strokeLinecap="round"
-              className="trend-line"
+              className={animate ? 'trend-line' : undefined}
             />
           )}
 
@@ -282,8 +305,8 @@ export function MockScoreTrend({ scores }: { scores: MockScore[] }) {
                 fill={SERIES}
                 stroke="#ffffff"
                 strokeWidth={2}
-                className="trend-dot"
-                style={{ animationDelay: `${dotDelay(i)}s` }}
+                className={animate ? 'trend-dot' : undefined}
+                style={animate ? { animationDelay: `${dotDelay(i)}s` } : undefined}
               />
               {i === lastIdx && (
                 <text
@@ -293,8 +316,8 @@ export function MockScoreTrend({ scores }: { scores: MockScore[] }) {
                   fontSize={13}
                   fontWeight={600}
                   fill={LABEL_INK}
-                  className="trend-label"
-                  style={{ animationDelay: `${dotDelay(i) + 0.1}s` }}
+                  className={animate ? 'trend-label' : undefined}
+                  style={animate ? { animationDelay: `${dotDelay(i) + 0.1}s` } : undefined}
                 >
                   {p.value}
                   {unit}
@@ -308,8 +331,8 @@ export function MockScoreTrend({ scores }: { scores: MockScore[] }) {
                   fontSize={12}
                   fontWeight={600}
                   fill={LABEL_INK}
-                  className="trend-label"
-                  style={{ animationDelay: `${dotDelay(i) + 0.1}s` }}
+                  className={animate ? 'trend-label' : undefined}
+                  style={animate ? { animationDelay: `${dotDelay(i) + 0.1}s` } : undefined}
                 >
                   {p.value}
                   {unit}
@@ -349,9 +372,11 @@ export function MockScoreTrend({ scores }: { scores: MockScore[] }) {
         )}
       </div>
 
-      <p className="text-[11px] text-slate-400">
-        {points.length}개 회차 · 값 전체는 ‘모의고사 성적’ 탭 목록에 있습니다.
-      </p>
+      {caption !== null && (
+        <p className="text-[11px] text-slate-400">
+          {caption ?? `${points.length}개 회차 · 값 전체는 ‘모의고사 성적’ 탭 목록에 있습니다.`}
+        </p>
+      )}
     </section>
   )
 }
