@@ -182,6 +182,8 @@ export function AdminMockReport() {
                   subtitle={null}
                   caption={null}
                   animate={false}
+                  /* 인쇄물에는 손을 올려 볼 수 없으니 회차 값을 모두 적는다. */
+                  labelAll
                 />
               )}
             </section>
