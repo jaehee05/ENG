@@ -25,13 +25,16 @@ import {
   ensureDefaultCategories,
   listAssignmentsForStudent,
   listAttemptsForUser,
+  getVocabAvgBase,
   listKoreanMocks,
   listMockScores,
   listReadings,
   listVocabSets,
   setAssignmentManualStatus,
+  setVocabAvgBase,
   updateAssignment,
   updateMockScore,
+  type VocabAvgBase,
 } from '../lib/firestore'
 import { sendPushNotification } from '../lib/ppurioApi'
 import { buildWeeklyReportVars } from '../lib/weeklyReport'
@@ -254,6 +257,7 @@ export function AdminStudentDetail() {
   const [readings, setReadings] = useState<Reading[]>([])
   const [koreanMocks, setKoreanMocks] = useState<KoreanMock[]>([])
   const [mockScores, setMockScores] = useState<MockScore[]>([])
+  const [vocabBase, setVocabBase] = useState<VocabAvgBase | null>(null)
   const [msEditId, setMsEditId] = useState<string | null>(null)
   const [msTitle, setMsTitle] = useState('')
   const [msDate, setMsDate] = useState(todayISOKST())
@@ -305,8 +309,9 @@ export function AdminStudentDetail() {
       listAssignmentsForStudent(id),
       ensureDefaultCategories(),
       listMockScores(id),
+      getVocabAvgBase(id),
     ])
-      .then(([acc, atts, wb, vs, rd, km, asn, cats, ms]) => {
+      .then(([acc, atts, wb, vs, rd, km, asn, cats, ms, vb]) => {
         if (cancelled) return
         if (!acc) {
           setError('학생을 찾을 수 없습니다.')
@@ -321,6 +326,7 @@ export function AdminStudentDetail() {
         setAssignments(asn)
         setCategories(cats)
         setMockScores(ms)
+        setVocabBase(vb)
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : '불러오기에 실패했습니다.')
@@ -333,28 +339,51 @@ export function AdminStudentDetail() {
     }
   }, [id])
 
+  /**
+   * 단어 시험지 평균에 넣을 응시들.
+   *
+   * 기준 시험지를 정해 두면 그 시험지를 처음 푼 날부터의 응시만 센다(기준
+   * 시험지 자신도 포함). 재수강이나 교재 교체 전 성적이 평균을 계속 끌고
+   * 다니지 않게 하려는 것이다. 기준 시험지를 아직 푼 적이 없으면 거를 수
+   * 없으므로 전체를 쓴다.
+   */
+  const vocabForAvg = useMemo(() => {
+    const vocab = attempts.filter((a) => a.type === 'vocab' && a.total > 0)
+    if (!vocabBase) return vocab
+    const baseTimes = attempts
+      .filter((a) => a.type === 'vocab' && a.refId === vocabBase.refId)
+      .map((a) => a.createdAt?.toMillis() ?? 0)
+      .filter((t) => t > 0)
+    if (baseTimes.length === 0) return vocab
+    const from = Math.min(...baseTimes)
+    return vocab.filter((a) => (a.createdAt?.toMillis() ?? 0) >= from)
+  }, [attempts, vocabBase])
+
+  /** 기준 시험지 후보 — 이 학생이 실제로 응시한 단어 시험지들. */
+  const vocabBaseOptions = useMemo(() => {
+    const seen = new Map<string, { refId: string; refTitle: string; at: number }>()
+    for (const a of attempts) {
+      if (a.type !== 'vocab' || !a.refId) continue
+      const at = a.createdAt?.toMillis() ?? 0
+      const prev = seen.get(a.refId)
+      if (!prev || at < prev.at) seen.set(a.refId, { refId: a.refId, refTitle: a.refTitle, at })
+    }
+    return [...seen.values()].sort((x, y) => y.at - x.at)
+  }, [attempts])
+
   const stats = useMemo(() => {
     const ratios = attempts
       .filter((a) => a.total > 0)
       .map((a) => Math.round((a.correct / a.total) * 100))
-    const vocab = attempts.filter((a) => a.type === 'vocab')
-    const reading = attempts.filter((a) => a.type === 'reading')
     return {
       totalAttempts: attempts.length,
       avgRatio: avg(ratios),
-      vocabAvg: avg(
-        vocab.filter((a) => a.total > 0).map((a) => Math.round((a.correct / a.total) * 100)),
-      ),
-      readingAvg: avg(
-        reading
-          .filter((a) => a.total > 0)
-          .map((a) => Math.round((a.correct / a.total) * 100)),
-      ),
+      vocabAvg: avg(vocabForAvg.map((a) => Math.round((a.correct / a.total) * 100))),
       wordbookSize: wordbook.length,
       wordbookTotalLookups: wordbook.reduce((sum, w) => sum + (w.count ?? 0), 0),
       lastActivity: attempts[0]?.createdAt ?? null,
     }
-  }, [attempts, wordbook])
+  }, [attempts, wordbook, vocabForAvg])
 
   const filteredAttempts = useMemo(
     () => (typeFilter === 'all' ? attempts : attempts.filter((a) => a.type === typeFilter)),
@@ -1617,6 +1646,18 @@ export function AdminStudentDetail() {
     </div>
   )
 
+  async function handleVocabBaseChange(refId: string) {
+    if (!account) return
+    const picked = vocabBaseOptions.find((o) => o.refId === refId)
+    const next = picked ? { refId: picked.refId, refTitle: picked.refTitle } : null
+    setVocabBase(next)
+    try {
+      await setVocabAvgBase(account.id, next)
+    } catch {
+      setVocabBase(vocabBase) // 저장 실패 시 되돌린다
+    }
+  }
+
   const metricsPanel = (
     <div className="space-y-4">
       {/* 데스크탑에선 이 둘이 사이드바에 상시 노출되므로 탭에서 뺀다. */}
@@ -1629,25 +1670,40 @@ export function AdminStudentDetail() {
       {/* 추이 그래프는 지표를 보는 자리에 둔다. 어느 회차를 넣고 뺄지는
           '모의고사 성적' 탭에서 정한다 — 보는 곳과 고치는 곳을 나눈다. */}
       <MockScoreTrend scores={mockScores} />
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        <StatCard
-          label="단어 시험지 평균"
-          value={
-            attempts.some((a) => a.type === 'vocab' && a.total > 0)
-              ? `${stats.vocabAvg}%`
-              : '—'
-          }
-          sub={`${attempts.filter((a) => a.type === 'vocab').length}회 응시`}
-        />
-        <StatCard
-          label="지문 평균"
-          value={
-            attempts.some((a) => a.type === 'reading' && a.total > 0)
-              ? `${stats.readingAvg}%`
-              : '—'
-          }
-          sub={`${attempts.filter((a) => a.type === 'reading').length}회 응시`}
-        />
+      <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-2">
+        <div>
+          <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">
+            단어 시험지 평균
+          </p>
+          <p className="text-xl font-semibold text-slate-900 mt-0.5 tracking-tight">
+            {vocabForAvg.length > 0 ? `${stats.vocabAvg}%` : '—'}
+          </p>
+          <p className="text-[10px] text-slate-400 mt-0.5">
+            {vocabBase
+              ? `‘${vocabBase.refTitle}’ 이후 ${vocabForAvg.length}회 응시`
+              : `${vocabForAvg.length}회 응시`}
+          </p>
+        </div>
+        <label className="block">
+          <span className="text-[10px] text-slate-500">기준 시험지</span>
+          <select
+            value={vocabBase?.refId ?? ''}
+            onChange={(e) => handleVocabBaseChange(e.target.value)}
+            className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700"
+          >
+            <option value="">전체 (기준 없음)</option>
+            {vocabBaseOptions.map((o) => (
+              <option key={o.refId} value={o.refId}>
+                {o.refTitle}
+              </option>
+            ))}
+          </select>
+        </label>
+        {vocabBase && !vocabBaseOptions.some((o) => o.refId === vocabBase.refId) && (
+          <p className="text-[10px] text-amber-600">
+            기준으로 잡은 ‘{vocabBase.refTitle}’ 응시 기록이 없어 전체로 계산했습니다.
+          </p>
+        )}
       </div>
       <WeeklyReportPreview
         studentName={account.displayName}
