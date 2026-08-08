@@ -1475,8 +1475,9 @@ export function AdminStudentDetail() {
 
   const mockScoresPanel = (
     <div className="space-y-4">
-      <p className="text-xs text-slate-500">
-        여기서 성적을 넣고 어느 회차를 추이에 넣을지 정합니다. 그래프는{' '}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-xs text-slate-500">
+          여기서 성적을 넣고 어느 회차를 추이에 넣을지 정합니다. 그래프는{' '}
         <button
           type="button"
           onClick={() => setTab('metrics')}
@@ -1484,8 +1485,15 @@ export function AdminStudentDetail() {
         >
           학습 지표
         </button>{' '}
-        탭에 있습니다.
-      </p>
+          탭에 있습니다.
+        </p>
+        <Link
+          to={`/admin/students/${account.id}/report`}
+          className="shrink-0 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+        >
+          성적표 출력
+        </Link>
+      </div>
 
       <form
         onSubmit={handleSaveMockScore}

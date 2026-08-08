@@ -187,3 +187,34 @@ body {
     opacity: 1;
   }
 }
+
+/* 성적표 인쇄 — 화면이 곧 지면이다.
+   버튼과 돌아가기만 빼고, 배경·그림자를 없애 잉크를 아낀다. 그래프의 면·선은
+   색이 데이터라서 브라우저의 '배경 그래픽 끄기'에 지워지지 않게 못 박는다. */
+@page {
+  size: A4 portrait;
+  margin: 14mm;
+}
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff !important;
+  }
+  .report-page {
+    max-width: none !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  /* 표와 그래프가 페이지 경계에서 잘리지 않게 한다. */
+  section,
+  table,
+  tr {
+    break-inside: avoid;
+  }
+}
