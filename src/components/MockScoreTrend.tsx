@@ -24,8 +24,6 @@ const SERIES = '#4b8b4b'
 const GRID = '#eef2f7'
 const AXIS_INK = '#94a3b8'
 const LABEL_INK = '#334155'
-/** 값을 전부 적을 때, 최고 회차가 아닌 값에 쓰는 옅은 먹. */
-const AXIS_LABEL_INK = '#64748b'
 
 // 오른쪽은 마지막 회차 값을 선 끝에 적을 자리를 비워 둔다.
 const PAD = { top: 20, right: 48, bottom: 28, left: 32 }
@@ -61,7 +59,6 @@ export function MockScoreTrend({
   subtitle = '직접 입력한 성적 · 관리자만 볼 수 있음',
   caption,
   animate = true,
-  labelAll = false,
 }: {
   scores: MockScore[]
   /** 지표를 고정한다. 주면 전환 버튼이 사라진다 (성적표 출력용). */
@@ -72,11 +69,6 @@ export function MockScoreTrend({
   caption?: string | null
   /** 등장 애니메이션. 인쇄할 때는 끈다 — 그리는 중에 찍히면 안 된다. */
   animate?: boolean
-  /**
-   * 모든 회차에 값을 적는다. 인쇄물처럼 손을 올려 볼 수 없는 자리에서 쓴다.
-   * 화면에서는 마지막·최고 회차만 적는 편이 읽기 좋다.
-   */
-  labelAll?: boolean
 }) {
   const has = useMemo(
     () => ({
@@ -209,21 +201,6 @@ export function MockScoreTrend({
   const dotDelay = (i: number) =>
     points.length === 1 ? 0.1 : 0.1 + (0.8 * i) / (points.length - 1)
 
-  /**
-   * 값을 점 위에 둘지 아래에 둘지. 양옆보다 화면상 아래에 있는 점(골짜기)은
-   * 위쪽이 꺾은선으로 막혀 있으므로 아래에 적는다.
-   */
-  const labelBelow = (i: number) => {
-    const yi = y(points[i].value)
-    const near = [i > 0 ? y(points[i - 1].value) : null, i < lastIdx ? y(points[i + 1].value) : null]
-      .filter((v): v is number => v != null)
-    const below = near.length > 0 && yi > near.reduce((a, b) => a + b, 0) / near.length
-    // 그림 밖으로 나가면 반대쪽에 붙인다. 아래로 넘치면 x축 눈금과 겹친다.
-    if (below && yi + 18 > PAD.top + innerH) return false
-    if (!below && yi - 13 < PAD.top + 2) return true
-    return below
-  }
-
   const hovered = hover != null ? points[hover] : null
 
   function handleMove(e: React.PointerEvent<SVGSVGElement>) {
@@ -346,16 +323,14 @@ export function MockScoreTrend({
                   {unit}
                 </text>
               )}
-              {(labelAll || i === bestIdx) && i !== lastIdx && (
+              {i === bestIdx && i !== lastIdx && (
                 <text
-                  /* 왼쪽 끝 점은 가운데 정렬하면 y축 눈금 위로 삐져나간다.
-                     그 점만 오른쪽으로 뻗게 한다. */
-                  x={i === 0 ? x(i) + 3 : x(i)}
-                  y={y(p.value) + (labelBelow(i) ? 18 : -13)}
-                  textAnchor={i === 0 ? 'start' : 'middle'}
+                  x={x(i)}
+                  y={y(p.value) - 13}
+                  textAnchor="middle"
                   fontSize={12}
-                  fontWeight={labelAll && i !== bestIdx ? 500 : 600}
-                  fill={labelAll && i !== bestIdx ? AXIS_LABEL_INK : LABEL_INK}
+                  fontWeight={600}
+                  fill={LABEL_INK}
                   className={animate ? 'trend-label' : undefined}
                   style={animate ? { animationDelay: `${dotDelay(i) + 0.1}s` } : undefined}
                 >
