@@ -1,9 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getAccount } from '../lib/account'
-import { listMockScores } from '../lib/firestore'
+import { listAttemptsForUser, listKoreanMocks, listMockScores } from '../lib/firestore'
+import { attemptToMockScore } from '../lib/mockAttemptScore'
 import { MockScoreTrend } from '../components/MockScoreTrend'
-import type { MockScore, UserAccount } from '../lib/types'
+import {
+  getMockSubject,
+  type Attempt,
+  type KoreanMock,
+  type MockScore,
+  type UserAccount,
+} from '../lib/types'
 
 /**
  * 학생에게 건네는 성적 추이표. 인쇄해서 PDF 로 저장한다.
@@ -45,16 +52,27 @@ export function AdminMockReport() {
   const { id } = useParams()
   const [account, setAccount] = useState<UserAccount | null>(null)
   const [scores, setScores] = useState<MockScore[]>([])
+  const [attempts, setAttempts] = useState<Attempt[]>([])
+  const [mocks, setMocks] = useState<KoreanMock[]>([])
   const [loading, setLoading] = useState(true)
+  /** 앱에서 응시한 모의고사도 성적표에 넣을지. */
+  const [includeAttempts, setIncludeAttempts] = useState(true)
 
   useEffect(() => {
     if (!id) return
     let cancelled = false
-    Promise.all([getAccount(id), listMockScores(id)])
-      .then(([acc, ms]) => {
+    Promise.all([
+      getAccount(id),
+      listMockScores(id),
+      listAttemptsForUser(id),
+      listKoreanMocks(),
+    ])
+      .then(([acc, ms, atts, km]) => {
         if (cancelled) return
         setAccount(acc)
         setScores(ms)
+        setAttempts(atts)
+        setMocks(km)
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -64,12 +82,40 @@ export function AdminMockReport() {
     }
   }, [id])
 
+  /**
+   * 앱에서 응시한 국어 모의고사를 성적 한 줄씩으로 환산한 것.
+   *
+   * 100점 만점 회차만 쓴다. 부분 편성 시험지(52점·76점 만점 등)를 같은
+   * 원점수 축에 얹으면 22/52 와 64/100 이 같은 높이에 찍혀 추이가 뒤집힌다.
+   * 걸러낸 개수는 화면에 알려 주고, 필요하면 직접 입력으로 넣게 한다.
+   */
+  const { attemptRows, partialCount } = useMemo(() => {
+    const byId = new Map(mocks.map((m) => [m.id, m]))
+    const rows: MockScore[] = []
+    let partial = 0
+    for (const a of attempts) {
+      if (a.type !== 'korean_mock' || a.practice) continue
+      if ((a.mockSubject ?? 'korean') !== 'korean') continue
+      const mock = byId.get(a.refId)
+      // 영어 시험지에 과목 표시가 없던 예전 기록은 시험지 쪽에서 한 번 더 거른다.
+      if (mock && getMockSubject(mock) !== 'korean') continue
+      const converted = attemptToMockScore(a, mock)
+      if (!converted) continue
+      if (converted.totalPoints !== 100) {
+        partial++
+        continue
+      }
+      rows.push(converted.score)
+    }
+    return { attemptRows: rows, partialCount: partial }
+  }, [attempts, mocks])
+
   const rows = useMemo(
     () =>
-      scores
-        .filter((s) => s.inTrend)
-        .sort((a, b) => a.dateISO.localeCompare(b.dateISO)),
-    [scores],
+      [...scores.filter((s) => s.inTrend), ...(includeAttempts ? attemptRows : [])].sort(
+        (a, b) => a.dateISO.localeCompare(b.dateISO),
+      ),
+    [scores, attemptRows, includeAttempts],
   )
 
   const summary = useMemo(() => {
@@ -103,13 +149,31 @@ export function AdminMockReport() {
         >
           ← {account.displayName} 학생
         </Link>
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="rounded-md bg-slate-900 px-4 py-2 text-xs font-medium text-white hover:bg-slate-800"
-        >
-          PDF로 저장 · 인쇄
-        </button>
+        <div className="flex items-center gap-4">
+          {attemptRows.length > 0 && (
+            <label className="flex items-center gap-2 text-xs text-slate-600">
+              <input
+                type="checkbox"
+                checked={includeAttempts}
+                onChange={(e) => setIncludeAttempts(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-300"
+              />
+              앱에서 응시한 모의고사 포함 ({attemptRows.length}회)
+            </label>
+          )}
+          {partialCount > 0 && (
+            <span className="text-[11px] text-slate-400">
+              100점 만점이 아닌 응시 {partialCount}회는 제외했습니다
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="rounded-md bg-slate-900 px-4 py-2 text-xs font-medium text-white hover:bg-slate-800"
+          >
+            PDF로 저장 · 인쇄
+          </button>
+        </div>
       </div>
 
       <article className="report-page mx-auto max-w-[210mm] bg-white px-10 py-10 shadow-soft print:shadow-none">
