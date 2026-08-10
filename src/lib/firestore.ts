@@ -944,6 +944,36 @@ export async function updateKoreanMock(
   }
   if (Object.keys(update).length === 0) return
   await updateDoc(doc(db, 'koreanMocks', id), update)
+  if (patch.title !== undefined) await renameKoreanMockRefs(id, patch.title)
+}
+
+/**
+ * 시험지 이름을 바꾸면 이미 저장된 곳의 이름도 같이 바꾼다.
+ *
+ * 응시 기록(attempts)과 과제(assignments)는 시험지 이름을 그때그때 베껴
+ * 두고 쓴다 — 목록을 그릴 때마다 시험지를 따라가지 않으려는 것이다. 그래서
+ * 이름만 고치면 학생 화면에는 옛 이름이 그대로 남는다.
+ *
+ * 실패해도 시험지 이름 변경 자체는 이미 저장된 뒤다. 여기서 던지면 화면이
+ * "실패"로 보이지만 실제로는 절반만 바뀐 상태라, 조용히 넘기지 않고 던진다.
+ */
+async function renameKoreanMockRefs(id: string, title: string): Promise<void> {
+  const [atts, asns] = await Promise.all([
+    getDocs(query(collection(db, 'attempts'), where('refId', '==', id))),
+    getDocs(query(collection(db, 'assignments'), where('refId', '==', id))),
+  ])
+  const stale = [
+    ...atts.docs.filter((d) => d.get('type') === 'korean_mock'),
+    ...asns.docs.filter((d) => d.get('type') === 'korean_mock'),
+  ].filter((d) => d.get('refTitle') !== title)
+  if (stale.length === 0) return
+
+  // 한 배치에 500 건까지만 담긴다.
+  for (let i = 0; i < stale.length; i += 400) {
+    const batch = writeBatch(db)
+    for (const d of stale.slice(i, i + 400)) batch.update(d.ref, { refTitle: title })
+    await batch.commit()
+  }
 }
 
 export async function deleteKoreanMock(id: string): Promise<void> {
