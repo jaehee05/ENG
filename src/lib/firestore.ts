@@ -1435,6 +1435,33 @@ export async function deleteAssignment(id: string): Promise<void> {
   await deleteDoc(doc(db, 'assignments', id))
 }
 
+// ───── 추이·성적표에 넣을 앱 응시 회차 ─────
+//
+// 앱에서 푼 모의고사 중 어느 회차를 성적 추이에 넣을지 관리자가 고른다.
+// 응시 기록 자체에 표시하면 학생 화면에도 영향이 가므로 따로 담는다.
+// 키는 응시 id, 값은 넣을지 여부. 적혀 있지 않으면 넣지 않는다.
+
+const MOCK_ATTEMPT_TREND_DOC = 'mockAttemptTrend'
+
+export async function getMockAttemptTrend(): Promise<Record<string, boolean>> {
+  const snap = await getDoc(doc(db, 'meta', MOCK_ATTEMPT_TREND_DOC))
+  const data = (snap.data() ?? {}) as Record<string, unknown>
+  const out: Record<string, boolean> = {}
+  for (const [k, v] of Object.entries(data)) if (typeof v === 'boolean') out[k] = v
+  return out
+}
+
+export async function setMockAttemptTrend(
+  attemptId: string,
+  include: boolean,
+): Promise<void> {
+  await setDoc(
+    doc(db, 'meta', MOCK_ATTEMPT_TREND_DOC),
+    { [attemptId]: include },
+    { merge: true },
+  )
+}
+
 // ───── 성적표에서 손으로 채운 등급 ─────
 //
 // 등급컷이 없는 시험지를 응시했거나 등급을 비워 둔 성적은 등급이 나오지

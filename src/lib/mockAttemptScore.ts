@@ -1,4 +1,5 @@
 import {
+  getMockSubject,
   gradeFromScore,
   questionPoints,
   type Attempt,
@@ -70,4 +71,48 @@ function toISOKST(ts: Attempt['createdAt']): string {
     month: '2-digit',
     day: '2-digit',
   }).format(d)
+}
+
+
+/**
+ * 성적 한 줄. 그래프에 쓰는 값(raw)은 100점 만점으로 맞춘 점수다.
+ * 부분 편성 시험지를 응시한 회차만 원본 점수를 함께 달고 다니며, 표에서
+ * '78점 / 52/67 환산' 처럼 병기한다.
+ */
+export type MockRow = MockScore & { rawOriginal?: number; totalPoints?: number }
+
+/**
+ * 학생의 국어 모의고사 응시 기록을 성적 줄로 환산한다.
+ *
+ * 부분 편성 시험지(52점·76점 만점 등)는 100점 만점으로 환산한다. 원점수를
+ * 그대로 얹으면 22/52 와 64/100 이 같은 높이에 찍혀 추이가 뒤집힌다.
+ */
+export function koreanMockRowsFromAttempts(
+  attempts: Attempt[],
+  mocks: KoreanMock[],
+): MockRow[] {
+  const byId = new Map(mocks.map((m) => [m.id, m]))
+  const rows: MockRow[] = []
+  for (const a of attempts) {
+    if (a.type !== 'korean_mock' || a.practice) continue
+    if ((a.mockSubject ?? 'korean') !== 'korean') continue
+    const mock = byId.get(a.refId)
+    // 영어 시험지에 과목 표시가 없던 예전 기록은 시험지 쪽에서 한 번 더 거른다.
+    if (mock && getMockSubject(mock) !== 'korean') continue
+    const converted = attemptToMockScore(a, mock)
+    if (!converted || converted.totalPoints <= 0) continue
+    const { score, totalPoints } = converted
+    const actual = score.raw ?? 0
+    if (totalPoints === 100) {
+      rows.push(score)
+      continue
+    }
+    rows.push({
+      ...score,
+      raw: Math.round((actual / totalPoints) * 100),
+      rawOriginal: actual,
+      totalPoints,
+    })
+  }
+  return rows.sort((x, y) => x.dateISO.localeCompare(y.dateISO))
 }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getAccount } from '../lib/account'
 import {
+  getMockAttemptTrend,
   getMockGradeOverrides,
   listAttemptsForUser,
   listKoreanMocks,
@@ -9,15 +10,9 @@ import {
   setMockGradeOverride,
   updateMockScore,
 } from '../lib/firestore'
-import { attemptToMockScore } from '../lib/mockAttemptScore'
+import { koreanMockRowsFromAttempts, type MockRow } from '../lib/mockAttemptScore'
 import { MockScoreTrend } from '../components/MockScoreTrend'
-import {
-  getMockSubject,
-  type Attempt,
-  type KoreanMock,
-  type MockScore,
-  type UserAccount,
-} from '../lib/types'
+import type { Attempt, KoreanMock, MockScore, UserAccount } from '../lib/types'
 
 /**
  * 학생에게 건네는 성적 추이표. 인쇄해서 PDF 로 저장한다.
@@ -29,12 +24,7 @@ import {
  * 들어오면 안 된다 — 학생과 학부모가 읽는 문서다.
  */
 
-/**
- * 성적표 한 줄. 그래프에 쓰는 값(raw)은 100점 만점으로 맞춘 점수다.
- * 부분 편성 시험지를 응시한 회차만 원본 점수를 함께 달고 다니며, 표에서
- * '61점 (52/67)' 처럼 병기한다.
- */
-type ReportRow = MockScore & { rawOriginal?: number; totalPoints?: number }
+type ReportRow = MockRow
 
 function fmtDate(iso: string): string {
   const [y, m, d] = iso.split('-')
@@ -69,8 +59,8 @@ export function AdminMockReport() {
   const [attempts, setAttempts] = useState<Attempt[]>([])
   const [mocks, setMocks] = useState<KoreanMock[]>([])
   const [loading, setLoading] = useState(true)
-  /** 앱에서 응시한 모의고사도 성적표에 넣을지. */
-  const [includeAttempts, setIncludeAttempts] = useState(true)
+  /** 추이에 넣기로 고른 앱 응시 회차. '모의고사 성적' 탭에서 정한다. */
+  const [attemptTrend, setAttemptTrend] = useState<Record<string, boolean>>({})
   /** 등급이 비어 있는 줄에 관리자가 손으로 채운 등급. 줄 id → 등급. */
   const [gradeOverrides, setGradeOverrides] = useState<Record<string, number>>({})
 
@@ -83,14 +73,16 @@ export function AdminMockReport() {
       listAttemptsForUser(id),
       listKoreanMocks(),
       getMockGradeOverrides(),
+      getMockAttemptTrend(),
     ])
-      .then(([acc, ms, atts, km, ov]) => {
+      .then(([acc, ms, atts, km, ov, at]) => {
         if (cancelled) return
         setAccount(acc)
         setScores(ms)
         setAttempts(atts)
         setMocks(km)
         setGradeOverrides(ov)
+        setAttemptTrend(at)
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -100,52 +92,24 @@ export function AdminMockReport() {
     }
   }, [id])
 
-  /**
-   * 앱에서 응시한 국어 모의고사를 성적 한 줄씩으로 환산한 것.
-   *
-   * 부분 편성 시험지(52점·76점 만점 등)는 100점 만점으로 환산해서 넣는다.
-   * 원점수를 그대로 얹으면 22/52 와 64/100 이 같은 높이에 찍혀 추이가
-   * 뒤집힌다. 환산했다는 사실은 표에 원점수/만점을 병기해 남긴다.
-   *
-   * 등급은 환산하지 않는다 — 그 시험지의 등급컷으로 판정한 값이라 손대면
-   * 근거가 사라진다.
-   */
-  const attemptRows = useMemo(() => {
-    const byId = new Map(mocks.map((m) => [m.id, m]))
-    const rows: ReportRow[] = []
-    for (const a of attempts) {
-      if (a.type !== 'korean_mock' || a.practice) continue
-      if ((a.mockSubject ?? 'korean') !== 'korean') continue
-      const mock = byId.get(a.refId)
-      // 영어 시험지에 과목 표시가 없던 예전 기록은 시험지 쪽에서 한 번 더 거른다.
-      if (mock && getMockSubject(mock) !== 'korean') continue
-      const converted = attemptToMockScore(a, mock)
-      if (!converted || converted.totalPoints <= 0) continue
-      const { score, totalPoints } = converted
-      const actual = score.raw ?? 0
-      if (totalPoints === 100) {
-        rows.push(score)
-        continue
-      }
-      rows.push({
-        ...score,
-        raw: Math.round((actual / totalPoints) * 100),
-        rawOriginal: actual,
-        totalPoints,
-      })
-    }
-    return rows
-  }, [attempts, mocks])
+  /** 앱 응시분 중 '모의고사 성적' 탭에서 고른 회차만. */
+  const attemptRows = useMemo(
+    () =>
+      koreanMockRowsFromAttempts(attempts, mocks).filter(
+        (r) => attemptTrend[r.id.replace('attempt:', '')],
+      ),
+    [attempts, mocks, attemptTrend],
+  )
 
   const rows: ReportRow[] = useMemo(
     () =>
-      [...scores.filter((s) => s.inTrend), ...(includeAttempts ? attemptRows : [])]
+      [...scores.filter((s) => s.inTrend), ...attemptRows]
         // 비어 있던 등급을 손으로 채운 값으로 메운다.
         .map((r) => (r.grade == null && gradeOverrides[r.id] != null
           ? { ...r, grade: gradeOverrides[r.id] }
           : r))
         .sort((a, b) => a.dateISO.localeCompare(b.dateISO)),
-    [scores, attemptRows, includeAttempts, gradeOverrides],
+    [scores, attemptRows, gradeOverrides],
   )
 
   const summary = useMemo(() => {
@@ -207,15 +171,9 @@ export function AdminMockReport() {
         </Link>
         <div className="flex items-center gap-4">
           {attemptRows.length > 0 && (
-            <label className="flex items-center gap-2 text-xs text-slate-600">
-              <input
-                type="checkbox"
-                checked={includeAttempts}
-                onChange={(e) => setIncludeAttempts(e.target.checked)}
-                className="h-4 w-4 rounded border-slate-300"
-              />
-              앱에서 응시한 모의고사 포함 ({attemptRows.length}회)
-            </label>
+            <span className="text-[11px] text-slate-400">
+              앱 응시 {attemptRows.length}회 포함
+            </span>
           )}
           <button
             type="button"
