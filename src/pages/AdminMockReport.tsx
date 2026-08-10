@@ -282,11 +282,15 @@ export function AdminMockReport() {
                       <td className="py-2 text-slate-500 tabular-nums">
                         {fmtDate(r.dateISO)}
                       </td>
-                      <td className="py-2 text-right text-slate-900 tabular-nums">
-                        {r.raw != null ? `${r.raw}점` : '—'}
+                      <td className="py-2 text-right tabular-nums">
+                        <span className="text-slate-900">
+                          {r.raw != null ? `${r.raw}점` : '—'}
+                        </span>
+                        {/* 환산한 회차만 원점수를 한 줄 내려 적는다. 괄호로 옆에
+                            붙이면 숫자 열의 오른쪽 정렬이 어긋난다. */}
                         {r.totalPoints != null && r.rawOriginal != null && (
-                          <span className="ml-1 text-[11px] text-slate-400">
-                            ({r.rawOriginal}/{r.totalPoints})
+                          <span className="block text-[10px] leading-tight text-slate-400">
+                            {r.rawOriginal}/{r.totalPoints} 환산
                           </span>
                         )}
                       </td>
