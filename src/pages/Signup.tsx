@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
+import { blurActiveElement } from '../lib/blurActive'
 import { formatPhoneKR } from '../lib/phone'
 import { normalizeSchool } from '../lib/school'
 
@@ -22,6 +23,9 @@ export function Signup() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    // 화면이 바뀌기 전에 포커스를 푼다 — iOS 는 그러지 않으면 키보드 위
+    // 액세서리 바가 다음 화면에 남는다.
+    blurActiveElement()
     setError(null)
     setSubmitting(true)
     try {

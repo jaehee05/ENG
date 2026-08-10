@@ -118,10 +118,26 @@ export function htmlToMarkdown(html: string | undefined): string {
   }
 
   for (const child of Array.from(doc.body.childNodes)) walk(child)
-  return blocks
-    .join('\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
+
+  /**
+   * 문장 중간에서 끊긴 줄을 다시 붙인다.
+   *
+   * 저장된 해설은 PDF 에서 붙여넣은 것이 많아 눈에 보이던 줄마다 블록(<div>,
+   * <br>)이 생겨 있다. 그대로 옮기면 한 문장이 서너 줄로 쪼개져 나온다.
+   * 표·목록·보충(→)만 줄을 지키고 나머지 본문은 한 문단으로 잇는다.
+   */
+  const isSpecial = (t: string) => /^(-\s|\||→|⇨|➔|#)/.test(t)
+  const merged: string[] = []
+  for (const raw of blocks) {
+    const b = isSpecial(raw) ? raw : raw.replace(/\s*\n\s*/g, ' ').trim()
+    const prev = merged[merged.length - 1]
+    if (b && prev && !isSpecial(b) && !isSpecial(prev)) {
+      merged[merged.length - 1] = `${prev} ${b}`.replace(/\s{2,}/g, ' ')
+    } else if (b) {
+      merged.push(b)
+    }
+  }
+  return merged.join('\n').trim()
 }
 
 /** 한 문항을 원고 형식 한 덩어리로. 해설이 없으면 null. */
