@@ -22,6 +22,13 @@ import {
  * 들어오면 안 된다 — 학생과 학부모가 읽는 문서다.
  */
 
+/**
+ * 성적표 한 줄. 그래프에 쓰는 값(raw)은 100점 만점으로 맞춘 점수다.
+ * 부분 편성 시험지를 응시한 회차만 원본 점수를 함께 달고 다니며, 표에서
+ * '61점 (52/67)' 처럼 병기한다.
+ */
+type ReportRow = MockScore & { rawOriginal?: number; totalPoints?: number }
+
 function fmtDate(iso: string): string {
   const [y, m, d] = iso.split('-')
   return `${y}. ${Number(m)}. ${Number(d)}.`
@@ -85,14 +92,16 @@ export function AdminMockReport() {
   /**
    * 앱에서 응시한 국어 모의고사를 성적 한 줄씩으로 환산한 것.
    *
-   * 100점 만점 회차만 쓴다. 부분 편성 시험지(52점·76점 만점 등)를 같은
-   * 원점수 축에 얹으면 22/52 와 64/100 이 같은 높이에 찍혀 추이가 뒤집힌다.
-   * 걸러낸 개수는 화면에 알려 주고, 필요하면 직접 입력으로 넣게 한다.
+   * 부분 편성 시험지(52점·76점 만점 등)는 100점 만점으로 환산해서 넣는다.
+   * 원점수를 그대로 얹으면 22/52 와 64/100 이 같은 높이에 찍혀 추이가
+   * 뒤집힌다. 환산했다는 사실은 표에 원점수/만점을 병기해 남긴다.
+   *
+   * 등급은 환산하지 않는다 — 그 시험지의 등급컷으로 판정한 값이라 손대면
+   * 근거가 사라진다.
    */
-  const { attemptRows, partialCount } = useMemo(() => {
+  const attemptRows = useMemo(() => {
     const byId = new Map(mocks.map((m) => [m.id, m]))
-    const rows: MockScore[] = []
-    let partial = 0
+    const rows: ReportRow[] = []
     for (const a of attempts) {
       if (a.type !== 'korean_mock' || a.practice) continue
       if ((a.mockSubject ?? 'korean') !== 'korean') continue
@@ -100,17 +109,24 @@ export function AdminMockReport() {
       // 영어 시험지에 과목 표시가 없던 예전 기록은 시험지 쪽에서 한 번 더 거른다.
       if (mock && getMockSubject(mock) !== 'korean') continue
       const converted = attemptToMockScore(a, mock)
-      if (!converted) continue
-      if (converted.totalPoints !== 100) {
-        partial++
+      if (!converted || converted.totalPoints <= 0) continue
+      const { score, totalPoints } = converted
+      const actual = score.raw ?? 0
+      if (totalPoints === 100) {
+        rows.push(score)
         continue
       }
-      rows.push(converted.score)
+      rows.push({
+        ...score,
+        raw: Math.round((actual / totalPoints) * 100),
+        rawOriginal: actual,
+        totalPoints,
+      })
     }
-    return { attemptRows: rows, partialCount: partial }
+    return rows
   }, [attempts, mocks])
 
-  const rows = useMemo(
+  const rows: ReportRow[] = useMemo(
     () =>
       [...scores.filter((s) => s.inTrend), ...(includeAttempts ? attemptRows : [])].sort(
         (a, b) => a.dateISO.localeCompare(b.dateISO),
@@ -161,11 +177,6 @@ export function AdminMockReport() {
               앱에서 응시한 모의고사 포함 ({attemptRows.length}회)
             </label>
           )}
-          {partialCount > 0 && (
-            <span className="text-[11px] text-slate-400">
-              100점 만점이 아닌 응시 {partialCount}회는 제외했습니다
-            </span>
-          )}
           <button
             type="button"
             onClick={() => window.print()}
@@ -209,7 +220,8 @@ export function AdminMockReport() {
                 <Summary
                   label="최근 등급"
                   value={summary.latest != null ? `${summary.latest}등급` : '—'}
-                  sub={rows[rows.length - 1].title}
+                  /* 시험명은 길어서 카드를 밀어낸다. 이름은 아래 표에서 읽는다. */
+                  sub={fmtDate(rows[rows.length - 1].dateISO)}
                 />
               )}
               {summary.hasGrade && (
@@ -266,12 +278,17 @@ export function AdminMockReport() {
                   {rows.map((r, i) => (
                     <tr key={r.id} className="border-b border-slate-100">
                       <td className="py-2 text-slate-400 tabular-nums">{i + 1}</td>
-                      <td className="py-2 text-slate-900">{r.title}</td>
+                      <td className="py-2 text-slate-900 break-keep">{r.title}</td>
                       <td className="py-2 text-slate-500 tabular-nums">
                         {fmtDate(r.dateISO)}
                       </td>
                       <td className="py-2 text-right text-slate-900 tabular-nums">
                         {r.raw != null ? `${r.raw}점` : '—'}
+                        {r.totalPoints != null && r.rawOriginal != null && (
+                          <span className="ml-1 text-[11px] text-slate-400">
+                            ({r.rawOriginal}/{r.totalPoints})
+                          </span>
+                        )}
                       </td>
                       <td className="py-2 text-right font-medium text-slate-900 tabular-nums">
                         {r.grade != null ? `${r.grade}등급` : '—'}
