@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import { ScheduleManager } from '../components/ScheduleManager'
 import { MockScoreTrend } from '../components/MockScoreTrend'
+import { koreanMockRowsFromAttempts } from '../lib/mockAttemptScore'
 import { DESKTOP_QUERY, useMediaQuery } from '../lib/useMediaQuery'
 import { WORDBOOK_ENABLED } from '../lib/features'
 import {
@@ -25,12 +26,14 @@ import {
   ensureDefaultCategories,
   listAssignmentsForStudent,
   listAttemptsForUser,
+  getMockAttemptTrend,
   getVocabAvgBase,
   listKoreanMocks,
   listMockScores,
   listReadings,
   listVocabSets,
   setAssignmentManualStatus,
+  setMockAttemptTrend,
   setVocabAvgBase,
   updateAssignment,
   updateMockScore,
@@ -258,6 +261,8 @@ export function AdminStudentDetail() {
   const [koreanMocks, setKoreanMocks] = useState<KoreanMock[]>([])
   const [mockScores, setMockScores] = useState<MockScore[]>([])
   const [vocabBase, setVocabBase] = useState<VocabAvgBase | null>(null)
+  /** 앱 응시 회차 중 추이에 넣기로 한 것. 응시 id → 여부. */
+  const [attemptTrend, setAttemptTrend] = useState<Record<string, boolean>>({})
   const [msEditId, setMsEditId] = useState<string | null>(null)
   const [msTitle, setMsTitle] = useState('')
   const [msDate, setMsDate] = useState(todayISOKST())
@@ -310,8 +315,9 @@ export function AdminStudentDetail() {
       ensureDefaultCategories(),
       listMockScores(id),
       getVocabAvgBase(id),
+      getMockAttemptTrend(),
     ])
-      .then(([acc, atts, wb, vs, rd, km, asn, cats, ms, vb]) => {
+      .then(([acc, atts, wb, vs, rd, km, asn, cats, ms, vb, at]) => {
         if (cancelled) return
         if (!acc) {
           setError('학생을 찾을 수 없습니다.')
@@ -327,6 +333,7 @@ export function AdminStudentDetail() {
         setCategories(cats)
         setMockScores(ms)
         setVocabBase(vb)
+        setAttemptTrend(at)
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : '불러오기에 실패했습니다.')
@@ -384,6 +391,21 @@ export function AdminStudentDetail() {
       lastActivity: attempts[0]?.createdAt ?? null,
     }
   }, [attempts, wordbook, vocabForAvg])
+
+  /** 앱에서 푼 국어 모의고사를 성적 줄로 환산한 것 (100점 만점 기준). */
+  const appMockRows = useMemo(
+    () => koreanMockRowsFromAttempts(attempts, koreanMocks),
+    [attempts, koreanMocks],
+  )
+
+  /** 그래프에 넣을 것 — 직접 입력분 + 고른 앱 응시분. */
+  const trendScores = useMemo(
+    () => [
+      ...mockScores,
+      ...appMockRows.filter((r) => attemptTrend[r.id.replace('attempt:', '')]),
+    ],
+    [mockScores, appMockRows, attemptTrend],
+  )
 
   const filteredAttempts = useMemo(
     () => (typeFilter === 'all' ? attempts : attempts.filter((a) => a.type === typeFilter)),
@@ -1450,6 +1472,18 @@ export function AdminStudentDetail() {
     }
   }
 
+  /** 앱 응시 회차를 추이에 넣고 뺀다. 응시 기록 자체는 건드리지 않는다. */
+  async function handleToggleAttemptTrend(rowId: string) {
+    const attemptId = rowId.replace('attempt:', '')
+    const next = !attemptTrend[attemptId]
+    setAttemptTrend((prev) => ({ ...prev, [attemptId]: next }))
+    try {
+      await setMockAttemptTrend(attemptId, next)
+    } catch {
+      setAttemptTrend((prev) => ({ ...prev, [attemptId]: !next }))
+    }
+  }
+
   async function handleToggleTrend(m: MockScore) {
     const next = !m.inTrend
     setMockScores((prev) =>
@@ -1590,6 +1624,66 @@ export function AdminStudentDetail() {
         </div>
       </form>
 
+      {appMockRows.length > 0 && (
+        <section className="space-y-2">
+          <div className="flex items-baseline justify-between gap-2">
+            <h3 className="text-sm font-semibold text-slate-800">앱에서 응시한 모의고사</h3>
+            <span className="text-[11px] text-slate-400">
+              {appMockRows.filter((r) => attemptTrend[r.id.replace('attempt:', '')]).length}
+              /{appMockRows.length} 선택
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-400">
+            체크한 회차만 추이 그래프와 성적표에 들어갑니다. 응시 기록 자체는 바뀌지 않습니다.
+          </p>
+          <ul className="space-y-2">
+            {[...appMockRows]
+              .sort((a, b) => b.dateISO.localeCompare(a.dateISO))
+              .map((r) => {
+                const on = !!attemptTrend[r.id.replace('attempt:', '')]
+                return (
+                  <li
+                    key={r.id}
+                    className="rounded-lg border border-slate-200 bg-white p-3 flex items-start gap-3"
+                  >
+                    <label className="flex items-center gap-2 shrink-0 pt-0.5">
+                      <input
+                        type="checkbox"
+                        checked={on}
+                        onChange={() => handleToggleAttemptTrend(r.id)}
+                        className="h-4 w-4 rounded border-slate-300"
+                      />
+                      <span className="text-[11px] text-slate-500">추이</span>
+                    </label>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-slate-900 break-words">{r.title}</p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        {r.dateISO} · 앱 응시
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-sm font-semibold text-slate-900 tabular-nums">
+                        {r.raw != null ? `${r.raw}점` : '-'}
+                        {r.grade != null && (
+                          <span className="ml-1.5 text-xs font-medium text-brand-700">
+                            {r.grade}등급
+                          </span>
+                        )}
+                      </p>
+                      {r.totalPoints != null && r.rawOriginal != null && (
+                        <p className="text-[10px] text-slate-400">
+                          {r.rawOriginal}/{r.totalPoints} 환산
+                        </p>
+                      )}
+                    </div>
+                  </li>
+                )
+              })}
+          </ul>
+        </section>
+      )}
+
+      <h3 className="text-sm font-semibold text-slate-800">직접 입력한 성적</h3>
       {mockScores.length === 0 ? (
         <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
           입력한 성적이 없습니다.
@@ -1677,7 +1771,7 @@ export function AdminStudentDetail() {
       )}
       {/* 추이 그래프는 지표를 보는 자리에 둔다. 어느 회차를 넣고 뺄지는
           '모의고사 성적' 탭에서 정한다 — 보는 곳과 고치는 곳을 나눈다. */}
-      <MockScoreTrend scores={mockScores} />
+      <MockScoreTrend scores={trendScores} />
       <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-2">
         <div>
           <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">
