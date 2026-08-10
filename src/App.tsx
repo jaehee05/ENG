@@ -1,5 +1,7 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { useEffect } from 'react'
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
+import { blurActiveElement } from './lib/blurActive'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { Layout } from './components/Layout'
 import { Login } from './pages/Login'
@@ -46,10 +48,25 @@ import { Profile } from './pages/Profile'
 import { Privacy } from './pages/Privacy'
 import { Support } from './pages/Support'
 
+/**
+ * 화면이 바뀔 때 남아 있는 포커스를 푼다.
+ *
+ * 포커스를 쥔 입력칸이 언마운트되면 iOS 는 키보드 위 액세서리 바만 남긴다.
+ * 폼마다 챙기는 대신 여기서 한 번에 막는다.
+ */
+function BlurOnNavigate() {
+  const { pathname } = useLocation()
+  useEffect(() => {
+    blurActiveElement()
+  }, [pathname])
+  return null
+}
+
 function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <BlurOnNavigate />
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
