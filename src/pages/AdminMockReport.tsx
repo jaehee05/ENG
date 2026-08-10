@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getAccount } from '../lib/account'
-import { listAttemptsForUser, listKoreanMocks, listMockScores } from '../lib/firestore'
+import {
+  getMockGradeOverrides,
+  listAttemptsForUser,
+  listKoreanMocks,
+  listMockScores,
+  setMockGradeOverride,
+  updateMockScore,
+} from '../lib/firestore'
 import { attemptToMockScore } from '../lib/mockAttemptScore'
 import { MockScoreTrend } from '../components/MockScoreTrend'
 import {
@@ -64,6 +71,8 @@ export function AdminMockReport() {
   const [loading, setLoading] = useState(true)
   /** 앱에서 응시한 모의고사도 성적표에 넣을지. */
   const [includeAttempts, setIncludeAttempts] = useState(true)
+  /** 등급이 비어 있는 줄에 관리자가 손으로 채운 등급. 줄 id → 등급. */
+  const [gradeOverrides, setGradeOverrides] = useState<Record<string, number>>({})
 
   useEffect(() => {
     if (!id) return
@@ -73,13 +82,15 @@ export function AdminMockReport() {
       listMockScores(id),
       listAttemptsForUser(id),
       listKoreanMocks(),
+      getMockGradeOverrides(),
     ])
-      .then(([acc, ms, atts, km]) => {
+      .then(([acc, ms, atts, km, ov]) => {
         if (cancelled) return
         setAccount(acc)
         setScores(ms)
         setAttempts(atts)
         setMocks(km)
+        setGradeOverrides(ov)
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -128,10 +139,13 @@ export function AdminMockReport() {
 
   const rows: ReportRow[] = useMemo(
     () =>
-      [...scores.filter((s) => s.inTrend), ...(includeAttempts ? attemptRows : [])].sort(
-        (a, b) => a.dateISO.localeCompare(b.dateISO),
-      ),
-    [scores, attemptRows, includeAttempts],
+      [...scores.filter((s) => s.inTrend), ...(includeAttempts ? attemptRows : [])]
+        // 비어 있던 등급을 손으로 채운 값으로 메운다.
+        .map((r) => (r.grade == null && gradeOverrides[r.id] != null
+          ? { ...r, grade: gradeOverrides[r.id] }
+          : r))
+        .sort((a, b) => a.dateISO.localeCompare(b.dateISO)),
+    [scores, attemptRows, includeAttempts, gradeOverrides],
   )
 
   const summary = useMemo(() => {
@@ -147,6 +161,32 @@ export function AdminMockReport() {
       hasRaw: raws.length > 0,
     }
   }, [rows])
+
+  /**
+   * 비어 있던 등급을 채운다.
+   *
+   * 직접 입력한 성적은 그 문서에 바로 적어 '모의고사 성적' 탭에서도 보이게
+   * 하고, 앱 응시분은 적을 자리가 없으므로 성적표용 보정값으로만 남긴다.
+   */
+  async function handleGradeFill(row: ReportRow, value: string) {
+    const grade = value === '' ? null : Number(value)
+    setGradeOverrides((prev) => {
+      const next = { ...prev }
+      if (grade == null) delete next[row.id]
+      else next[row.id] = grade
+      return next
+    })
+    try {
+      if (row.id.startsWith('attempt:')) {
+        await setMockGradeOverride(row.id, grade)
+      } else {
+        await updateMockScore(row.id, { grade })
+        if (account) setScores(await listMockScores(account.id))
+      }
+    } catch {
+      // 저장에 실패해도 화면 값은 남겨 둔다 — 인쇄는 계속할 수 있어야 한다.
+    }
+  }
 
   if (loading) return <p className="p-8 text-sm text-slate-500">불러오는 중...</p>
   if (!account) return <p className="p-8 text-sm text-red-600">학생을 찾을 수 없습니다.</p>
@@ -295,7 +335,27 @@ export function AdminMockReport() {
                         )}
                       </td>
                       <td className="py-2 text-right font-medium text-slate-900 tabular-nums">
-                        {r.grade != null ? `${r.grade}등급` : '—'}
+                        {r.grade != null ? (
+                          `${r.grade}등급`
+                        ) : (
+                          <>
+                            {/* 인쇄물에는 빈칸으로 나가고, 화면에서만 고를 수 있다. */}
+                            <span className="print-only">—</span>
+                            <select
+                              value=""
+                              onChange={(e) => handleGradeFill(r, e.target.value)}
+                              className="no-print rounded border border-dashed border-slate-300 bg-white px-1 py-0.5 text-xs font-normal text-slate-500"
+                              title="등급을 직접 채웁니다"
+                            >
+                              <option value="">등급 입력</option>
+                              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((g) => (
+                                <option key={g} value={g}>
+                                  {g}등급
+                                </option>
+                              ))}
+                            </select>
+                          </>
+                        )}
                       </td>
                     </tr>
                   ))}

@@ -195,9 +195,15 @@ body {
   size: A4 portrait;
   margin: 14mm;
 }
+.print-only {
+  display: none;
+}
 @media print {
   .no-print {
     display: none !important;
+  }
+  .print-only {
+    display: inline !important;
   }
   body {
     background: #fff !important;

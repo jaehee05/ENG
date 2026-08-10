@@ -1405,6 +1405,38 @@ export async function deleteAssignment(id: string): Promise<void> {
   await deleteDoc(doc(db, 'assignments', id))
 }
 
+// ───── 성적표에서 손으로 채운 등급 ─────
+//
+// 등급컷이 없는 시험지를 응시했거나 등급을 비워 둔 성적은 등급이 나오지
+// 않는다. 성적표를 뽑을 때 관리자가 직접 채울 수 있게 하고, 그 값을 여기
+// 담아 다음에 다시 뽑을 때도 남아 있게 한다.
+//
+// 키는 성적표 한 줄의 id — 직접 입력분은 mockScores 문서 id, 앱 응시분은
+// 'attempt:<응시 id>'. 둘 다 전역에서 유일해 학생별로 나눌 필요가 없다.
+
+const MOCK_GRADE_OVERRIDE_DOC = 'mockGradeOverrides'
+
+export async function getMockGradeOverrides(): Promise<Record<string, number>> {
+  const snap = await getDoc(doc(db, 'meta', MOCK_GRADE_OVERRIDE_DOC))
+  const data = (snap.data() ?? {}) as Record<string, unknown>
+  const out: Record<string, number> = {}
+  for (const [k, v] of Object.entries(data)) {
+    if (typeof v === 'number' && v >= 1 && v <= 9) out[k] = v
+  }
+  return out
+}
+
+export async function setMockGradeOverride(
+  rowId: string,
+  grade: number | null,
+): Promise<void> {
+  await setDoc(
+    doc(db, 'meta', MOCK_GRADE_OVERRIDE_DOC),
+    { [rowId]: grade ?? deleteField() },
+    { merge: true },
+  )
+}
+
 // ───── 단어 시험지 평균의 기준 시험지 ─────
 //
 // 학생별로 "이 시험지부터 평균을 낸다"를 정해 둔다. 재수강·교재 교체 전의
