@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
+import { downloadMarkdown, mockToMarkdown } from '../lib/explanationMarkdown'
 import {
   deleteAttempt,
   deleteKoreanMock,
@@ -581,13 +582,26 @@ export function KoreanMockDetail() {
           </p>
         </div>
         {isAdmin && (
-          <button
-            type="button"
-            onClick={handleDelete}
-            className="text-xs text-slate-400 hover:text-red-600 px-1"
-          >
-            삭제
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            {/* 입력해 둔 해설을 원고 형식 .md 로 내보낸다. 저장된 값에는 선지
+                번호가 없으므로(화면이 붙인다) 파일에는 여기서 붙여 적는다. */}
+            <button
+              type="button"
+              onClick={() =>
+                downloadMarkdown(`${mock.title} 해설.md`, mockToMarkdown(mock))
+              }
+              className="rounded-md border border-slate-300 text-slate-600 text-xs font-medium px-2.5 py-1.5 hover:bg-slate-100"
+            >
+              해설 .md
+            </button>
+            <button
+              type="button"
+              onClick={handleDelete}
+              className="text-xs text-slate-400 hover:text-red-600 px-1"
+            >
+              삭제
+            </button>
+          </div>
         )}
       </header>
 
