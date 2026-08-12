@@ -12,6 +12,8 @@ import {
 } from '../lib/firestore'
 import { koreanMockRowsFromAttempts, type MockRow } from '../lib/mockAttemptScore'
 import { MockScoreTrend } from '../components/MockScoreTrend'
+import { ReportSummary } from '../components/ReportSummary'
+import { fmtReportDate, todayLabel } from '../lib/reportFormat'
 import type { Attempt, KoreanMock, MockScore, UserAccount } from '../lib/types'
 
 /**
@@ -25,32 +27,6 @@ import type { Attempt, KoreanMock, MockScore, UserAccount } from '../lib/types'
  */
 
 type ReportRow = MockRow
-
-function fmtDate(iso: string): string {
-  const [y, m, d] = iso.split('-')
-  return `${y}. ${Number(m)}. ${Number(d)}.`
-}
-
-function todayLabel(): string {
-  const now = new Date()
-  const f = new Intl.DateTimeFormat('ko-KR', {
-    timeZone: 'Asia/Seoul',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
-  return f.format(now)
-}
-
-function Summary({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <div className="flex-1 rounded-lg border border-slate-200 px-4 py-3">
-      <p className="text-[11px] tracking-wider text-slate-500">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">{value}</p>
-      {sub && <p className="mt-0.5 text-[11px] text-slate-400">{sub}</p>}
-    </div>
-  )
-}
 
 export function AdminMockReport() {
   const { id } = useParams()
@@ -157,7 +133,7 @@ export function AdminMockReport() {
 
   const period =
     rows.length > 0
-      ? `${fmtDate(rows[0].dateISO)} ~ ${fmtDate(rows[rows.length - 1].dateISO)}`
+      ? `${fmtReportDate(rows[0].dateISO)} ~ ${fmtReportDate(rows[rows.length - 1].dateISO)}`
       : '-'
 
   return (
@@ -215,21 +191,21 @@ export function AdminMockReport() {
           <>
             <section className="mt-6 flex gap-3">
               {summary.hasGrade && (
-                <Summary
+                <ReportSummary
                   label="최근 등급"
                   value={summary.latest != null ? `${summary.latest}등급` : '—'}
                   /* 시험명은 길어서 카드를 밀어낸다. 이름은 아래 표에서 읽는다. */
-                  sub={fmtDate(rows[rows.length - 1].dateISO)}
+                  sub={fmtReportDate(rows[rows.length - 1].dateISO)}
                 />
               )}
               {summary.hasGrade && (
-                <Summary
+                <ReportSummary
                   label="최고 등급"
                   value={summary.best != null ? `${summary.best}등급` : '—'}
                 />
               )}
               {summary.hasRaw && (
-                <Summary
+                <ReportSummary
                   label="원점수 평균"
                   value={summary.rawAvg != null ? `${summary.rawAvg}점` : '—'}
                   sub={
@@ -278,7 +254,7 @@ export function AdminMockReport() {
                       <td className="py-2 text-slate-400 tabular-nums">{i + 1}</td>
                       <td className="py-2 text-slate-900 break-keep">{r.title}</td>
                       <td className="py-2 text-slate-500 tabular-nums">
-                        {fmtDate(r.dateISO)}
+                        {fmtReportDate(r.dateISO)}
                       </td>
                       <td className="py-2 text-right tabular-nums">
                         <span className="text-slate-900">

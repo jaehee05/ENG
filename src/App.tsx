@@ -24,6 +24,7 @@ import { Rejected } from './pages/Rejected'
 import { AdminStudents } from './pages/AdminStudents'
 import { AdminStudentDetail } from './pages/AdminStudentDetail'
 import { AdminMockReport } from './pages/AdminMockReport'
+import { AdminMockAttemptReport } from './pages/AdminMockAttemptReport'
 import { AdminNotify } from './pages/AdminNotify'
 import { AdminAnnounce } from './pages/AdminAnnounce'
 import { AdminCategories } from './pages/AdminCategories'
@@ -113,6 +114,10 @@ function App() {
           <Route element={<ProtectedRoute adminOnly />}>
             {/* 성적표는 앱 껍데기 밖에 둔다 — 인쇄하면 화면이 그대로 지면이 된다. */}
             <Route path="/admin/students/:id/report" element={<AdminMockReport />} />
+            <Route
+              path="/admin/students/:id/report/:attemptId"
+              element={<AdminMockAttemptReport />}
+            />
             <Route element={<Layout />}>
               {/* /vocab/:id 보다 세그먼트가 하나 많아 라우터가 이쪽을 먼저 고른다 */}
               <Route path="/vocab/student/:uid" element={<AdminVocabStudent />} />
