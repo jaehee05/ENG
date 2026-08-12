@@ -230,7 +230,7 @@ export function AdminMockAttemptReport() {
       </div>
 
       <article className="report-page mx-auto max-w-[210mm] bg-white px-10 py-10 shadow-soft print:shadow-none">
-        <header className="flex items-end justify-between gap-6 border-b border-slate-900 pb-4">
+        <header className="flex items-end justify-between gap-6 border-b border-slate-900 pb-3">
           <div className="min-w-0">
             <p className="text-[11px] font-medium tracking-[0.2em] text-slate-500">
               {MOCK_SUBJECT_LABEL[subject]} 모의고사
@@ -301,9 +301,9 @@ export function AdminMockAttemptReport() {
             <table className="mt-2 w-full border-collapse text-sm">
               <thead>
                 <tr className="border-y border-slate-200 text-[11px] tracking-wider text-slate-500">
-                  <th className="w-16 py-2 text-left font-medium">등급</th>
+                  <th className="w-16 py-1.5 text-left font-medium">등급</th>
                   {cutoffRows.map((c) => (
-                    <th key={c.grade} className="py-2 text-center font-medium">
+                    <th key={c.grade} className="py-1.5 text-center font-medium">
                       {c.label}
                     </th>
                   ))}
@@ -311,12 +311,12 @@ export function AdminMockAttemptReport() {
               </thead>
               <tbody>
                 <tr className="border-b border-slate-100">
-                  <td className="py-2 text-left text-[11px] text-slate-500">점수</td>
+                  <td className="py-1.5 text-left text-[11px] text-slate-500">점수</td>
                   {cutoffRows.map((c) => (
                     <td
                       key={c.grade}
                       /* 받은 등급 칸만 진하게 — 표에서 자기 자리를 바로 찾는다. */
-                      className={`py-2 text-center tabular-nums ${
+                      className={`py-1.5 text-center tabular-nums ${
                         isMyCutoffCell(c.grade)
                           ? 'font-semibold text-slate-900'
                           : 'text-slate-500'
@@ -342,14 +342,14 @@ export function AdminMockAttemptReport() {
           </div>
           <div className="mt-2 grid grid-cols-3 gap-x-6">
             {answerColumns.map((column, ci) => (
-              <table key={ci} className="w-full border-collapse text-sm">
+              <table key={ci} className="w-full border-collapse text-[13px]">
                 <thead>
                   <tr className="border-y border-slate-200 text-[11px] tracking-wider text-slate-500">
-                    <th className="py-1 text-left font-medium">문항</th>
-                    <th className="py-1 text-center font-medium">배점</th>
-                    <th className="py-1 text-center font-medium">정답</th>
-                    <th className="py-1 text-center font-medium">학생</th>
-                    <th className="py-1 text-center font-medium">정오</th>
+                    <th className="py-0.5 text-left font-medium">문항</th>
+                    <th className="py-0.5 text-center font-medium">배점</th>
+                    <th className="py-0.5 text-center font-medium">정답</th>
+                    <th className="py-0.5 text-center font-medium">학생</th>
+                    <th className="py-0.5 text-center font-medium">정오</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -360,24 +360,24 @@ export function AdminMockAttemptReport() {
                         r.correct ? '' : 'bg-red-50/60'
                       }`}
                     >
-                      <td className="py-1 font-medium text-slate-900 tabular-nums">
+                      <td className="py-0.5 font-medium text-slate-900 tabular-nums">
                         {r.number}
                       </td>
-                      <td className="py-1 text-center text-slate-500 tabular-nums">
+                      <td className="py-0.5 text-center text-slate-500 tabular-nums">
                         {pointsOf(r.number)}
                       </td>
-                      <td className="py-1 text-center text-slate-900">
+                      <td className="py-0.5 text-center text-slate-900">
                         {choiceMark(r.correctAnswer)}
                       </td>
                       <td
-                        className={`py-1 text-center ${
+                        className={`py-0.5 text-center ${
                           r.userAnswer === 0 ? 'text-[11px] text-slate-400' : 'text-slate-700'
                         }`}
                       >
                         {r.userAnswer === 0 ? '미응답' : choiceMark(r.userAnswer)}
                       </td>
                       <td
-                        className={`py-1 text-center font-semibold ${
+                        className={`py-0.5 text-center font-semibold ${
                           r.correct ? 'text-slate-700' : 'text-red-600'
                         }`}
                       >
@@ -392,9 +392,9 @@ export function AdminMockAttemptReport() {
         </section>
 
         {mock?.examinerComment && (
-          <section className="mt-5 rounded-lg border border-slate-200 px-4 py-3">
+          <section className="mt-4 rounded-lg border border-slate-200 px-4 py-2.5">
             <h2 className="text-[11px] tracking-wider text-slate-500">출제자의 한마디</h2>
-            <p className="mt-1 whitespace-pre-wrap break-keep text-justify text-sm leading-relaxed text-slate-700">
+            <p className="mt-1 whitespace-pre-wrap break-keep text-justify text-[13px] leading-relaxed text-slate-700">
               {/* 해설과 같이 부등호는 작품명 홑화살괄호로 읽어 준다. */}
               {convertAngleInText(mock.examinerComment)}
             </p>
