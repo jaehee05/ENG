@@ -153,13 +153,13 @@ type TypeFilter = 'all' | Attempt['type']
 /**
  * 시험 이력 필터 칩.
  *
- * 내 단어장은 숨김이라 칩에서 뺀다. 이미 쌓인 단어장 응시 기록은 '전체' 에
- * 그대로 남는다 — 기능을 감추는 것이지 기록을 지우는 게 아니다.
+ * 내 단어장과 지문 문제풀이는 내린 기능이라 칩에서 뺀다. 이미 쌓인 응시
+ * 기록은 '전체' 에 그대로 남는다 — 기능을 감추는 것이지 기록을 지우는 게
+ * 아니다.
  */
 const ATTEMPT_FILTERS: readonly TypeFilter[] = [
   'all',
   'vocab',
-  'reading',
   'korean_mock',
   ...(WORDBOOK_ENABLED ? (['wordbook'] as const) : []),
 ]
@@ -444,17 +444,12 @@ export function AdminStudentDetail() {
     const vocabDone = new Set(
       attempts.filter((a) => a.type === 'vocab' && a.refId).map((a) => a.refId),
     )
-    const readingDone = new Set(
-      attempts.filter((a) => a.type === 'reading' && a.refId).map((a) => a.refId),
-    )
     return {
       vocabDone: vocabDone.size,
       // 시험지가 교재 공용이라 분모는 이 학생이 풀 수 있는 전체 시험지 수다
       vocabTotal: studentVocabSets.length,
-      readingDone: readingDone.size,
-      readingTotal: readings.length,
     }
-  }, [attempts, studentVocabSets, readings])
+  }, [attempts, studentVocabSets])
 
   /**
    * 진행 중(미완료) — D-day 오름차순(지난 것 가장 위) → 마감 없음은 맨 뒤
@@ -857,11 +852,6 @@ export function AdminStudentDetail() {
         label="단어 시험지"
         done={progress.vocabDone}
         total={progress.vocabTotal}
-      />
-      <ProgressCard
-        label="지문 문제풀이"
-        done={progress.readingDone}
-        total={progress.readingTotal}
       />
     </div>
   )
