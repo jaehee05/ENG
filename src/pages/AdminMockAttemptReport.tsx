@@ -8,6 +8,7 @@ import {
   setMockGradeOverride,
 } from '../lib/firestore'
 import { ReportSummary } from '../components/ReportSummary'
+import { convertAngleInText } from '../lib/angleBrackets'
 import { fmtReportDate, isoKST, todayLabel } from '../lib/reportFormat'
 import {
   choiceMark,
@@ -16,7 +17,6 @@ import {
   MOCK_SUBJECT_LABEL,
   type Attempt,
   type KoreanMock,
-  type MockGradeCut,
   type MockSubject,
   type UserAccount,
 } from '../lib/types'
@@ -39,52 +39,8 @@ function gradeLabel(g: number): string {
   return g >= 6 ? '6등급 이하' : `${g}등급`
 }
 
-/**
- * 원점수가 등급컷 어디쯤인지 보여주는 막대.
- *
- * 등급컷은 1~5등급만 눈금으로 찍는다. 그 아래는 칸이 좁아 이름표가 겹치고,
- * 어차피 '6등급 이하'로 묶어 부르는 구간이다.
- */
-function CutoffBar({
-  score,
-  total,
-  cuts,
-}: {
-  score: number
-  total: number
-  cuts: MockGradeCut[]
-}) {
-  const pct = (v: number) => (total > 0 ? Math.max(0, Math.min(100, (v / total) * 100)) : 0)
-  const marks = [...cuts]
-    .filter((c) => c.grade <= 5 && c.minScore > 0 && c.minScore <= total)
-    .sort((a, b) => a.minScore - b.minScore)
-  return (
-    <div>
-      <div className="relative h-3 w-full overflow-hidden rounded-full bg-slate-100">
-        <div className="h-3 rounded-full bg-slate-900" style={{ width: `${pct(score)}%` }} />
-        {marks.map((c) => (
-          <span
-            key={c.grade}
-            className="absolute top-0 h-3 w-px bg-slate-400"
-            style={{ left: `${pct(c.minScore)}%` }}
-          />
-        ))}
-      </div>
-      <div className="relative mt-1 h-8">
-        {marks.map((c) => (
-          <span
-            key={c.grade}
-            className="absolute -translate-x-1/2 text-center text-[10px] leading-tight text-slate-400"
-            style={{ left: `${pct(c.minScore)}%` }}
-          >
-            {c.grade}등급
-            <span className="block tabular-nums">{c.minScore}</span>
-          </span>
-        ))}
-      </div>
-    </div>
-  )
-}
+/** 문항 표를 몇 칸으로 갈라 놓을지. A4 한 장에 45문항을 담는 폭이다. */
+const ANSWER_COLUMN_COUNT = 3
 
 export function AdminMockAttemptReport() {
   const { id, attemptId } = useParams()
@@ -139,23 +95,60 @@ export function AdminMockAttemptReport() {
     return mock?.gradeCutoffs ?? []
   }, [attempt, mock])
 
-  const scored = useMemo(() => {
-    const total = results.reduce((s, r) => s + pointsOf(r.number), 0)
-    const raw = results.reduce((s, r) => s + (r.correct ? pointsOf(r.number) : 0), 0)
-    const wrong = results.filter((r) => !r.correct)
-    return {
-      total,
-      raw,
-      wrong,
-      lost: wrong.reduce((s, r) => s + pointsOf(r.number), 0),
-      correctCount: results.length - wrong.length,
-    }
-  }, [results, pointsOf])
+  const scored = useMemo(
+    () => ({
+      total: results.reduce((s, r) => s + pointsOf(r.number), 0),
+      raw: results.reduce((s, r) => s + (r.correct ? pointsOf(r.number) : 0), 0),
+      correctCount: results.filter((r) => r.correct).length,
+    }),
+    [results, pointsOf],
+  )
+
+  /**
+   * 등급컷 표의 칸. 1~5등급을 늘어놓고 그 아래를 '6등급 이하'로 묶는다 —
+   * 결과 화면과 같은 묶음이다.
+   */
+  const cutoffRows = useMemo(() => {
+    const under = cutoffs
+      .filter((c) => c.grade <= 5 && Number.isFinite(c.minScore))
+      .sort((a, b) => a.grade - b.grade)
+    if (under.length === 0) return []
+    return [
+      ...under.map((c) => ({
+        grade: c.grade,
+        label: `${c.grade}등급`,
+        score: c.minScore as number | null,
+      })),
+      { grade: 6, label: '6등급 이하', score: null as number | null },
+    ]
+  }, [cutoffs])
+
+  /** '6등급 이하' 칸에 적을 기준 점수 — 가장 낮은 등급컷. */
+  const lowestCut = useMemo(
+    () =>
+      cutoffRows.reduce(
+        (min, c) => (c.score != null && c.score < min ? c.score : min),
+        Infinity,
+      ),
+    [cutoffRows],
+  )
+
+  /** 45문항이 세로로 늘어지면 지면을 넘긴다. 갈라서 나란히 놓는다. */
+  const answerColumns = useMemo(() => {
+    const per = Math.ceil(results.length / ANSWER_COLUMN_COUNT)
+    if (per === 0) return []
+    return Array.from({ length: ANSWER_COLUMN_COUNT }, (_, i) =>
+      results.slice(i * per, (i + 1) * per),
+    ).filter((c) => c.length > 0)
+  }, [results])
 
   const overrideKey = `attempt:${attemptId ?? ''}`
   const grade = gradeFromScore(scored.raw, cutoffs) ?? gradeOverrides[overrideKey] ?? null
   /** 등급컷으로 나온 등급은 못 바꾼다. 비어 있을 때만 손으로 채운다. */
   const canFillGrade = gradeFromScore(scored.raw, cutoffs) == null
+  /** 등급컷 표에서 학생이 받은 칸인지. 7·8·9등급은 '6등급 이하' 칸에 든다. */
+  const isMyCutoffCell = (cellGrade: number) =>
+    grade != null && (cellGrade === 6 ? grade >= 6 : grade === cellGrade)
 
   async function handleGradeFill(value: string) {
     const g = value === '' ? null : Number(value)
@@ -187,11 +180,13 @@ export function AdminMockAttemptReport() {
 
   const subject: MockSubject = attempt.mockSubject ?? mock?.subject ?? 'korean'
   const dateISO = isoKST(attempt.createdAt)
-  /** 부분 편성 시험지는 100점 만점으로 환산한 값을 함께 적는다. */
-  const scaled =
-    scored.total > 0 && scored.total !== 100
-      ? Math.round((scored.raw / scored.total) * 100)
-      : null
+  /**
+   * 점수는 늘 100점 만점으로 환산해 적는다. 부분 편성 시험지(52점·76점 만점
+   * 등)가 섞여 있어서, 회차마다 자가 달라지면 성적표끼리 견줄 수 없다.
+   * 등급컷도 같은 자로 재야 점수와 나란히 읽힌다.
+   */
+  const toHundred = (v: number) =>
+    scored.total > 0 ? Math.round((v / scored.total) * 100) : 0
 
   return (
     <div className="min-h-screen bg-slate-100 py-8 print:bg-white print:py-0">
@@ -225,7 +220,7 @@ export function AdminMockAttemptReport() {
             <p className="text-[11px] font-medium tracking-[0.2em] text-slate-500">
               {MOCK_SUBJECT_LABEL[subject]} 모의고사
             </p>
-            <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-900 break-keep">
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 break-keep">
               {attempt.refTitle}
             </h1>
           </div>
@@ -244,20 +239,20 @@ export function AdminMockAttemptReport() {
           )}
         </section>
 
-        <section className="mt-6 flex gap-3">
+        <section className="mt-5 flex gap-3">
           <ReportSummary
-            label="원점수"
-            value={`${scored.raw}점`}
+            label="점수"
+            value={`${toHundred(scored.raw)}점`}
             sub={
-              scaled != null
-                ? `${scored.total}점 만점 · 100점 환산 ${scaled}점`
-                : `${scored.total}점 만점`
+              scored.total === 100
+                ? '100점 만점'
+                : `${scored.raw}/${scored.total}점 → 100점 만점 환산`
             }
           />
           <ReportSummary
             label="맞힌 문항"
             value={`${scored.correctCount}/${results.length}`}
-            sub={scored.lost > 0 ? `실점 ${scored.lost}점` : '만점'}
+            sub={`${results.length}문항 중`}
           />
           <div className="flex-1 rounded-lg border border-slate-200 px-4 py-3">
             <p className="text-[11px] tracking-wider text-slate-500">등급</p>
@@ -285,90 +280,108 @@ export function AdminMockAttemptReport() {
           </div>
         </section>
 
-        {cutoffs.length > 0 && (
-          <section className="mt-6">
-            <h2 className="text-sm font-semibold text-slate-900">등급컷 안에서의 위치</h2>
-            <div className="mt-3">
-              <CutoffBar score={scored.raw} total={scored.total} cuts={cutoffs} />
-            </div>
-          </section>
-        )}
-
-        <section className="mt-6">
-          <h2 className="text-sm font-semibold text-slate-900">문항별 정오</h2>
-          <div className="mt-2 grid grid-cols-10 gap-1">
-            {results.map((r) => (
-              <div
-                key={r.number}
-                className={`rounded border py-1 text-center ${
-                  r.correct ? 'border-slate-200' : 'border-red-300 bg-red-50'
-                }`}
-              >
-                <span
-                  className={`block text-[10px] tabular-nums ${
-                    r.correct ? 'text-slate-400' : 'text-red-400'
-                  }`}
-                >
-                  {r.number}
-                </span>
-                <span
-                  className={`block text-sm font-semibold leading-tight ${
-                    r.correct ? 'text-slate-700' : 'text-red-600'
-                  }`}
-                >
-                  {r.correct ? '○' : '✕'}
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {scored.wrong.length > 0 && (
-          <section className="mt-6">
-            <div className="flex items-baseline justify-between">
-              <h2 className="text-sm font-semibold text-slate-900">틀린 문항</h2>
-              <p className="text-[11px] text-slate-500">
-                {scored.wrong.length}문항 · 실점 {scored.lost}점
-              </p>
-            </div>
+        {cutoffRows.length > 0 && (
+          <section className="mt-5">
+            <h2 className="text-sm font-semibold text-slate-900">등급컷</h2>
             <table className="mt-2 w-full border-collapse text-sm">
               <thead>
                 <tr className="border-y border-slate-200 text-[11px] tracking-wider text-slate-500">
-                  <th className="w-16 py-2 text-left font-medium">문항</th>
-                  <th className="w-16 py-2 text-right font-medium">배점</th>
-                  <th className="w-20 py-2 text-right font-medium">정답</th>
-                  <th className="w-24 py-2 text-right font-medium">학생 답</th>
-                  <th className="py-2" />
+                  <th className="w-16 py-2 text-left font-medium">등급</th>
+                  {cutoffRows.map((c) => (
+                    <th key={c.grade} className="py-2 text-center font-medium">
+                      {c.label}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {scored.wrong.map((r) => (
-                  <tr key={r.number} className="border-b border-slate-100">
-                    <td className="py-2 font-medium text-slate-900 tabular-nums">
-                      {r.number}번
+                <tr className="border-b border-slate-100">
+                  <td className="py-2 text-left text-[11px] text-slate-500">점수</td>
+                  {cutoffRows.map((c) => (
+                    <td
+                      key={c.grade}
+                      /* 받은 등급 칸만 진하게 — 표에서 자기 자리를 바로 찾는다. */
+                      className={`py-2 text-center tabular-nums ${
+                        isMyCutoffCell(c.grade)
+                          ? 'font-semibold text-slate-900'
+                          : 'text-slate-500'
+                      }`}
+                    >
+                      {c.score != null
+                        ? `${toHundred(c.score)}점 이상`
+                        : `${toHundred(lowestCut)}점 미만`}
                     </td>
-                    <td className="py-2 text-right text-slate-500 tabular-nums">
-                      {pointsOf(r.number)}점
-                    </td>
-                    <td className="py-2 text-right text-slate-900">
-                      {choiceMark(r.correctAnswer)}
-                    </td>
-                    <td className="py-2 text-right text-slate-500">
-                      {r.userAnswer === 0 ? '미응답' : choiceMark(r.userAnswer)}
-                    </td>
-                    <td />
-                  </tr>
-                ))}
+                  ))}
+                </tr>
               </tbody>
             </table>
           </section>
         )}
 
+        <section className="mt-5">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-sm font-semibold text-slate-900">문항별 정오</h2>
+            <p className="text-[11px] text-slate-500">
+              {scored.correctCount}/{results.length} 정답
+            </p>
+          </div>
+          <div className="mt-2 grid grid-cols-3 gap-x-6">
+            {answerColumns.map((column, ci) => (
+              <table key={ci} className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="border-y border-slate-200 text-[11px] tracking-wider text-slate-500">
+                    <th className="py-1 text-left font-medium">문항</th>
+                    <th className="py-1 text-center font-medium">배점</th>
+                    <th className="py-1 text-center font-medium">정답</th>
+                    <th className="py-1 text-center font-medium">학생</th>
+                    <th className="py-1 text-center font-medium">정오</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {column.map((r) => (
+                    <tr
+                      key={r.number}
+                      className={`border-b border-slate-100 ${
+                        r.correct ? '' : 'bg-red-50/60'
+                      }`}
+                    >
+                      <td className="py-1 font-medium text-slate-900 tabular-nums">
+                        {r.number}
+                      </td>
+                      <td className="py-1 text-center text-slate-500 tabular-nums">
+                        {pointsOf(r.number)}
+                      </td>
+                      <td className="py-1 text-center text-slate-900">
+                        {choiceMark(r.correctAnswer)}
+                      </td>
+                      <td
+                        className={`py-1 text-center ${
+                          r.userAnswer === 0 ? 'text-[11px] text-slate-400' : 'text-slate-700'
+                        }`}
+                      >
+                        {r.userAnswer === 0 ? '미응답' : choiceMark(r.userAnswer)}
+                      </td>
+                      <td
+                        className={`py-1 text-center font-semibold ${
+                          r.correct ? 'text-slate-700' : 'text-red-600'
+                        }`}
+                      >
+                        {r.correct ? '○' : '✕'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ))}
+          </div>
+        </section>
+
         {mock?.examinerComment && (
-          <section className="mt-6 rounded-lg border border-slate-200 px-4 py-3">
+          <section className="mt-5 rounded-lg border border-slate-200 px-4 py-3">
             <h2 className="text-[11px] tracking-wider text-slate-500">출제자의 한마디</h2>
-            <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
-              {mock.examinerComment}
+            <p className="mt-1 whitespace-pre-wrap break-keep text-justify text-sm leading-relaxed text-slate-700">
+              {/* 해설과 같이 부등호는 작품명 홑화살괄호로 읽어 준다. */}
+              {convertAngleInText(mock.examinerComment)}
             </p>
           </section>
         )}
