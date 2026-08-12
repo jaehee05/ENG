@@ -42,6 +42,21 @@ function gradeLabel(g: number): string {
 /** 문항 표를 몇 칸으로 갈라 놓을지. A4 한 장에 45문항을 담는 폭이다. */
 const ANSWER_COLUMN_COUNT = 3
 
+/**
+ * 이름 줄의 '응시 2026. 7. 16.', '선택 화법과 작문' 같은 항목.
+ *
+ * 이름표와 값이 같은 크기·같은 색이면 '선택 화법과 작문'이 한 덩어리로
+ * 읽힌다. 이름표는 작게 흐리게, 값은 진하게 — 눈이 값부터 집는다.
+ */
+function MetaField({ label, value }: { label: string; value: string }) {
+  return (
+    <p className="flex items-baseline gap-1.5">
+      <span className="text-[10px] tracking-[0.15em] text-slate-400">{label}</span>
+      <span className="font-medium text-slate-700">{value}</span>
+    </p>
+  )
+}
+
 export function AdminMockAttemptReport() {
   const { id, attemptId } = useParams()
   const [account, setAccount] = useState<UserAccount | null>(null)
@@ -230,12 +245,12 @@ export function AdminMockAttemptReport() {
           </div>
         </header>
 
-        <section className="mt-5 flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm text-slate-700">
+        <section className="mt-5 flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
           <p className="text-base font-semibold text-slate-900">{account.displayName}</p>
           {account.school && <p className="text-slate-500">{account.school}</p>}
-          {dateISO && <p className="text-slate-500">응시 {fmtReportDate(dateISO)}</p>}
+          {dateISO && <MetaField label="응시" value={fmtReportDate(dateISO)} />}
           {attempt.mockElectiveName && (
-            <p className="text-slate-500">선택 {attempt.mockElectiveName}</p>
+            <MetaField label="선택" value={attempt.mockElectiveName} />
           )}
         </section>
 
