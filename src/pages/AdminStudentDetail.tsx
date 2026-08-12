@@ -1660,6 +1660,13 @@ export function AdminStudentDetail() {
                       <p className="text-[11px] text-slate-500 mt-0.5">
                         {r.dateISO} · 앱 응시
                       </p>
+                      {/* 추이표와 달리 이 회차 하나만 파고드는 성적표. */}
+                      <Link
+                        to={`/admin/students/${account.id}/report/${r.id.replace('attempt:', '')}`}
+                        className="mt-1 inline-block text-[11px] font-medium text-brand-700 hover:underline"
+                      >
+                        회차 성적표
+                      </Link>
                     </div>
                     <div className="shrink-0 text-right">
                       <p className="text-sm font-semibold text-slate-900 tabular-nums">

@@ -1222,6 +1222,13 @@ export function KoreanMockDetail() {
                         {ratio}%
                       </span>
                     </Link>
+                    {/* 이 학생의 이 회차만 담은 인쇄용 성적표. */}
+                    <Link
+                      to={`/admin/students/${a.studentUid}/report/${a.id}`}
+                      className="shrink-0 px-3 py-3 text-[11px] font-medium text-slate-400 hover:text-slate-900"
+                    >
+                      성적표
+                    </Link>
                     <button
                       type="button"
                       onClick={() => handleDeleteAttempt(a)}
