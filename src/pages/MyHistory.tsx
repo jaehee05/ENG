@@ -20,12 +20,12 @@ const SUBJECT_BADGE_CLASS: Record<MockSubject, string> = {
 type Filter = 'all' | Attempt['type']
 
 /**
- * 필터 칩. 내 단어장은 숨김이라 뺀다 — 지난 응시 기록은 '전체' 에 남는다.
+ * 필터 칩. 내 단어장과 지문 문제풀이는 내린 기능이라 뺀다 — 지난 응시
+ * 기록은 '전체' 에 남는다.
  */
 const HISTORY_FILTERS: readonly Filter[] = [
   'all',
   'vocab',
-  'reading',
   ...(WORDBOOK_ENABLED ? (['wordbook'] as const) : []),
   'korean_mock',
 ]
