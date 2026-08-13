@@ -33,7 +33,7 @@ import {
   isBlankHtml,
   hasMockPassage,
   MOCK_SUBJECT_LABEL,
-  mockLinkLabel,
+  mockLinkLabels,
   questionPoints,
   wrongChoiceNumbers,
   type Attempt,
@@ -836,20 +836,30 @@ export function KoreanMockDetail() {
                         <p className="text-xs font-medium text-slate-600 mb-1">
                           연계 교재{' '}
                           <span className="text-slate-400 font-normal">
-                            — 적어두면 해설 맨 위에 칩으로 뜹니다 (선택)
+                            — 적어두면 해설 맨 위에 칩으로 뜹니다. 두 곳 이상이면
+                            쉼표로 나눠 적으세요 (선택)
                           </span>
                         </p>
                         <input
                           value={explLinkDraft}
                           onChange={(e) => setExplLinkDraft(e.target.value)}
-                          placeholder="수능완성 p.134"
+                          placeholder="수능완성 p.134, 수능특강 p.88"
                           className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                         />
-                        {/* 뒤의 '연계'는 붙여서 보여주므로 출처만 적으면 된다. */}
-                        {explLinkDraft.trim() && (
-                          <p className="mt-1 text-[11px] text-slate-400">
-                            학생에게는 「{mockLinkLabel(explLinkDraft)}」 로 뜹니다
-                          </p>
+                        {/* 뒤의 '연계'와 교재 이름 줄임은 화면이 알아서 한다 —
+                            적은 대로가 아니라 학생이 볼 모양을 그대로 보여준다. */}
+                        {mockLinkLabels(explLinkDraft).length > 0 && (
+                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                            <span className="text-[11px] text-slate-400">학생 화면</span>
+                            {mockLinkLabels(explLinkDraft).map((label) => (
+                              <span
+                                key={label}
+                                className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800"
+                              >
+                                {label}
+                              </span>
+                            ))}
+                          </div>
                         )}
                       </div>
 

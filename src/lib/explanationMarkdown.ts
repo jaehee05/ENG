@@ -1,5 +1,5 @@
 import {
-  mockLinkLabel,
+  mockLinkLabels,
   mockWrongChoiceEntries,
   questionPoints,
   type KoreanMock,
@@ -151,13 +151,14 @@ function questionToMarkdown(q: KoreanMockQuestion): string | null {
   }))
   const legacyWrong = htmlToMarkdown(q.explanationWrong)
   const note = htmlToMarkdown(q.examinerNote)
-  const link = mockLinkLabel(q.linkedSource)
-  if (!correct && wrongs.length === 0 && !legacyWrong && !note && !link) return null
+  const links = mockLinkLabels(q.linkedSource)
+  if (!correct && wrongs.length === 0 && !legacyWrong && !note && links.length === 0)
+    return null
 
   const lines: string[] = []
   const points = questionPoints(q)
   lines.push(`${String(q.number).padStart(2, '0')}. [  ]${points === 3 ? ' (3점)' : ''}`)
-  if (link) lines.push(`[${link}]`)
+  if (links.length) lines.push(links.map((l) => `[${l}]`).join(' '))
   lines.push(`정답 해설 : ${circled(q.answer)} ${correct}`.trimEnd())
   if (note) lines.push(`→ ${note}`)
   if (wrongs.length > 0 || legacyWrong) {
