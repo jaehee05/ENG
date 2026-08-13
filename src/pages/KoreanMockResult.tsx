@@ -725,8 +725,9 @@ export function KoreanMockResult() {
                       <div className="space-y-3">
                         {wrongEntries.map((e) => (
                           <div key={e.choice} className="flex gap-2">
-                            {/* 선지 번호는 저장하지 않고 표시할 때 붙인다 */}
-                            <span className="shrink-0 text-sm font-semibold text-slate-500 leading-7">
+                            {/* 선지 번호는 저장하지 않고 표시할 때 붙인다.
+                                .rte-mark 로 본문과 글꼴·줄 높이를 맞춘다. */}
+                            <span className="rte-mark shrink-0 text-sm font-semibold text-slate-500">
                               {e.mark}
                             </span>
                             <div
