@@ -654,11 +654,13 @@ export function KoreanMockResult() {
                   {/* 연계 교재 칩. 해설보다 먼저 온다 — 이 문항이 어디서 왔는지
                       먼저 알고 해설을 읽게 하려는 것. */}
                   {linkLabels.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {/* '연계'는 이름표가 한 번만 달고 간다 — 칩마다 되풀이할 말이 아니다. */}
+                      <span className="text-xs text-slate-500">연계</span>
                       {linkLabels.map((label) => (
                         <span
                           key={label}
-                          className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800"
+                          className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800"
                         >
                           {label}
                         </span>
