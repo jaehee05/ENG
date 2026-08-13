@@ -521,8 +521,8 @@ const MOCK_LINK_ABBR: readonly [string, string][] = [
  * 연계 교재 칩에 적을 말들. 없으면 빈 배열.
  *
  * 두 곳 이상 연계면 쉼표(또는 줄바꿈)로 나눠 적고, 칩도 그만큼 뜬다.
- * 관리자는 출처만 적고('수능완성 p.134') 뒤의 '연계'는 여기서 붙인다.
- * 다만 이미 '연계'로 끝나게 적었으면 그대로 둔다 — 두 번 붙지 않게.
+ * '연계'라는 말은 칩 왼쪽 이름표가 한 번만 달고 가므로 칩에서는 뗀다 —
+ * 관리자가 습관대로 '수능완성 p.134 연계' 라고 적어도 칩은 '수완 p.134'.
  */
 export function mockLinkLabels(source: string | undefined | null): string[] {
   return (source ?? '')
@@ -530,10 +530,11 @@ export function mockLinkLabels(source: string | undefined | null): string[] {
     .map((s) => s.trim())
     .filter(Boolean)
     .map((s) => {
-      let t = s
+      let t = s.replace(/\s*연계$/, '').trim()
       for (const [long, short] of MOCK_LINK_ABBR) t = t.split(long).join(short)
-      return t.endsWith('연계') ? t : `${t} 연계`
+      return t
     })
+    .filter(Boolean)
 }
 
 /** 정답/오답/한마디 중 어느 하나라도 있는지 — 학생에게 보여줄 게 있는지. */

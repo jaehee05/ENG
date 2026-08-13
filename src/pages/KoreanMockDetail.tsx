@@ -846,15 +846,16 @@ export function KoreanMockDetail() {
                           placeholder="수능완성 p.134, 수능특강 p.88"
                           className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                         />
-                        {/* 뒤의 '연계'와 교재 이름 줄임은 화면이 알아서 한다 —
+                        {/* 교재 이름 줄임도 '연계' 떼는 것도 화면이 알아서 한다 —
                             적은 대로가 아니라 학생이 볼 모양을 그대로 보여준다. */}
                         {mockLinkLabels(explLinkDraft).length > 0 && (
                           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                             <span className="text-[11px] text-slate-400">학생 화면</span>
+                            <span className="text-[11px] text-slate-500">연계</span>
                             {mockLinkLabels(explLinkDraft).map((label) => (
                               <span
                                 key={label}
-                                className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800"
+                                className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800"
                               >
                                 {label}
                               </span>
