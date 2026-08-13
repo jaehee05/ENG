@@ -454,8 +454,8 @@ export interface KoreanMockQuestion {
    */
   examinerNote?: string
   /**
-   * 연계 교재 출처. ' 수능완성 p.134' 처럼 적어두면 해설 위에 칩으로 뜬다.
-   * 평문이다 — 칩 한 줄에 들어갈 짧은 말만 쓴다.
+   * 연계 교재 출처. '수능완성 p.134' 처럼 적어두면 해설 위에 칩으로 뜬다.
+   * 두 곳 이상이면 쉼표로 나눠 적는다 — 칩도 그만큼 뜬다.
    */
   linkedSource?: string
   /**
@@ -509,15 +509,31 @@ export function isBlankHtml(html: string | undefined | null): boolean {
 }
 
 /**
- * 연계 교재 칩에 적을 말. 없으면 null.
+ * 칩에서 줄여 쓰는 교재 이름. 칩은 한 줄짜리라 긴 이름이 자리를 다 먹는다.
+ * 관리자는 어느 쪽으로 적어도 된다 — 화면에서 줄여 보여준다.
+ */
+const MOCK_LINK_ABBR: readonly [string, string][] = [
+  ['수능특강', '수특'],
+  ['수능완성', '수완'],
+]
+
+/**
+ * 연계 교재 칩에 적을 말들. 없으면 빈 배열.
  *
+ * 두 곳 이상 연계면 쉼표(또는 줄바꿈)로 나눠 적고, 칩도 그만큼 뜬다.
  * 관리자는 출처만 적고('수능완성 p.134') 뒤의 '연계'는 여기서 붙인다.
  * 다만 이미 '연계'로 끝나게 적었으면 그대로 둔다 — 두 번 붙지 않게.
  */
-export function mockLinkLabel(source: string | undefined | null): string | null {
-  const src = source?.trim()
-  if (!src) return null
-  return src.endsWith('연계') ? src : `${src} 연계`
+export function mockLinkLabels(source: string | undefined | null): string[] {
+  return (source ?? '')
+    .split(/[,;\n]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => {
+      let t = s
+      for (const [long, short] of MOCK_LINK_ABBR) t = t.split(long).join(short)
+      return t.endsWith('연계') ? t : `${t} 연계`
+    })
 }
 
 /** 정답/오답/한마디 중 어느 하나라도 있는지 — 학생에게 보여줄 게 있는지. */
