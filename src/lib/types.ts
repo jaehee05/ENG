@@ -454,6 +454,11 @@ export interface KoreanMockQuestion {
    */
   examinerNote?: string
   /**
+   * 연계 교재 출처. ' 수능완성 p.134' 처럼 적어두면 해설 위에 칩으로 뜬다.
+   * 평문이다 — 칩 한 줄에 들어갈 짧은 말만 쓴다.
+   */
+  linkedSource?: string
+  /**
    * 오답 리뷰용 지문 원문. 모의고사는 종이 시험지로 풀기 때문에 응시 중에는
    * 쓰이지 않고, 채점 후 학생이 "틀린" 문항을 열었을 때만 펼쳐 보여준다.
    */
@@ -501,6 +506,18 @@ export function isBlankHtml(html: string | undefined | null): boolean {
     // 눈에 안 보이는 공백들 — 줄바꿈 없는 공백, 폭 없는 공백, BOM
     .replace(/[\u00a0\u200b\ufeff]/g, ' ')
   return text.trim().length === 0
+}
+
+/**
+ * 연계 교재 칩에 적을 말. 없으면 null.
+ *
+ * 관리자는 출처만 적고('수능완성 p.134') 뒤의 '연계'는 여기서 붙인다.
+ * 다만 이미 '연계'로 끝나게 적었으면 그대로 둔다 — 두 번 붙지 않게.
+ */
+export function mockLinkLabel(source: string | undefined | null): string | null {
+  const src = source?.trim()
+  if (!src) return null
+  return src.endsWith('연계') ? src : `${src} 연계`
 }
 
 /** 정답/오답/한마디 중 어느 하나라도 있는지 — 학생에게 보여줄 게 있는지. */

@@ -33,6 +33,7 @@ import {
   isBlankHtml,
   hasMockPassage,
   MOCK_SUBJECT_LABEL,
+  mockLinkLabel,
   questionPoints,
   wrongChoiceNumbers,
   type Attempt,
@@ -121,6 +122,8 @@ export function KoreanMockDetail() {
   const [explChoiceDraft, setExplChoiceDraft] = useState<Record<string, string>>({})
   // 문항별 출제자 한마디 초안.
   const [explNoteDraft, setExplNoteDraft] = useState('')
+  // 연계 교재 출처 초안 ('수능완성 p.134').
+  const [explLinkDraft, setExplLinkDraft] = useState('')
   const [explSaving, setExplSaving] = useState(false)
   /** Ctrl+S 로 창을 닫지 않고 저장했을 때 그 시각. 저장됐는지 눈으로 확인용. */
   const [explSavedAt, setExplSavedAt] = useState<string | null>(null)
@@ -300,6 +303,7 @@ export function KoreanMockDetail() {
     setExplDraft(q?.explanation ?? '')
     setExplChoiceDraft({ ...(q?.explanationChoices ?? {}) })
     setExplNoteDraft(q?.examinerNote ?? '')
+    setExplLinkDraft(q?.linkedSource ?? '')
     setPassageDraft(q?.passage ?? '')
     setPassageKoDraft(q?.passageKo ?? '')
     setGlossDraft(q?.glossary ?? [])
@@ -356,10 +360,14 @@ export function KoreanMockDetail() {
   async function applyExpl(clear = false, close = true) {
     const correct = clear || isBlankHtml(explDraft) ? '' : explDraft.trim()
     const note = clear || isBlankHtml(explNoteDraft) ? '' : explNoteDraft.trim()
+    const link = clear ? '' : explLinkDraft.trim()
     await saveQuestionPatch((q) => {
       const next = { ...q }
       if (correct) next.explanation = correct
       else delete next.explanation
+
+      if (link) next.linkedSource = link
+      else delete next.linkedSource
 
       const choices = clear ? {} : normalizeChoiceDraft(explChoiceDraft, q.answer)
       if (Object.keys(choices).length) next.explanationChoices = choices
@@ -516,6 +524,7 @@ export function KoreanMockDetail() {
         normalizeChoiceDraft(explChoiceDraft, explTargetQuestion.answer),
       ) !== choiceCompareKey(explTargetQuestion.explanationChoices) ||
       blankToEmpty(explNoteDraft) !== blankToEmpty(explTargetQuestion.examinerNote) ||
+      explLinkDraft.trim() !== (explTargetQuestion.linkedSource ?? '').trim() ||
       passageDraft.trim() !== (explTargetQuestion.passage ?? '').trim() ||
       passageKoDraft.trim() !== (explTargetQuestion.passageKo ?? '').trim() ||
       JSON.stringify(glossDraft) !==
@@ -822,7 +831,28 @@ export function KoreanMockDetail() {
                         ]
                   return (
                     <>
-                      {/* 학생 화면에 뜨는 순서대로 놓는다 — 한마디, 정답, 오답. */}
+                      {/* 학생 화면에 뜨는 순서대로 놓는다 — 연계, 한마디, 정답, 오답. */}
+                      <div>
+                        <p className="text-xs font-medium text-slate-600 mb-1">
+                          연계 교재{' '}
+                          <span className="text-slate-400 font-normal">
+                            — 적어두면 해설 맨 위에 칩으로 뜹니다 (선택)
+                          </span>
+                        </p>
+                        <input
+                          value={explLinkDraft}
+                          onChange={(e) => setExplLinkDraft(e.target.value)}
+                          placeholder="수능완성 p.134"
+                          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                        />
+                        {/* 뒤의 '연계'는 붙여서 보여주므로 출처만 적으면 된다. */}
+                        {explLinkDraft.trim() && (
+                          <p className="mt-1 text-[11px] text-slate-400">
+                            학생에게는 「{mockLinkLabel(explLinkDraft)}」 로 뜹니다
+                          </p>
+                        )}
+                      </div>
+
                       <div>
                         <p className="text-xs font-medium text-slate-600 mb-1">
                           출제자의 한마디{' '}

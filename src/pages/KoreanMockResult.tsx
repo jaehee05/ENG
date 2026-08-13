@@ -13,6 +13,7 @@ import {
   hasMockExplanation,
   isBlankHtml,
   hasMockPassage,
+  mockLinkLabel,
   mockWrongChoiceEntries,
   MOCK_SUBJECT_LABEL,
   questionPoints,
@@ -221,10 +222,13 @@ export function KoreanMockResult() {
   // 해설(정답/오답)과 오답 리뷰 지문을 모두 여기서 꺼내 쓴다.
   const explByNumber = new Map<number, KoreanMockQuestion>()
   const passageByNumber = new Map<number, KoreanMockQuestion>()
+  /** 문항 번호 → 연계 교재 출처. 해설이 없어도 이것만으로 열어볼 값어치가 있다. */
+  const linkByNumber = new Map<number, string>()
   if (mock) {
     const collect = (q: KoreanMockQuestion) => {
       if (hasMockExplanation(q)) explByNumber.set(q.number, q)
       if (hasMockPassage(q)) passageByNumber.set(q.number, q)
+      if (q.linkedSource?.trim()) linkByNumber.set(q.number, q.linkedSource)
     }
     for (const q of mock.questions) collect(q)
     const el = attempt.mockElectiveName
@@ -427,7 +431,8 @@ export function KoreanMockResult() {
               // 지문은 틀린 문항에서만. 관리자는 검수용으로 항상 볼 수 있다.
               const showPassage =
                 passageByNumber.has(r.number) && (!r.correct || canEdit)
-              const tappable = !editing && (hasExpl || showPassage)
+              const hasLink = linkByNumber.has(r.number)
+              const tappable = !editing && (hasExpl || showPassage || hasLink)
               return (
                 <tr
                   key={i}
@@ -448,6 +453,13 @@ export function KoreanMockResult() {
                     {showPassage && (
                       <span className="ml-1.5 inline-block rounded bg-brand-50 text-brand-700 px-1.5 py-0.5 text-[10px] font-medium align-middle">
                         지문
+                      </span>
+                    )}
+                    {/* 해설이 없어도 연계만으로 열리는 줄이 있다. 눌리는 줄임을
+                        표시해 두지 않으면 눌러볼 이유를 모른다. */}
+                    {hasLink && (
+                      <span className="ml-1.5 inline-block rounded bg-amber-50 text-amber-800 px-1.5 py-0.5 text-[10px] font-medium align-middle">
+                        연계
                       </span>
                     )}
                   </td>
@@ -595,6 +607,7 @@ export function KoreanMockResult() {
           // 지문은 틀렸을 때만 (관리자는 검수용으로 항상)
           const pq = passageByNumber.get(explNumber)
           const passageQ = pq && (!r?.correct || canEdit) ? pq : undefined
+          const linkLabel = mockLinkLabel(linkByNumber.get(explNumber))
           return (
             <div
               className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm"
@@ -638,6 +651,16 @@ export function KoreanMockResult() {
                       </span>
                     </div>
                   )}
+                  {/* 연계 교재 칩. 해설보다 먼저 온다 — 이 문항이 어디서 왔는지
+                      먼저 알고 해설을 읽게 하려는 것. */}
+                  {linkLabel && (
+                    <div>
+                      <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                        {linkLabel}
+                      </span>
+                    </div>
+                  )}
+
                   {passageQ && (
                     <MockPassageReview question={passageQ} subject={subj} />
                   )}
