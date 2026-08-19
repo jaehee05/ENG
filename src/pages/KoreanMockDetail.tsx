@@ -3,6 +3,11 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import { downloadMarkdown, mockToMarkdown } from '../lib/explanationMarkdown'
 import {
+  applyParsedToMock,
+  parseExplanationMarkdown,
+  type ImportResult,
+} from '../lib/explanationImport'
+import {
   deleteAttempt,
   deleteKoreanMock,
   formatDate,
@@ -140,6 +145,14 @@ export function KoreanMockDetail() {
   const [cutoffBusy, setCutoffBusy] = useState(false)
   const [cutoffError, setCutoffError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+
+  // 해설 원고 .md 올리기 — 파싱 결과를 먼저 보여주고 확인받는다.
+  const mdInputRef = useRef<HTMLInputElement | null>(null)
+  const [mdPreview, setMdPreview] = useState<
+    (ImportResult & { fileName: string }) | null
+  >(null)
+  const [mdError, setMdError] = useState<string | null>(null)
+  const [mdSaving, setMdSaving] = useState(false)
 
   // 해설 PDF (관리자)
   const pdfInputRef = useRef<HTMLInputElement>(null)
@@ -446,6 +459,51 @@ export function KoreanMockDetail() {
     }
   }
 
+  /**
+   * 해설 원고 .md 를 읽어 미리보기를 만든다. 여기서는 저장하지 않는다 —
+   * 몇 문항이 덮이는지, 정답이 어긋난 곳은 없는지 먼저 보여주고 확인받는다.
+   */
+  async function handleMdPick(file: File | null) {
+    if (!file || !mock) return
+    setMdError(null)
+    try {
+      const text = await file.text()
+      const doc = parseExplanationMarkdown(text)
+      const result = applyParsedToMock(mock, doc)
+      if (result.applied === 0) {
+        setMdError(
+          '이 파일에서 채울 문항을 찾지 못했습니다. 내보낸 .md 와 같은 원고 형식인지 확인해 주세요.',
+        )
+        return
+      }
+      setMdPreview({ ...result, fileName: file.name })
+    } catch (err) {
+      setMdError(err instanceof Error ? err.message : '파일을 읽지 못했습니다.')
+    }
+  }
+
+  /** 미리보기에서 확인을 누르면 그때 저장한다. */
+  async function applyMdImport() {
+    if (!mock || !mdPreview) return
+    setMdSaving(true)
+    try {
+      await updateKoreanMock(mock.id, {
+        questions: mdPreview.questions,
+        ...(mdPreview.electives ? { electives: mdPreview.electives } : {}),
+      })
+      setMock({
+        ...mock,
+        questions: mdPreview.questions,
+        ...(mdPreview.electives ? { electives: mdPreview.electives } : {}),
+      })
+      setMdPreview(null)
+    } catch (err) {
+      setMdError(err instanceof Error ? err.message : '해설 저장 실패')
+    } finally {
+      setMdSaving(false)
+    }
+  }
+
   async function handleDelete() {
     if (!mock) return
     if (!window.confirm(`"${mock.title}" 모의고사를 삭제하시겠습니까?`)) return
@@ -602,6 +660,25 @@ export function KoreanMockDetail() {
               className="rounded-md border border-slate-300 text-slate-600 text-xs font-medium px-2.5 py-1.5 hover:bg-slate-100"
             >
               해설 .md
+            </button>
+            {/* 내보낸 원고를 고쳐 다시 올린다. 앱에서 한 칸씩 치는 것보다 빠르다. */}
+            <input
+              ref={mdInputRef}
+              type="file"
+              accept=".md,.markdown,.txt,text/markdown,text/plain"
+              className="hidden"
+              onChange={(e) => {
+                void handleMdPick(e.target.files?.[0] ?? null)
+                // 같은 파일을 다시 골라도 onChange 가 오게 비워 둔다.
+                e.target.value = ''
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => mdInputRef.current?.click()}
+              className="rounded-md border border-slate-300 text-slate-600 text-xs font-medium px-2.5 py-1.5 hover:bg-slate-100"
+            >
+              해설 올리기
             </button>
             <button
               type="button"
@@ -1284,6 +1361,80 @@ export function KoreanMockDetail() {
             </ul>
           )}
         </section>
+      )}
+
+      {/* 해설 .md 올리기 — 읽은 결과를 먼저 보여주고 확인받는다. 덮어쓰는
+          일이라 그냥 저장해 버리면 되돌릴 방법이 없다. */}
+      {mdError && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <div className="w-full sm:max-w-md bg-white rounded-2xl shadow-xl p-5 space-y-3">
+            <h3 className="text-sm font-bold text-slate-900">해설을 올리지 못했습니다</h3>
+            <p className="text-sm text-slate-600">{mdError}</p>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setMdError(null)}
+                className="rounded-md bg-slate-900 text-white text-xs font-medium px-4 py-2"
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mdPreview && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <div className="w-full sm:max-w-lg bg-white rounded-2xl shadow-xl p-5 space-y-3 max-h-[85vh] overflow-y-auto">
+            <h3 className="text-sm font-bold text-slate-900">해설 올리기</h3>
+            <p className="text-xs text-slate-500 break-all">{mdPreview.fileName}</p>
+            <p className="text-sm text-slate-700">
+              <b className="font-semibold text-slate-900">{mdPreview.applied}개</b> 문항의
+              해설을 이 파일 내용으로 덮어씁니다. 파일에 없는 문항은 그대로 둡니다.
+            </p>
+            <p className="text-[11px] text-slate-400">
+              정답과 배점은 바꾸지 않습니다 — 정답을 바꾸면 학생 응시 기록이 모두
+              재채점되기 때문입니다.
+            </p>
+            {/* 원고에는 굵게·기울임만 남는다. 이미 넣어 둔 밑줄·색이 사라지는 건
+                되돌릴 수 없으므로 누르기 전에 말해 준다. */}
+            <p className="text-[11px] text-slate-400">
+              원고에 남는 서식은 굵게·기울임뿐입니다. 앱에서 넣어 둔 밑줄과 색은
+              덮어쓰면서 사라집니다.
+            </p>
+            {mdPreview.warnings.length > 0 && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <p className="text-xs font-semibold text-amber-800">
+                  확인할 것 {mdPreview.warnings.length}건
+                </p>
+                <ul className="mt-1 space-y-1">
+                  {mdPreview.warnings.map((w) => (
+                    <li key={w} className="text-[11px] leading-relaxed text-amber-900">
+                      {w}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setMdPreview(null)}
+                className="text-xs text-slate-500 hover:text-slate-900 px-3 py-2"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={applyMdImport}
+                disabled={mdSaving}
+                className="rounded-md bg-slate-900 text-white text-xs font-medium px-4 py-2 hover:bg-slate-800 disabled:opacity-50"
+              >
+                {mdSaving ? '저장 중...' : '덮어쓰기'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
