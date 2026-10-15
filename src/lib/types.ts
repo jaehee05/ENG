@@ -700,6 +700,11 @@ export interface Attempt {
   mockSubject?: MockSubject
   /** 'korean_mock' 한정: 학생이 응시한 선택과목 이름(있을 때). 등급컷 판정에 사용. */
   mockElectiveName?: string
+  /**
+   * 'korean_mock' 한정: 답을 OMR 사진 판독으로 불러왔으면 'omr'. 불러온 뒤 학생이
+   * 고친 것도 포함한다. 없으면 손으로 입력한 것(기존 기록 전부).
+   */
+  answerSource?: 'omr'
   /** reading 한정: 오답 검토(재시도 1회) 완료 시각. */
   wrongReviewedAt?: Timestamp | null
   /** reading 한정: 오답 문항별 재시도에서 고른 선지 인덱스. 키는 문항 인덱스 문자열. */

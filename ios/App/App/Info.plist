@@ -22,6 +22,10 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>NSCameraUsageDescription</key>
+	<string>모의고사 OMR 답안지를 촬영해 답을 불러오는 데 사용합니다. 사진은 저장하지 않습니다.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>찍어 둔 OMR 답안지 사진을 골라 답을 불러오는 데 사용합니다. 사진은 저장하지 않습니다.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSSupportsLiveActivities</key>

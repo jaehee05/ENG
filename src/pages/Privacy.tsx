@@ -10,7 +10,7 @@
 
 import { useNavigate } from 'react-router-dom'
 
-const UPDATED = '2026년 8월 3일'
+const UPDATED = '2026년 10월 15일'
 const CONTACT = 'support@kjhedu.kr'
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -114,6 +114,11 @@ export function Privacy() {
                 '서비스 이용 과정에서 자동 생성',
               ],
               ['서비스 이용 중 생성', '수강료 수납 기록', '학원이 입력'],
+              [
+                '선택',
+                'OMR 답안지 사진(판독 후 저장하지 않음)',
+                '모의고사 응시 중 이용자가 사진을 올린 경우',
+              ],
               ['자동 수집', '푸시 알림 토큰', '앱에서 알림을 허용한 경우'],
             ]}
           />
@@ -162,7 +167,7 @@ export function Privacy() {
               ['㈜뿌리오', '학습 현황 알림톡 발송 (이름·연락처)', '대한민국'],
               [
                 'Anthropic PBC',
-                '단어 시험 자동 채점(제출한 답), 지문 번역·해설 생성',
+                '단어 시험 자동 채점(제출한 답), 지문 번역·해설 생성, OMR 답안지 사진 판독',
                 '미국',
               ],
               ['Capgo', '애플리케이션 업데이트 배포', '국외'],
