@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode, type UIEvent } from 'react'
 import { Link, NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { Capacitor } from '@capacitor/core'
 import { FirebaseMessaging } from '@capacitor-firebase/messaging'
@@ -12,6 +12,7 @@ import { resolveBackTarget } from '../lib/backNav'
 import { NAV_QUERY, useMediaQuery } from '../lib/useMediaQuery'
 import { accountSubjects } from '../lib/types'
 import { WORDBOOK_ENABLED } from '../lib/features'
+import { Badge, confirm, cx } from './ui'
 
 interface NavItem {
   to: string
@@ -148,6 +149,13 @@ export function Layout() {
   const isAdmin = profile?.role === 'admin'
   const [unread, setUnread] = useState(0)
   const [backOverride, setBackOverride] = useState<BackOverride | null>(null)
+  // 헤더는 바탕과 같은 색이라 평소엔 경계가 없다. 본문이 헤더 밑으로 밀려 올라갈
+  // 때만 얇은 선을 그어, 내용이 헤더에 묻혀 보이지 않게 한다.
+  const [scrolled, setScrolled] = useState(false)
+  function onMainScroll(e: UIEvent<HTMLElement>) {
+    const next = e.currentTarget.scrollTop > 4
+    if (next !== scrolled) setScrolled(next)
+  }
 
   useEffect(() => {
     if (!profile) return
@@ -266,18 +274,24 @@ export function Layout() {
         }
       : null
 
-  function goBack() {
+  async function goBack() {
     if (!back) return
-    if (back.confirmMessage && !window.confirm(back.confirmMessage)) return
+    if (back.confirmMessage && !(await confirm(back.confirmMessage, { confirmText: '나가기', danger: true })))
+      return
     if (hasHistory) navigate(-1)
     else navigate(back.to)
   }
 
   return (
-    <div className="h-dvh flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      {/* 상단 미니멀 헤더 */}
-      <header className="bg-white border-b border-slate-200 safe-top safe-x">
-        <div className="max-w-6xl xl:max-w-7xl 2xl:max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-3">
+    <div className="h-dvh flex flex-col bg-surface text-slate-900 overflow-hidden">
+      {/* 상단 헤더 — 바탕과 같은 색. 스크롤하면 아래 선만 생긴다. */}
+      <header
+        className={cx(
+          'bg-surface border-b safe-top safe-x transition-colors',
+          scrolled ? 'border-slate-200/80' : 'border-transparent',
+        )}
+      >
+        <div className="max-w-6xl xl:max-w-7xl 2xl:max-w-screen-2xl mx-auto px-5 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-3">
           {/* 뒤로가기가 있는 화면에선 로고 자리를 내준다 — 아이폰 폭에서 둘을
               같이 두면 이름이 잘린다. 로고는 어차피 홈으로 가는 링크였고,
               홈은 탭바에 있다. */}
@@ -285,7 +299,7 @@ export function Layout() {
             <button
               type="button"
               onClick={goBack}
-              className="-ml-2 h-11 pl-1.5 pr-3 min-w-0 inline-flex items-center gap-0.5 rounded-lg text-[15px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 active:bg-slate-100 transition"
+              className="pressable -ml-2.5 h-11 pl-1.5 pr-3 min-w-0 inline-flex items-center gap-0.5 rounded-xl text-[16px] font-semibold text-slate-800 hover:bg-slate-200/60 active:bg-slate-200/60"
             >
               {/* 목적지 이름만 적힌 경우('시험지') 읽어주는 기기에는 그게 뒤로
                   가는 버튼이라는 걸 따로 알려준다. 이름이 이미 '뒤로' 면
@@ -299,33 +313,29 @@ export function Layout() {
           ) : (
             <Link
               to="/"
-              className="text-[15px] font-semibold tracking-tight text-slate-900 flex items-center gap-1.5"
+              className="text-[17px] font-bold tracking-tight text-slate-900 flex items-center gap-1.5"
             >
               <span className="inline-block w-1.5 h-1.5 rounded-full bg-brand-500" />
               KJHEDU
             </Link>
           )}
 
-          <div className="flex items-center gap-1.5">
-            <span className="hidden sm:inline text-xs text-slate-500">
+          <div className="flex items-center gap-1">
+            <span className="hidden sm:inline-flex items-center gap-1.5 text-[13px] font-medium text-slate-500 mr-1">
               {profile?.displayName}
-              {isAdmin && (
-                <span className="ml-1.5 inline-block rounded bg-brand-50 text-brand-700 px-1.5 py-0.5 text-[10px] font-medium align-middle">
-                  관리자
-                </span>
-              )}
+              {isAdmin && <Badge tone="brand">관리자</Badge>}
             </span>
             <Link
               to="/notifications"
               aria-label="알림함"
-              className="relative h-9 w-9 inline-flex items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 transition"
+              className="pressable relative -mr-2 h-10 w-10 inline-flex items-center justify-center rounded-full text-slate-600 hover:bg-slate-200/60 active:bg-slate-200/60"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8" />
                 <path d="M10 21a2 2 0 0 0 4 0" />
               </svg>
               {unread > 0 && (
-                <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
+                <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-surface" />
               )}
             </Link>
           </div>
@@ -333,8 +343,8 @@ export function Layout() {
       </header>
 
       {/* 본문 */}
-      <main className="flex-1 overflow-y-auto overscroll-contain safe-x">
-        <div className="max-w-6xl xl:max-w-7xl 2xl:max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7 pb-6">
+      <main className="flex-1 overflow-y-auto overscroll-contain safe-x" onScroll={onMainScroll}>
+        <div className="max-w-6xl xl:max-w-7xl 2xl:max-w-screen-2xl mx-auto px-5 sm:px-6 lg:px-8 pt-2 sm:pt-5 pb-8">
           <BackNavContext.Provider value={setBackOverride}>
             <Outlet />
           </BackNavContext.Provider>
@@ -344,7 +354,7 @@ export function Layout() {
       {/* 아이패드 세로(768) 이상: 하단 가로 네비 — 전체 메뉴 노출.
           관리자는 항목이 10개까지 늘어나 768px에서 빠듯하므로, 넘치면 가로 스크롤되게 둔다.
           (안쪽 flex에 mx-auto → 들어갈 땐 가운데 정렬, 넘칠 땐 왼쪽부터) */}
-      <nav className="hidden md:block sticky bottom-0 border-t border-slate-200 bg-white/95 backdrop-blur safe-bottom safe-x">
+      <nav className="hidden md:block sticky bottom-0 bg-white/95 backdrop-blur shadow-bar safe-bottom safe-x">
         <div className="max-w-6xl xl:max-w-7xl 2xl:max-w-screen-2xl mx-auto px-4 lg:px-6 h-12 flex items-center overflow-x-auto">
           <div className="flex items-center gap-0.5 lg:gap-1 mx-auto">
             {desktopNav.map((i) => (
@@ -353,10 +363,10 @@ export function Layout() {
                 to={i.to}
                 end={i.end}
                 className={({ isActive }) =>
-                  `inline-flex items-center gap-1.5 px-2 lg:px-3 h-9 rounded-md text-[13px] lg:text-sm font-medium whitespace-nowrap transition ${
+                  `pressable inline-flex items-center gap-1.5 px-2.5 lg:px-3 h-9 rounded-xl text-[13px] lg:text-sm whitespace-nowrap ${
                     isActive
-                      ? 'bg-slate-100 text-slate-900'
-                      : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                      ? 'bg-slate-100 text-slate-900 font-bold [&_svg]:stroke-[2.2]'
+                      : 'text-slate-500 font-medium hover:text-slate-900 hover:bg-slate-50 active:bg-slate-100'
                   }`
                 }
               >
@@ -368,8 +378,8 @@ export function Layout() {
         </div>
       </nav>
 
-      {/* 아이폰(768 미만) 하단 탭바 */}
-      <nav className="md:hidden border-t border-slate-200 bg-white safe-bottom safe-x">
+      {/* 아이폰(768 미만) 하단 탭바 — 선 대신 옅은 그림자로 본문과 나눈다. */}
+      <nav className="md:hidden bg-white shadow-bar safe-bottom safe-x">
         <div
           className="grid px-1 max-w-md mx-auto"
           style={{
@@ -382,12 +392,15 @@ export function Layout() {
               to={i.to}
               end={i.end}
               className={({ isActive }) =>
-                `flex flex-col items-center justify-center gap-0.5 py-2 text-[10.5px] font-medium transition ${
-                  isActive ? 'text-brand-700' : 'text-slate-500 active:bg-slate-100'
+                // 선택된 탭만 진하게 — 색을 입히기보다 글자·아이콘 굵기로 구분한다.
+                `pressable flex flex-col items-center justify-center gap-1 pt-2 pb-1.5 text-[11px] ${
+                  isActive
+                    ? 'text-slate-900 font-bold [&_svg]:stroke-[2.2]'
+                    : 'text-slate-400 font-medium'
                 }`
               }
             >
-              <span className="w-5 h-5 inline-flex">{i.icon}</span>
+              <span className="w-6 h-6 inline-flex">{i.icon}</span>
               {i.label}
             </NavLink>
           ))}
