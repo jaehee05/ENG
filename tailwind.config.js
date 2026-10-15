@@ -32,7 +32,10 @@ export default {
         },
       },
       fontFamily: {
+        // 토스에서 받은 Toss Product Sans 를 기본 고딕으로(2026-10-15). 글꼴 파일은
+        // static.toss.im 에서 오므로(index.css), 늦거나 막히면 바로 뒤의 Pretendard 로 보인다.
         sans: [
+          'Toss Product Sans',
           'Pretendard Variable',
           'Pretendard',
           '-apple-system',

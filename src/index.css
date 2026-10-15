@@ -1,3 +1,8 @@
+/* Toss Product Sans — 토스 제공. main 은 400·700, others 는 300·500·600·800~950.
+   토스 안내 코드의 `* { font-family }` 는 쓰지 않는다 — 지문·해설의 명조 글꼴까지
+   덮어 버린다. 기본 고딕은 tailwind.config.js 의 fontFamily.sans 에서 고른다. */
+@import url('https://static.toss.im/tps/main.css');
+@import url('https://static.toss.im/tps/others.css');
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css');
 
 @tailwind base;
@@ -140,7 +145,7 @@ html.native-app, html.native-app body {
 
 
 body {
-  font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', system-ui, sans-serif;
+  font-family: 'Toss Product Sans', 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', system-ui, sans-serif;
   background: radial-gradient(900px 600px at 12% -10%, rgba(11, 146, 18, 0.08), transparent 60%),
               radial-gradient(700px 500px at 100% 0%, rgba(11, 146, 18, 0.06), transparent 55%),
               #ffffff;
