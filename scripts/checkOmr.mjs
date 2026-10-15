@@ -16,7 +16,7 @@
  * macOS 의 sips 를 쓴다. 원본 그대로 보내면 앱에서와 다른 조건을 재게 된다.
  */
 
-import { readFileSync, readdirSync, existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { readFileSync, readdirSync, existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { join, dirname, basename, extname } from 'node:path'
 import { tmpdir } from 'node:os'
 import { execFileSync } from 'node:child_process'
@@ -54,6 +54,30 @@ function sipsSize(path) {
   return { w, h }
 }
 
+/** sips 가 만든 BMP 를 RGBA 로 푼다(브라우저 캔버스 ImageData 와 같은 모양). */
+function decodeBmp(buf) {
+  const off = buf.readUInt32LE(10)
+  const width = buf.readInt32LE(18)
+  const rawH = buf.readInt32LE(22)
+  const bpp = buf.readUInt16LE(28)
+  const height = Math.abs(rawH)
+  const bytes = bpp / 8
+  const stride = Math.ceil((width * bytes) / 4) * 4
+  const data = new Uint8Array(width * height * 4)
+  for (let y = 0; y < height; y++) {
+    const sy = rawH > 0 ? height - 1 - y : y
+    for (let x = 0; x < width; x++) {
+      const si = off + sy * stride + x * bytes
+      const di = (y * width + x) * 4
+      data[di] = buf[si + 2]
+      data[di + 1] = buf[si + 1]
+      data[di + 2] = buf[si]
+      data[di + 3] = 255
+    }
+  }
+  return { width, height, data }
+}
+
 /** 앱의 resizeImageForUpload 와 같은 규칙으로 줄인 JPEG 의 base64. */
 function prepareImage(path, tmp) {
   const { w, h } = sipsSize(path)
@@ -63,7 +87,10 @@ function prepareImage(path, tmp) {
   if (scale < 1) sipsArgs.push('--resampleWidth', String(Math.floor(w * scale)))
   execFileSync('sips', [...sipsArgs, path, '--out', out], { stdio: 'ignore' })
   const resized = sipsSize(out)
-  return { base64: readFileSync(out).toString('base64'), ...resized }
+  // 픽셀 판독용 — 보낸 JPEG 그대로를 푼다(앱이 캔버스에서 읽는 것과 같은 픽셀).
+  const bmp = join(tmp, 'omr.bmp')
+  execFileSync('sips', ['-s', 'format', 'bmp', out, '--out', bmp], { stdio: 'ignore' })
+  return { base64: readFileSync(out).toString('base64'), rgba: decodeBmp(readFileSync(bmp)), ...resized }
 }
 
 /** api/read-omr.ts 의 handler 를 가짜 req/res 로 직접 부른다(배포 없이). */
@@ -127,6 +154,30 @@ async function runCase({ name, image, answerPath }) {
   if (status !== 200) {
     console.log(`  실패 HTTP ${status}: ${data.error ?? JSON.stringify(data)}`)
     return { name, failed: true }
+  }
+
+  if (data.grid) {
+    const { readByGrid } = await import(join(ROOT, 'src', 'lib', 'omrGrid.ts'))
+    const byGrid = readByGrid(img.rgba, data.grid, numbers)
+    let gRight = 0
+    let gLow = 0
+    const gWrongHigh = []
+    for (const n of numbers) {
+      const g = byGrid.get(n)
+      if (!g) continue
+      if (g.choice === expected.get(n)) gRight++
+      else if (g.confidence === 'high') gWrongHigh.push(n)
+      if (g.confidence === 'low') gLow++
+    }
+    console.log(
+      `  [격자] ${gRight}/${numbers.length} 일치(읽은 줄 ${byGrid.size}), low ${gLow}` +
+        (gWrongHigh.length ? `, ⚠ 틀렸는데 high: ${gWrongHigh.join(', ')}번` : ''),
+    )
+    if (process.env.OMR_DUMP) {
+      writeFileSync(join(process.env.OMR_DUMP, `${basename(image, extname(image))}.grid.json`), JSON.stringify({ grid: data.grid, w: img.w, h: img.h }))
+    }
+  } else {
+    console.log('  [격자] 응답에 grid 없음')
   }
 
   const got = new Map((data.answers ?? []).map((a) => [a.number, a]))

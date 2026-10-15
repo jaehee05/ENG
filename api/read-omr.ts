@@ -41,7 +41,14 @@ const COMMON_RULES = `당신은 한국 수능·모의고사 OMR 답안지 판독
 - 수험번호·성명·학교 칸은 읽지 마세요. 사진에 이름이나 번호가 보이더라도 응답 어디에도(note 포함) 담지 마세요.
 
 제출 형식:
-- 사용자가 주는 numbers 목록의 번호만, 하나도 빠짐없이, 그 순서대로 answers 에 담으세요. 목록에 없는 번호는 카드에 칠해져 있어도 제출하지 마세요.`
+- 사용자가 주는 numbers 목록의 번호만, 하나도 빠짐없이, 그 순서대로 answers 에 담으세요. 목록에 없는 번호는 카드에 칠해져 있어도 제출하지 마세요.
+
+칸 위치(grid) — answers 와 별개로 꼭 채우세요:
+- 좌표는 받은 사진 그대로의 픽셀 좌표입니다. 왼쪽 위가 (0, 0), x 는 오른쪽, y 는 아래로 커집니다. 사진이 돌아가 있어도 돌리기 전 원래 사진의 좌표로 적으세요.
+- 답란 열마다 하나씩 columns 에 담습니다. first 는 그 열 맨 위 줄의 인쇄된 문번, last 는 맨 아래 줄의 문번입니다.
+- topLeft 는 맨 위 줄 ① 칸의 가운데, topRight 는 맨 위 줄 ⑤ 칸의 가운데, bottomLeft 는 맨 아래 줄 ① 칸의 가운데, bottomRight 는 맨 아래 줄 ⑤ 칸의 가운데입니다. 칠해졌는지와 상관없이 인쇄된 칸의 가운데를 가리키세요.
+- 네 점은 앱이 그 사이의 칸 위치를 계산하는 데 씁니다. 몇 픽셀 차이가 판독을 가르므로 칸의 한가운데를 정확히 짚으세요.
+- 선택 과목 상자가 있으면 elective.one 은 ① 칸 가운데, elective.two 는 ② 칸 가운데입니다.`
 
 /**
  * 양식별 배치 설명. 양식이 과목마다 달라서 나눠 둔다.
@@ -67,6 +74,20 @@ const LAYOUT_BY_SUBJECT: Record<Subject, string> = {
 - 수험번호·성명 칸(숫자·한글 타원)은 답란이 아닙니다. 읽지 마세요.`,
 }
 
+interface Pt {
+  x: number
+  y: number
+}
+
+interface OmrColumnGrid {
+  first: number
+  last: number
+  topLeft: Pt
+  topRight: Pt
+  bottomLeft: Pt
+  bottomRight: Pt
+}
+
 interface OmrAnswer {
   number: number
   choice: number
@@ -79,9 +100,46 @@ const MAX_IMAGE_BASE64 = 4_200_000
 
 const MEDIA_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 
+/** 도구 스키마의 좌표 한 점. */
+const PT_SCHEMA = {
+  type: 'object' as const,
+  properties: { x: { type: 'number' as const }, y: { type: 'number' as const } },
+  required: ['x', 'y'],
+}
+
+function toPt(v: unknown): Pt | null {
+  if (!v || typeof v !== 'object') return null
+  const r = v as Record<string, unknown>
+  const x = Number(r.x)
+  const y = Number(r.y)
+  return Number.isFinite(x) && Number.isFinite(y) && x >= 0 && y >= 0 ? { x, y } : null
+}
+
+/** 모델이 짚은 칸 위치. 모양이 맞지 않는 열은 버린다 — 판독은 클라이언트가 픽셀로 한다. */
+function normalizeGrid(input: unknown): { columns: OmrColumnGrid[]; elective?: { one: Pt; two: Pt } } | undefined {
+  const g = (input ?? {}) as { columns?: unknown; elective?: unknown }
+  const columns: OmrColumnGrid[] = []
+  for (const c of Array.isArray(g.columns) ? g.columns : []) {
+    if (!c || typeof c !== 'object') continue
+    const r = c as Record<string, unknown>
+    const first = Number(r.first)
+    const last = Number(r.last)
+    const pts = [toPt(r.topLeft), toPt(r.topRight), toPt(r.bottomLeft), toPt(r.bottomRight)]
+    if (!Number.isInteger(first) || !Number.isInteger(last) || last <= first || pts.some((p) => !p)) continue
+    const [topLeft, topRight, bottomLeft, bottomRight] = pts as Pt[]
+    columns.push({ first, last, topLeft, topRight, bottomLeft, bottomRight })
+  }
+  const e = (g.elective ?? null) as { one?: unknown; two?: unknown } | null
+  const one = e ? toPt(e.one) : null
+  const two = e ? toPt(e.two) : null
+  if (columns.length === 0) return undefined
+  return one && two ? { columns, elective: { one, two } } : { columns }
+}
+
 function normalize(input: unknown, numbers: number[]): {
   answers: OmrAnswer[]
   electiveMark?: 1 | 2
+  grid?: ReturnType<typeof normalizeGrid>
 } {
   const obj = (input ?? {}) as { answers?: unknown; electiveMark?: unknown }
   const arr = Array.isArray(obj.answers) ? obj.answers : []
@@ -104,7 +162,12 @@ function normalize(input: unknown, numbers: number[]): {
   // 빠진 번호는 미마킹·low 로 채워, 학생이 그 문항을 꼭 다시 보게 한다.
   const answers = numbers.map((n) => byNumber.get(n) ?? { number: n, choice: 0, confidence: 'low' as const })
   const em = Number(obj.electiveMark)
-  return em === 1 || em === 2 ? { answers, electiveMark: em } : { answers }
+  const grid = normalizeGrid((input as { grid?: unknown } | null)?.grid)
+  return {
+    answers,
+    ...(em === 1 || em === 2 ? { electiveMark: em as 1 | 2 } : {}),
+    ...(grid ? { grid } : {}),
+  }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -186,8 +249,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 enum: [1, 2],
                 description: '선택 과목 상자에 칠한 칸. 1=화법과 작문, 2=언어와 매체. 없거나 애매하면 생략.',
               },
+              grid: {
+                type: 'object',
+                description: '답란 열마다 네 모서리 칸의 가운데 픽셀 좌표(받은 사진 그대로).',
+                properties: {
+                  columns: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        first: { type: 'integer' },
+                        last: { type: 'integer' },
+                        topLeft: PT_SCHEMA,
+                        topRight: PT_SCHEMA,
+                        bottomLeft: PT_SCHEMA,
+                        bottomRight: PT_SCHEMA,
+                      },
+                      required: ['first', 'last', 'topLeft', 'topRight', 'bottomLeft', 'bottomRight'],
+                    },
+                  },
+                  elective: {
+                    type: 'object',
+                    properties: { one: PT_SCHEMA, two: PT_SCHEMA },
+                  },
+                },
+                required: ['columns'],
+              },
             },
-            required: ['answers'],
+            required: ['answers', 'grid'],
           },
         },
       ],
