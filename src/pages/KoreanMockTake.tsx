@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import { useBackNav } from '../contexts/useBackNav'
+import { readOmr } from '../lib/api'
+import { OMR_PHOTO_ENABLED } from '../lib/features'
 import { createKoreanMockAttempt, getKoreanMock } from '../lib/firestore'
+import { resizeImageForUpload } from '../lib/imageResize'
 import {
   getMockSubject,
   MOCK_SUBJECT_LABEL,
@@ -17,32 +20,57 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return out
 }
 
+/**
+ * OMR 사진용 크기. Claude 이미지 한도(긴 변 2576px, 약 3.75MP) 안에서 가장 크게 —
+ * 답 칸이 작아서 해상도가 곧 판독 정확도다. 면적 한도를 넘기면 서버에서 한 번 더
+ * 줄어드니 조금 안쪽으로 잡는다.
+ */
+const OMR_MAX_DIMENSION = 2576
+const OMR_MAX_PIXELS = 3_700_000
+/** Vercel 요청 본문 4.5MB 안에 넉넉히 들어오도록. 넘으면 화질을 낮춰 다시 만든다. */
+const OMR_MAX_BASE64 = 3_500_000
+
+/**
+ * 선택과목 이름 → OMR 선택 과목 상자의 칸 번호. 이름은 관리자가 자유롭게 적는
+ * 값이라('화법과 작문', '화작' …) 순서가 아니라 글자로 맞춘다. 모르면 null.
+ */
+function electiveMarkOf(name: string): 1 | 2 | null {
+  if (/화법|화작/.test(name)) return 1
+  if (/언어|언매/.test(name)) return 2
+  return null
+}
+
+const ELECTIVE_MARK_LABEL = { 1: '화법과 작문', 2: '언어와 매체' } as const
+
 /** 버블시트 한 문항 행 (문번 + 답란 1~5). 컬럼 안에서 컴팩트하게. */
 function BubbleRow({
   idx,
   number,
   sel,
   focused,
+  flagged,
   onFocus,
 }: {
   idx: number
   number: number
   sel: number
   focused: boolean
+  /** 사진 판독이 자신 없었거나 비어 있던 문항 — 학생이 직접 확인해야 한다. */
+  flagged: boolean
   onFocus: () => void
 }) {
   return (
     <div
       data-qidx={idx}
       className={`grid grid-cols-[1.7rem_1fr] items-center border-b border-slate-100 last:border-b-0 scroll-mt-24 ${
-        focused ? 'bg-brand-50' : ''
-      }`}
+        flagged ? 'outline outline-2 -outline-offset-2 outline-orange-400' : ''
+      } ${focused ? 'bg-brand-50' : flagged ? 'bg-orange-50' : ''}`}
     >
       <button
         type="button"
         onClick={onFocus}
         className={`py-1 text-center text-[11px] font-semibold tabular-nums border-r border-slate-100 ${
-          focused ? 'text-brand-700' : 'text-slate-500'
+          focused ? 'text-brand-700' : flagged ? 'text-orange-600' : 'text-slate-500'
         }`}
       >
         {number}
@@ -79,6 +107,7 @@ function SheetColumn({
   items,
   answers,
   focused,
+  flagged,
   setFocused,
 }: {
   title: string
@@ -86,6 +115,7 @@ function SheetColumn({
   items: { q: KoreanMockQuestion; idx: number }[]
   answers: number[]
   focused: number
+  flagged: Set<number>
   setFocused: (i: number) => void
 }) {
   const border = accent === 'brand' ? 'border-brand-300' : 'border-rose-300'
@@ -106,6 +136,7 @@ function SheetColumn({
             number={q.number}
             sel={answers[idx] ?? 0}
             focused={focused === idx}
+            flagged={flagged.has(idx)}
             onFocus={() => setFocused(idx)}
           />
         ))}
@@ -126,6 +157,17 @@ export function KoreanMockTake() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  // ── OMR 사진 불러오기 ──
+  const omrInputRef = useRef<HTMLInputElement>(null)
+  const [omrReading, setOmrReading] = useState(false)
+  const [omrError, setOmrError] = useState<string | null>(null)
+  const [omrWarning, setOmrWarning] = useState<string | null>(null)
+  /** 판독 결과 중 학생이 확인해야 하는 문항(items 인덱스). 그 문항 답을 고르면 빠진다. */
+  const [needsCheck, setNeedsCheck] = useState<Set<number>>(() => new Set())
+  /** 이번 응시에서 판독 결과를 한 번이라도 적용했는지 — 응시 기록의 answerSource. */
+  const [usedOmr, setUsedOmr] = useState(false)
+  // 개발 서버에서는 스위치와 상관없이 보여, 가짜 응답(?omrMock=)으로 흐름을 볼 수 있게 한다.
+  const omrEnabled = OMR_PHOTO_ENABLED || import.meta.env.DEV
 
   useEffect(() => {
     if (!id) return
@@ -160,17 +202,101 @@ export function KoreanMockTake() {
   function beginTake() {
     setAnswers(new Array(items.length).fill(0))
     setFocused(0)
+    setNeedsCheck(new Set())
+    setUsedOmr(false)
+    setOmrError(null)
+    setOmrWarning(null)
     setStarted(true)
   }
 
   function pick(idx: number, choice: number) {
     const isToggleOff = answers[idx] === choice
+    // 학생이 직접 손댔으면 확인한 것으로 본다.
+    if (needsCheck.has(idx)) {
+      setNeedsCheck((prev) => {
+        const next = new Set(prev)
+        next.delete(idx)
+        return next
+      })
+    }
     setAnswers((prev) => {
       const next = [...prev]
       next[idx] = isToggleOff ? 0 : choice
       return next
     })
     setFocused(isToggleOff ? idx : Math.min(items.length - 1, idx + 1))
+  }
+
+  function openOmrPicker() {
+    // 덮어쓰기 확인은 사진을 고르기 전에 받는다. 판독이 끝난 뒤 물으면 취소할 때
+    // 수십 초 걸린 판독을 버리게 된다. 판독 중엔 화면을 막으니 그 사이 답이 바뀌지 않는다.
+    const marked = answers.filter((a) => a > 0).length
+    if (
+      marked > 0 &&
+      !window.confirm(
+        `이미 표시한 ${marked}문항의 답이 사진에서 읽은 답으로 바뀝니다. 계속할까요?`,
+      )
+    )
+      return
+    omrInputRef.current?.click()
+  }
+
+  async function handleOmrFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    // 같은 사진을 다시 골라도 change 가 일어나도록 비워 둔다.
+    e.target.value = ''
+    if (!file || !mock) return
+    setOmrReading(true)
+    setOmrError(null)
+    setOmrWarning(null)
+    try {
+      let img = await resizeImageForUpload(file, OMR_MAX_DIMENSION, OMR_MAX_PIXELS)
+      if (img.base64.length > OMR_MAX_BASE64) {
+        img = await resizeImageForUpload(file, OMR_MAX_DIMENSION, OMR_MAX_PIXELS, 0.7)
+      }
+      if (img.base64.length > OMR_MAX_BASE64) {
+        throw new Error('사진 용량이 너무 큽니다. 답안지만 나오게 다시 찍어 주세요.')
+      }
+      const result = await readOmr({
+        image: img.base64,
+        mediaType: img.mediaType,
+        numbers: items.map((q) => q.number),
+        subject: getMockSubject(mock),
+      })
+      const byNumber = new Map(result.answers.map((a) => [a.number, a]))
+      const flagged = new Set<number>()
+      const next = items.map((q, i) => {
+        const a = byNumber.get(q.number)
+        // 서버가 빠진 번호를 채워 주지만, 혹시 없으면 비우고 확인 대상으로 둔다.
+        if (!a || a.confidence === 'low' || a.choice === 0) flagged.add(i)
+        return a ? a.choice : 0
+      })
+      setAnswers(next)
+      setNeedsCheck(flagged)
+      setUsedOmr(true)
+      if (flagged.size > 0) setFocused(Math.min(...flagged))
+      // 선택과목은 알려만 준다. 사진이 틀렸을 수도, 학생이 잘못 칠했을 수도 있어서
+      // 어느 쪽이 맞는지는 학생이 정해야 한다.
+      const chosenMark = chosenElective ? electiveMarkOf(chosenElective.name) : null
+      if (result.electiveMark && chosenMark && result.electiveMark !== chosenMark) {
+        setOmrWarning(
+          `답안지의 선택 과목은 ‘${ELECTIVE_MARK_LABEL[result.electiveMark]}’로 칠해져 있는데, 지금 ‘${chosenElective!.name}’로 응시하고 있습니다. 맞는지 확인해 주세요.`,
+        )
+      }
+    } catch (err) {
+      setOmrError(
+        `${err instanceof Error ? err.message : '판독에 실패했습니다.'} 직접 입력은 그대로 할 수 있습니다.`,
+      )
+    } finally {
+      setOmrReading(false)
+    }
+  }
+
+  /** ‘확인 필요’ 칩 — 지금 문항 다음의 확인 필요 문항으로, 끝이면 처음으로 돌아간다. */
+  function focusNextFlagged() {
+    const sorted = [...needsCheck].sort((a, b) => a - b)
+    if (sorted.length === 0) return
+    setFocused(sorted.find((i) => i > focused) ?? sorted[0])
   }
 
   async function handleSubmit() {
@@ -206,6 +332,7 @@ export function KoreanMockTake() {
         koreanMockResults: results,
         mockSubject: getMockSubject(mock),
         mockElectiveName: chosenElective?.name,
+        answerSource: usedOmr ? 'omr' : undefined,
       })
       // replace — 제출한 시험을 기록에서 지운다 (VocabTake 와 같은 이유).
       navigate(`/korean-mocks/${mock.id}/result/${attemptId}`, { replace: true })
@@ -344,6 +471,58 @@ export function KoreanMockTake() {
         </button>
       </header>
 
+      {omrEnabled && (
+        <div className="mb-3 space-y-2">
+          <input
+            ref={omrInputRef}
+            type="file"
+            // capture 를 넣지 않는다 — 넣으면 iOS 가 곧장 카메라를 열어, 미리 찍어 둔
+            // 사진을 앨범에서 고를 수 없다.
+            accept="image/*"
+            className="hidden"
+            onChange={handleOmrFile}
+          />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={openOmrPicker}
+              disabled={omrReading || submitting}
+              className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M4 7h3l2-3h6l2 3h3v13H4z" />
+                <circle cx="12" cy="13" r="3.5" />
+              </svg>
+              OMR 사진으로 불러오기
+            </button>
+            {needsCheck.size > 0 && (
+              <button
+                type="button"
+                onClick={focusNextFlagged}
+                className="inline-flex items-center rounded-full bg-orange-100 px-3 py-1.5 text-xs font-bold text-orange-700 hover:bg-orange-200"
+              >
+                확인 필요 {needsCheck.size}문항 ›
+              </button>
+            )}
+          </div>
+          {usedOmr && (
+            <p className="text-[11px] text-slate-500">
+              사진에서 읽은 답입니다. 틀리게 읽혔을 수 있으니 주황색 문항부터 확인하고 제출하세요.
+            </p>
+          )}
+          {omrWarning && (
+            <p className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
+              {omrWarning}
+            </p>
+          )}
+          {omrError && (
+            <p className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
+              {omrError}
+            </p>
+          )}
+        </div>
+      )}
+
       <div className="flex gap-2 overflow-x-auto pb-1">
         {commonCols.map((col, ci) => (
           <SheetColumn
@@ -353,6 +532,7 @@ export function KoreanMockTake() {
             items={col}
             answers={answers}
             focused={focused}
+            flagged={needsCheck}
             setFocused={setFocused}
           />
         ))}
@@ -364,12 +544,26 @@ export function KoreanMockTake() {
             items={col}
             answers={answers}
             focused={focused}
+            flagged={needsCheck}
             setFocused={setFocused}
           />
         ))}
       </div>
 
       {error && <p className="text-sm text-red-600 mt-3">{error}</p>}
+
+      {/* 판독 중엔 화면 전체를 막는다 — 그 사이 답을 고치면 결과가 덮어써 버린다. */}
+      {omrReading && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-white/80 backdrop-blur-sm"
+          role="status"
+          aria-live="polite"
+        >
+          <span className="h-8 w-8 animate-spin rounded-full border-[3px] border-brand-200 border-t-brand-600" />
+          <p className="text-sm font-semibold text-slate-800">답안지를 읽는 중…</p>
+          <p className="text-xs text-slate-500">30초쯤 걸릴 수 있습니다.</p>
+        </div>
+      )}
 
       {/* 하단: 문제 네비 + 답 선택 (PC는 하단 탭바 위로) */}
       <div className="fixed bottom-0 lg:bottom-12 inset-x-0 safe-bottom bg-white border-t border-slate-200 shadow-[0_-4px_16px_-8px_rgba(0,0,0,0.15)]">

@@ -27,11 +27,27 @@ function readFileAsDataURL(file: File): Promise<string> {
   })
 }
 
-export async function resizeImageForUpload(file: File): Promise<ResizedImage> {
+/**
+ * 긴 변을 maxDimension 이하로, (주면) 전체 픽셀 수를 maxPixels 이하로 줄여 JPEG 로 만든다.
+ *
+ * maxPixels 가 따로 있는 건 Claude 의 이미지 한도가 긴 변(2576px)과 면적(약 3.75MP)
+ * 둘 다라서다. 4:3 사진을 긴 변만 맞춰 줄이면 면적이 한도를 넘어 서버에서 다시
+ * 줄어든다 — OMR 처럼 칸이 작은 사진은 그 한 번이 판독을 망칠 수 있다.
+ */
+export async function resizeImageForUpload(
+  file: File,
+  maxDimension = MAX_DIMENSION,
+  maxPixels = Infinity,
+  quality = JPEG_QUALITY,
+): Promise<ResizedImage> {
   const dataUrl = await readFileAsDataURL(file)
   const img = await loadImage(dataUrl)
   const { width: w0, height: h0 } = img
-  const scale = Math.min(1, MAX_DIMENSION / Math.max(w0, h0))
+  const scale = Math.min(
+    1,
+    maxDimension / Math.max(w0, h0),
+    Math.sqrt(maxPixels / (w0 * h0)),
+  )
   const w = Math.round(w0 * scale)
   const h = Math.round(h0 * scale)
   const canvas = document.createElement('canvas')
@@ -42,7 +58,7 @@ export async function resizeImageForUpload(file: File): Promise<ResizedImage> {
   ctx.fillStyle = '#ffffff'
   ctx.fillRect(0, 0, w, h)
   ctx.drawImage(img, 0, 0, w, h)
-  const out = canvas.toDataURL('image/jpeg', JPEG_QUALITY)
+  const out = canvas.toDataURL('image/jpeg', quality)
   const base64 = out.includes(',') ? out.split(',')[1] : out
   return {
     base64,
