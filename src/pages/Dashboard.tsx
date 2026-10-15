@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import {
@@ -17,7 +17,19 @@ import {
   isAssignmentOverdue as isOverdue,
   isAssignmentVisibleToStudent,
 } from '../lib/types'
-import { useBackdropDismiss } from '../lib/useBackdropDismiss'
+import {
+  Badge,
+  BottomSheet,
+  Button,
+  Card,
+  EmptyState,
+  Field,
+  ListRow,
+  Section,
+  confirm,
+  cx,
+  inputClass,
+} from '../components/ui'
 import { computeStudentBalance, fmtDateLabel, todayISO } from '../lib/payments'
 import type {
   Announcement,
@@ -105,7 +117,7 @@ type OpenItem =
   | { kind: 'single'; a: Assignment; sortKey: number }
   | { kind: 'group'; category: string; items: Assignment[]; sortKey: number }
 
-/** 홈의 과제 현황 타일. */
+/** 홈의 과제 현황 타일 — 숫자를 크게. */
 function StatTile({
   label,
   value,
@@ -120,13 +132,14 @@ function StatTile({
   return (
     <Link
       to={to}
-      className="block rounded-lg border border-slate-200 bg-white px-3 py-3 hover:border-slate-300 hover:bg-slate-50/60 transition"
+      className="pressable block rounded-card bg-white px-4 py-4 hover:bg-slate-50 active:bg-slate-100"
     >
-      <p className="text-[11px] text-slate-500">{label}</p>
+      <p className="text-[13px] text-slate-500">{label}</p>
       <p
-        className={`text-2xl font-semibold tracking-tight mt-0.5 ${
-          tone === 'danger' ? 'text-red-600' : 'text-slate-900'
-        }`}
+        className={cx(
+          'text-[28px] font-bold tracking-tight tabular-nums mt-1 leading-none',
+          tone === 'danger' ? 'text-red-500' : 'text-slate-900',
+        )}
       >
         {value}
       </p>
@@ -160,6 +173,44 @@ const ATTEMPT_TYPE_LABEL: Partial<Record<Attempt['type'], string>> = {
   vocab: '단어 시험',
   korean_mock: '모의고사',
 }
+
+/** 목록 줄 왼쪽의 둥근 아이콘 자리. */
+function RowIcon({ tone, children }: { tone: 'blue' | 'amber'; children: ReactNode }) {
+  return (
+    <span
+      className={cx(
+        'inline-flex h-10 w-10 items-center justify-center rounded-xl',
+        tone === 'blue' ? 'bg-sky-50 text-sky-600' : 'bg-amber-50 text-amber-600',
+      )}
+    >
+      {children}
+    </span>
+  )
+}
+
+const glyphProps = {
+  width: 20,
+  height: 20,
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 1.9,
+  strokeLinecap: 'round' as const,
+  strokeLinejoin: 'round' as const,
+  'aria-hidden': true,
+}
+const calendarGlyph = (
+  <svg {...glyphProps}>
+    <rect x="3" y="4" width="18" height="18" rx="3" />
+    <path d="M16 2v4M8 2v4M3 10h18" />
+  </svg>
+)
+const megaphoneGlyph = (
+  <svg {...glyphProps}>
+    <path d="M3 11v2a1 1 0 0 0 1 1h3l5 4V6L7 10H4a1 1 0 0 0-1 1Z" />
+    <path d="M16 9a3 3 0 0 1 0 6" />
+  </svg>
+)
 
 export function Dashboard() {
   const { profile } = useAuth()
@@ -256,7 +307,7 @@ export function Dashboard() {
     }
   }
   async function removeDday() {
-    if (!window.confirm('D-day를 삭제할까요?')) return
+    if (!(await confirm('D-day를 삭제할까요?', { danger: true, confirmText: '삭제' }))) return
     setDdaySaving(true)
     try {
       await clearDDay()
@@ -390,62 +441,57 @@ export function Dashboard() {
     return '좋은 저녁이에요'
   })()
 
-  const ddayBackdrop = useBackdropDismiss({
-    open: ddayOpen,
-    onDismiss: () => setDdayOpen(false),
-    dirty:
-      ddayTitle.trim() !== (dday?.title ?? '').trim() ||
-      ddayDate !== (dday?.dateISO ?? ''),
-    disabled: ddaySaving,
-  })
+  const ddayDirty =
+    ddayTitle.trim() !== (dday?.title ?? '').trim() || ddayDate !== (dday?.dateISO ?? '')
+
+  /** 과제 한 줄의 보조 문구 — 마감(지나면 빨갛게)과 메모. */
+  function dueLine(a: Assignment) {
+    const overdue = isOverdue(a)
+    return (
+      <>
+        {a.dueAt && (
+          <span className={overdue ? 'text-red-500 font-medium' : ''}>
+            {formatDate(a.dueAt)}까지{overdue && ' · 지남'}
+          </span>
+        )}
+        {a.note && <span>{a.dueAt ? ' · ' : ''}{a.note}</span>}
+      </>
+    )
+  }
 
   return (
-    <div className="space-y-8">
-      <section>
-        <p className="text-xs text-slate-500 mb-1">{greeting}</p>
-        <div className="flex items-center gap-x-2 gap-y-1 flex-wrap">
-          <h1 className="text-2xl sm:text-[28px] font-semibold text-slate-900 tracking-tight">
+    <div className="space-y-7 max-w-2xl mx-auto">
+      <section className="px-1 pt-2">
+        <p className="text-[15px] text-slate-500">{greeting}</p>
+        <div className="flex items-center gap-x-2 gap-y-1 flex-wrap mt-0.5">
+          <h1 className="text-[26px] font-bold text-slate-900 tracking-tight">
             {profile?.displayName}님
           </h1>
-          {dueDateISO && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 text-amber-700 text-xs font-medium px-2 py-0.5">
-              다음 결제 {fmtDateLabel(dueDateISO)}
-            </span>
-          )}
+          {dueDateISO && <Badge tone="amber" size="md">다음 결제 {fmtDateLabel(dueDateISO)}</Badge>}
         </div>
-        {totalOpen > 0 ? (
-          <p className="text-sm text-slate-500 mt-1.5">
-            오늘 끝낼 과제가{' '}
-            <span className="text-slate-900 font-medium">{totalOpen}건</span>{' '}
-            남았어요.
-          </p>
-        ) : (
-          <p className="text-sm text-slate-500 mt-1.5">
-            오늘 부여된 과제가 없어요. 자유 학습 시간.
-          </p>
-        )}
+        <p className="text-[15px] text-slate-600 mt-1">
+          {totalOpen > 0 ? (
+            <>
+              끝낼 과제가 <span className="font-bold text-slate-900">{totalOpen}개</span> 남았어요.
+            </>
+          ) : (
+            '남은 과제가 없어요. 자유 학습 시간이에요.'
+          )}
+        </p>
       </section>
 
-      {/* D-day 카드 (관리자 설정) */}
+      {/* D-day (관리자 설정, 전체 공통) — 숫자를 크게 */}
       {dday
         ? (() => {
             const n = daysUntil(dday.dateISO)
             const inner = (
               <>
-                <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-600 shrink-0">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="4" width="18" height="18" rx="2" />
-                    <path d="M16 2v4M8 2v4M3 10h18" />
-                  </svg>
-                </span>
                 <div className="min-w-0 flex-1 text-left">
-                  <p className="text-[15px] font-bold text-slate-900 truncate">
-                    {dday.title}
-                  </p>
-                  <p className="text-xs text-slate-400">{fmtDDayDate(dday.dateISO)}</p>
+                  <p className="text-[15px] font-semibold text-slate-900 truncate">{dday.title}</p>
+                  <p className="text-[13px] text-slate-500 mt-0.5">{fmtDDayDate(dday.dateISO)}</p>
                 </div>
-                <span className="shrink-0 text-xl font-extrabold text-slate-900 tabular-nums">
-                  {n > 0 ? `${n}일` : n === 0 ? 'D-DAY' : '종료'}
+                <span className="shrink-0 text-[32px] font-bold text-slate-900 tabular-nums tracking-tight leading-none">
+                  {n > 0 ? `D-${n}` : n === 0 ? 'D-DAY' : '종료'}
                 </span>
               </>
             )
@@ -453,234 +499,135 @@ export function Dashboard() {
               <button
                 type="button"
                 onClick={openDdayEdit}
-                className="w-full flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4 hover:border-slate-300 transition"
+                className="pressable w-full flex items-center gap-4 rounded-card bg-white px-5 py-5 hover:bg-slate-50 active:bg-slate-100"
               >
                 {inner}
               </button>
             ) : (
-              <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4">
-                {inner}
-              </div>
+              <Card className="flex items-center gap-4">{inner}</Card>
             )
           })()
         : isAdmin && (
-            <button
-              type="button"
-              onClick={openDdayEdit}
-              className="w-full rounded-2xl border border-dashed border-slate-300 px-4 py-3.5 text-sm font-medium text-slate-500 hover:bg-slate-50"
-            >
-              + D-day 설정
-            </button>
+            <Button variant="secondary" block onClick={openDdayEdit}>
+              D-day 설정
+            </Button>
           )}
 
-      {topAnnouncement && (
-        <Link
-          to="/notice"
-          className="block rounded-lg border border-slate-200 bg-white px-4 py-3 hover:border-slate-300 hover:bg-slate-50/60 transition"
-        >
-          <div className="flex items-center gap-2 mb-1">
-            {topAnnouncement.pinned && (
-              <span className="inline-block rounded bg-amber-50 text-amber-700 text-[10px] font-medium px-1.5 py-0.5 border border-amber-200">
-                📌
-              </span>
-            )}
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-              공지
-            </span>
-          </div>
-          <p className="text-[15px] font-semibold text-slate-900 truncate">
-            {topAnnouncement.title}
-          </p>
-          {topAnnouncement.body && (
-            <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">
-              {topAnnouncement.body}
-            </p>
+      {(topAnnouncement || nextSession) && (
+        <Card padded={false}>
+          {nextSession && (
+            <ListRow
+              to="/schedule"
+              leading={<RowIcon tone="blue">{calendarGlyph}</RowIcon>}
+              title={
+                <span className="inline-flex items-center gap-1.5 max-w-full">
+                  <span className="truncate">{nextSession.title}</span>
+                  {nextSession.status === 'makeup' && <Badge tone="amber">보강</Badge>}
+                </span>
+              }
+              description={
+                <span className="tabular-nums">
+                  {fmtWhenLabel(nextSession.dateISO)} {nextSession.startTime}–{nextSession.endTime}
+                  {nextSession.location && ` · ${nextSession.location}`}
+                </span>
+              }
+            />
           )}
-        </Link>
-      )}
-
-      {nextSession && (
-        <Link
-          to="/schedule"
-          className="block rounded-lg border border-slate-200 bg-white px-4 py-3 hover:border-slate-300 hover:bg-slate-50/60 transition"
-        >
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-              다음 수업
-            </span>
-            {nextSession.status === 'makeup' && (
-              <span className="inline-block rounded bg-orange-50 text-orange-700 text-[10px] font-medium px-1.5 py-0.5 border border-orange-200">
-                보강
-              </span>
-            )}
-          </div>
-          <p className="text-[15px] font-semibold text-slate-900 truncate">
-            {nextSession.title}
-          </p>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500 mt-0.5">
-            <span className="text-slate-700 font-medium">
-              {fmtWhenLabel(nextSession.dateISO)}
-            </span>
-            <span className="tabular-nums">
-              {nextSession.startTime}–{nextSession.endTime}
-            </span>
-            {nextSession.location && <span>· {nextSession.location}</span>}
-          </div>
-        </Link>
+          {topAnnouncement && (
+            <ListRow
+              to="/notice"
+              leading={<RowIcon tone="amber">{megaphoneGlyph}</RowIcon>}
+              title={
+                <>
+                  {topAnnouncement.pinned && <span className="sr-only">고정 공지 </span>}
+                  {topAnnouncement.title}
+                </>
+              }
+              description={topAnnouncement.body || '공지'}
+            />
+          )}
+        </Card>
       )}
 
       {totalOpen > 0 && (
-        <section className="space-y-2.5">
-          <div className="flex items-baseline justify-between">
-            <h2 className="text-[13px] font-semibold text-slate-900 uppercase tracking-wider">
-              내 과제
-            </h2>
-            <span className="text-xs text-slate-500">{totalOpen}건</span>
-          </div>
-          <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white overflow-hidden">
+        <Section title="내 과제" action={<Link to="/assignments">{totalOpen}개 ›</Link>}>
+          <Card padded={false}>
             {openItems.map((item) => {
               if (item.kind === 'single') {
                 const a = item.a
-                const overdue = isOverdue(a)
-                const path = assignmentPath(a)
-                const body = (
-                  <>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="inline-block rounded bg-brand-50 text-brand-700 text-xs font-medium px-2 py-0.5">
-                          {assignmentLabel(a)}
-                        </span>
-                        <span className="text-sm font-semibold text-slate-900 truncate">
-                          {a.refTitle}
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500 mt-1">
-                        {a.dueAt && (
-                          <span className={overdue ? 'text-red-600 font-medium' : ''}>
-                            마감: {formatDate(a.dueAt)}
-                            {overdue && ' (지남)'}
-                          </span>
-                        )}
-                        {a.note && <span className="text-slate-600">· {a.note}</span>}
-                      </div>
-                    </div>
-                    <span className="text-slate-300 text-xl shrink-0">
-                      {path ? '→' : ''}
-                    </span>
-                  </>
-                )
                 return (
-                  <li key={a.id}>
-                    {path ? (
-                      <Link
-                        to={path}
-                        className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50"
-                      >
-                        {body}
-                      </Link>
-                    ) : (
-                      <div className="flex items-center justify-between gap-3 px-4 py-3">
-                        {body}
-                      </div>
-                    )}
-                  </li>
+                  <ListRow
+                    key={a.id}
+                    to={assignmentPath(a) ?? undefined}
+                    title={a.refTitle}
+                    description={
+                      <>
+                        {assignmentLabel(a)}
+                        {(a.dueAt || a.note) && ' · '}
+                        {dueLine(a)}
+                      </>
+                    }
+                  />
                 )
               }
-              // group
+              // 같은 지문 묶음 — 눌러서 펼친다
               const isOpen = expanded.has(item.category)
               const overdueCount = item.items.filter((a) => isOverdue(a)).length
               const earliest = item.items
                 .filter((a) => a.dueAt)
-                .sort((a, b) => (a.dueAt!.toMillis() - b.dueAt!.toMillis()))[0]
+                .sort((a, b) => a.dueAt!.toMillis() - b.dueAt!.toMillis())[0]
               return (
-                <li key={`g-${item.category}`}>
-                  <button
-                    type="button"
+                <div key={`g-${item.category}`}>
+                  <ListRow
                     onClick={() => toggleExpanded(item.category)}
-                    className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50 text-left"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="inline-block rounded bg-brand-50 text-brand-700 text-xs font-medium px-2 py-0.5">
-                          지문 묶음
-                        </span>
-                        <span className="text-sm font-semibold text-slate-900 truncate">
-                          {item.category}
-                        </span>
-                        <span className="text-xs text-slate-500">
-                          ({item.items.length}개)
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500 mt-1">
+                    chevron={false}
+                    title={`${item.category} (${item.items.length}개)`}
+                    description={
+                      <>
+                        지문 묶음
                         {earliest && (
-                          <span
-                            className={
-                              isOverdue(earliest) ? 'text-red-600 font-medium' : ''
-                            }
-                          >
-                            가장 빠른 마감: {formatDate(earliest.dueAt)}
+                          <span className={isOverdue(earliest) ? 'text-red-500 font-medium' : ''}>
+                            {' · '}
+                            {formatDate(earliest.dueAt)}까지
                           </span>
                         )}
-                        {overdueCount > 0 && (
-                          <span className="text-red-600">
-                            지난 과제 {overdueCount}건
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <span className="text-slate-400 text-base shrink-0">
-                      {isOpen ? '▴' : '▾'}
-                    </span>
-                  </button>
+                        {overdueCount > 0 && <span className="text-red-500"> · 지남 {overdueCount}개</span>}
+                      </>
+                    }
+                    trailing={
+                      <svg
+                        className={cx('text-slate-400 transition-transform', isOpen && 'rotate-180')}
+                        width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden
+                      >
+                        <path d="M6 9l6 6 6-6" />
+                      </svg>
+                    }
+                  />
                   {isOpen && (
-                    <ul className="divide-y divide-slate-100 bg-slate-50/60 border-t border-slate-100">
+                    <div className="mx-3 mb-2 rounded-2xl bg-slate-50 py-1">
                       {item.items.map((a) => {
-                        const overdue = isOverdue(a)
                         const parsed = parseTitle(a.refTitle)
-                        const label = parsed ? `${parsed.tag}번` : a.refTitle
                         return (
-                          <li key={a.id}>
-                            <Link
-                              to={assignmentPath(a) ?? '#'}
-                              className="flex items-center justify-between gap-3 pl-10 pr-4 py-2.5 hover:bg-white"
-                            >
-                              <div className="min-w-0">
-                                <span className="text-sm text-slate-900">
-                                  {label}
-                                </span>
-                                {a.dueAt && (
-                                  <span
-                                    className={`ml-3 text-xs ${overdue ? 'text-red-600' : 'text-slate-500'}`}
-                                  >
-                                    마감: {formatDate(a.dueAt)}
-                                    {overdue && ' (지남)'}
-                                  </span>
-                                )}
-                                {a.note && (
-                                  <span className="ml-3 text-xs text-slate-500">
-                                    · {a.note}
-                                  </span>
-                                )}
-                              </div>
-                              <span className="text-slate-300 text-base shrink-0">→</span>
-                            </Link>
-                          </li>
+                          <ListRow
+                            key={a.id}
+                            to={assignmentPath(a) ?? undefined}
+                            className="min-h-[52px] py-2.5"
+                            title={parsed ? `${parsed.tag}번` : a.refTitle}
+                            description={a.dueAt || a.note ? dueLine(a) : undefined}
+                          />
                         )
                       })}
-                    </ul>
+                    </div>
                   )}
-                </li>
+                </div>
               )
             })}
-          </ul>
-        </section>
+          </Card>
+        </Section>
       )}
 
-      <section className="space-y-2.5">
-        <h2 className="text-[13px] font-semibold text-slate-900 uppercase tracking-wider">
-          과제 현황
-        </h2>
-        <div className="grid grid-cols-3 gap-2">
+      <Section title="과제 현황">
+        <div className="grid grid-cols-3 gap-2.5">
           <StatTile label="진행 중" value={assignStats.open} to="/assignments" />
           <StatTile
             label="기한 지남"
@@ -690,148 +637,121 @@ export function Dashboard() {
           />
           <StatTile label="완료" value={assignStats.done} to="/assignments" />
         </div>
-      </section>
+      </Section>
 
-      <section className="space-y-2.5">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-[13px] font-semibold text-slate-900 uppercase tracking-wider">
-            시험 현황
-          </h2>
-          <Link to="/history" className="text-xs text-slate-500 hover:text-slate-900">
-            전체 기록 →
-          </Link>
+      <Section title="시험 현황" action={<Link to="/history">전체 기록 ›</Link>}>
+        <div className="flex items-center gap-1.5" role="tablist">
+          {ATTEMPT_FILTERS.map((f) => {
+            const on = attemptFilter === f.key
+            return (
+              <button
+                key={f.key}
+                type="button"
+                role="tab"
+                aria-selected={on}
+                onClick={() => setPickedFilter(f.key)}
+                className={cx(
+                  'pressable h-9 px-4 rounded-full text-[14px] font-semibold',
+                  on ? 'bg-slate-900 text-white' : 'bg-white text-slate-500 hover:bg-slate-50 active:bg-slate-100',
+                )}
+              >
+                {f.label}
+              </button>
+            )
+          })}
         </div>
-        <div className="flex items-center gap-1 text-xs">
-          {ATTEMPT_FILTERS.map((f) => (
-            <button
-              key={f.key}
-              type="button"
-              onClick={() => setPickedFilter(f.key)}
-              className={`px-3 py-1.5 rounded-full transition ${
-                attemptFilter === f.key
-                  ? 'bg-slate-900 text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-        {shownAttempts.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
-            {attemptFilter === 'vocab'
-              ? '아직 응시한 단어 시험이 없어요.'
-              : '아직 응시한 모의고사가 없어요.'}
-          </div>
-        ) : (
-          <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white overflow-hidden">
-            {shownAttempts.map((a) => {
+        <Card padded={false}>
+          {shownAttempts.length === 0 ? (
+            <EmptyState
+              title={
+                attemptFilter === 'vocab'
+                  ? '아직 응시한 단어 시험이 없어요'
+                  : '아직 응시한 모의고사가 없어요'
+              }
+            />
+          ) : (
+            shownAttempts.map((a) => {
               const ratio = a.total > 0 ? Math.round((a.correct / a.total) * 100) : null
               return (
-                <li key={a.id}>
-                  <Link
-                    to={attemptResultPath(a)}
-                    className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-slate-900 truncate">
-                        {a.refTitle}
-                      </p>
-                      <p className="text-[11px] text-slate-400 mt-0.5">
-                        {ATTEMPT_TYPE_LABEL[a.type] ?? ''} · {fmtAttemptDate(a.createdAt)}
-                      </p>
-                    </div>
-                    <span className="shrink-0 text-right">
+                <ListRow
+                  key={a.id}
+                  to={attemptResultPath(a)}
+                  title={a.refTitle}
+                  description={`${ATTEMPT_TYPE_LABEL[a.type] ?? ''} · ${fmtAttemptDate(a.createdAt)}`}
+                  trailing={
+                    <span className="text-right leading-tight">
                       <span
-                        className={`block text-sm font-semibold ${
+                        className={cx(
+                          'block text-[16px] font-bold tabular-nums',
                           ratio === null
                             ? 'text-slate-500'
                             : ratio >= 80
                               ? 'text-brand-700'
                               : ratio >= 60
-                                ? 'text-amber-700'
-                                : 'text-red-600'
-                        }`}
+                                ? 'text-amber-600'
+                                : 'text-red-500',
+                        )}
                       >
                         {a.correct}/{a.total}
                       </span>
                       {ratio !== null && (
-                        <span className="block text-[10px] text-slate-400">{ratio}%</span>
+                        <span className="block text-[12px] text-slate-400 tabular-nums">{ratio}%</span>
                       )}
                     </span>
-                  </Link>
-                </li>
+                  }
+                />
               )
-            })}
-          </ul>
-        )}
-      </section>
+            })
+          )}
+        </Card>
+      </Section>
 
-      {/* D-day 설정 모달 (관리자) */}
-      {ddayOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm"
-          {...ddayBackdrop}
-        >
-          <div
-            className="w-full sm:max-w-sm bg-white rounded-t-2xl sm:rounded-2xl shadow-xl p-5 space-y-3"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-lg font-semibold text-slate-900">D-day 설정</h3>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-slate-600">목표 이름</span>
-              <input
-                type="text"
-                value={ddayTitle}
-                onChange={(e) => setDdayTitle(e.target.value)}
-                placeholder="예: 2027 대수능"
-                className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-slate-600">목표일</span>
-              <input
-                type="date"
-                value={ddayDate}
-                onChange={(e) => setDdayDate(e.target.value)}
-                className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </label>
-            <div className="flex items-center justify-between gap-2 pt-1">
-              {dday ? (
-                <button
-                  type="button"
-                  onClick={removeDday}
-                  disabled={ddaySaving}
-                  className="text-xs text-slate-400 hover:text-red-600 px-1 disabled:opacity-50"
-                >
-                  삭제
-                </button>
-              ) : (
-                <span />
-              )}
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setDdayOpen(false)}
-                  disabled={ddaySaving}
-                  className="text-sm text-slate-500 hover:text-slate-900 px-2"
-                >
-                  취소
-                </button>
-                <button
-                  type="button"
-                  onClick={saveDday}
-                  disabled={ddaySaving || !ddayTitle.trim() || !ddayDate}
-                  className="rounded-md bg-brand-600 text-white text-sm font-medium px-4 py-2 hover:bg-brand-700 disabled:opacity-50"
-                >
-                  {ddaySaving ? '저장 중…' : '저장'}
-                </button>
-              </div>
-            </div>
-          </div>
+      {/* D-day 설정 (관리자) */}
+      <BottomSheet
+        open={ddayOpen}
+        onClose={() => setDdayOpen(false)}
+        title="D-day 설정"
+        dirty={ddayDirty}
+        disabled={ddaySaving}
+        footer={
+          <>
+            {dday && (
+              <Button variant="dangerSoft" size="lg" onClick={removeDday} disabled={ddaySaving}>
+                삭제
+              </Button>
+            )}
+            <Button
+              size="lg"
+              block
+              onClick={saveDday}
+              loading={ddaySaving}
+              disabled={!ddayTitle.trim() || !ddayDate}
+            >
+              저장
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Field label="목표 이름">
+            <input
+              type="text"
+              value={ddayTitle}
+              onChange={(e) => setDdayTitle(e.target.value)}
+              placeholder="예: 2027 대수능"
+              className={inputClass()}
+            />
+          </Field>
+          <Field label="목표일">
+            <input
+              type="date"
+              value={ddayDate}
+              onChange={(e) => setDdayDate(e.target.value)}
+              className={inputClass()}
+            />
+          </Field>
         </div>
-      )}
+      </BottomSheet>
     </div>
   )
 }
