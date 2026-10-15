@@ -314,6 +314,14 @@ export function KoreanMockTake() {
 
   async function handleSubmit() {
     if (!mock || !profile) return
+    // 사진으로 불러온 답이면 한 번 더 못 박는다. 채점 뒤엔 고칠 길이 없다.
+    if (
+      usedOmr &&
+      !window.confirm(
+        '사진에서 읽은 답을 종이 답안지와 모두 대조했나요?\n채점 후에는 판독 오류가 있어도 답을 수정할 수 없습니다.',
+      )
+    )
+      return
     const unanswered = answers.filter((a) => a === 0).length
     if (unanswered > 0) {
       if (
@@ -519,9 +527,15 @@ export function KoreanMockTake() {
             )}
           </div>
           {usedOmr && (
-            <p className="text-[11px] text-slate-500">
-              사진에서 읽은 답입니다. 틀리게 읽혔을 수 있으니 주황색 문항부터 확인하고 제출하세요.
-            </p>
+            // 판독 오류의 책임이 학생에게 있다는 것을 제출 전에 분명히 한다 —
+            // 채점 뒤에는 답을 고칠 수 없다.
+            <div className="rounded-lg bg-orange-50 border border-orange-200 px-3 py-2 text-xs text-orange-800 space-y-0.5">
+              <p className="font-bold">사진에서 읽은 답입니다. 종이 답안지와 한 문항씩 직접 대조하세요.</p>
+              <p>
+                판독이 틀릴 수 있습니다. 주황색 문항은 꼭 확인하고, 나머지도 대조한 뒤 제출하세요.
+                채점 후에는 판독 오류가 있어도 답을 수정할 수 없습니다.
+              </p>
+            </div>
           )}
           {omrWarning && (
             <p className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
