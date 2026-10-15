@@ -23,10 +23,20 @@ import {
   type KoreanMockResult,
   type MockSubject,
 } from '../lib/types'
+import {
+  Badge,
+  BottomSheet,
+  Button,
+  Card,
+  PageHeader,
+  SkeletonList,
+  buttonClass,
+  type BadgeTone,
+} from '../components/ui'
 
-const SUBJECT_BADGE_CLASS: Record<MockSubject, string> = {
-  korean: 'bg-rose-50 text-rose-700 border-rose-200',
-  english: 'bg-sky-50 text-sky-700 border-sky-200',
+const SUBJECT_TONE: Record<MockSubject, BadgeTone> = {
+  korean: 'rose',
+  english: 'blue',
 }
 
 /** 원형 점수 게이지. */
@@ -174,8 +184,8 @@ export function KoreanMockResult() {
     return map
   }, [mock])
 
-  if (loading) return <p className="text-slate-500 text-sm">불러오는 중…</p>
-  if (error) return <p className="text-red-600 text-sm">{error}</p>
+  if (loading) return <SkeletonList rows={3} className="max-w-lg mx-auto" />
+  if (error) return <p className="text-[15px] text-red-500 px-1">{error}</p>
   if (!attempt || !attempt.koreanMockResults) return null
 
   const results =
@@ -271,40 +281,36 @@ export function KoreanMockResult() {
 
   return (
     <div className="space-y-4 max-w-lg mx-auto">
-      <header className="text-center">
-        <h1 className="text-lg font-bold text-slate-900">시험 결과</h1>
-      </header>
+      <PageHeader title="시험 결과" />
 
       {/* 점수 카드 */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center">
+      <Card className="p-6 text-center">
         {attempt.createdAt && (
-          <p className="text-xs text-slate-400">{fmtAttemptDate(attempt.createdAt)}</p>
+          <p className="text-[13px] text-slate-400">{fmtAttemptDate(attempt.createdAt)}</p>
         )}
-        <h2 className="text-xl font-bold text-slate-900 mt-1">{attempt.refTitle}</h2>
-        <span
-          className={`inline-block mt-2 rounded-full text-[11px] font-medium px-2.5 py-1 border ${SUBJECT_BADGE_CLASS[subj]}`}
-        >
+        <h2 className="text-[20px] font-bold text-slate-900 mt-1">{attempt.refTitle}</h2>
+        <Badge tone={SUBJECT_TONE[subj]} size="md" className="mt-2">
           {MOCK_SUBJECT_LABEL[subj]}
-        </span>
+        </Badge>
         <div className="mt-4 flex justify-center">
           <ScoreRing score={score} total={totalPoints} />
         </div>
-      </div>
+      </Card>
 
       {/* 등급 카드 (등급컷 있을 때) — 탭하면 등급컷 상세 */}
       {grade != null && (
         <button
           type="button"
           onClick={() => setShowCutoffs(true)}
-          className="w-full text-left rounded-2xl border border-slate-200 bg-white p-5 hover:border-slate-300 transition"
+          className="pressable w-full text-left rounded-card bg-white p-5 hover:bg-slate-50 active:bg-slate-100"
         >
           <div className="flex items-center gap-2.5">
             <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-amber-100 text-amber-700">
               🏆
             </span>
             <div className="flex-1">
-              <p className="text-sm font-bold text-slate-900">등급</p>
-              <p className="text-xs text-slate-400">이번 시험에서 나의 위치는?</p>
+              <p className="text-[15px] font-bold text-slate-900">등급</p>
+              <p className="text-[13px] text-slate-500">이번 시험에서 나의 위치는?</p>
             </div>
             <span className="text-slate-300 text-lg">›</span>
           </div>
@@ -317,7 +323,7 @@ export function KoreanMockResult() {
               style={{ width: `${totalPoints > 0 ? Math.round((score / totalPoints) * 100) : 0}%` }}
             />
           </div>
-          <p className="mt-1 text-[11px] text-slate-400">
+          <p className="mt-1.5 text-[13px] text-slate-500 tabular-nums">
             원점수 {score}점 / {totalPoints}점 · 등급컷 보기
           </p>
         </button>
@@ -325,7 +331,7 @@ export function KoreanMockResult() {
 
       {/* 출제자 한마디 */}
       {mock?.examinerComment && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+        <div className="rounded-card bg-white p-5">
           <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-400 overflow-hidden">
             <span className="font-serif text-4xl leading-none translate-y-[0.18em]">
               &ldquo;
@@ -348,20 +354,20 @@ export function KoreanMockResult() {
       )}
 
       {/* 정답/오답 */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 grid grid-cols-2">
+      <div className="rounded-card bg-white p-5 grid grid-cols-2">
         <div className="flex flex-col items-center gap-1 border-r border-slate-100">
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-brand-50 text-brand-600 text-lg">
             ○
           </span>
-          <span className="text-xs text-slate-500">정답</span>
-          <span className="text-xl font-bold text-slate-900">{correctCount}</span>
+          <span className="text-[13px] text-slate-500">정답</span>
+          <span className="text-[24px] font-bold text-slate-900 tabular-nums">{correctCount}</span>
         </div>
         <div className="flex flex-col items-center gap-1">
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-red-50 text-red-500 text-lg">
             ✕
           </span>
-          <span className="text-xs text-slate-500">오답</span>
-          <span className="text-xl font-bold text-slate-900">{wrongCount}</span>
+          <span className="text-[13px] text-slate-500">오답</span>
+          <span className="text-[24px] font-bold text-slate-900 tabular-nums">{wrongCount}</span>
         </div>
       </div>
 
@@ -370,52 +376,39 @@ export function KoreanMockResult() {
           href={mock.explanationPdfUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="block text-center rounded-xl bg-brand-600 text-white text-sm font-semibold px-4 py-3 hover:bg-brand-700 transition"
+          className={buttonClass({ size: 'lg', block: true })}
         >
-          📄 해설 보기
+          해설 PDF 보기
         </a>
       )}
 
       {/* 정오표 */}
-      <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-          <h3 className="text-sm font-bold text-slate-900">정오표</h3>
+      <div className="rounded-card bg-white overflow-hidden">
+        <div className="px-5 py-4 flex items-center justify-between">
+          <h3 className="text-[17px] font-bold text-slate-900">정오표</h3>
           {canEdit &&
             (editing ? (
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setEditing(false)}
-                  className="text-xs text-slate-400 hover:text-slate-700"
-                >
+              <div className="flex items-center gap-1">
+                <Button size="sm" variant="text" onClick={() => setEditing(false)}>
                   취소
-                </button>
-                <button
-                  type="button"
-                  onClick={saveEditAnswers}
-                  disabled={savingEdit}
-                  className="rounded-md bg-brand-600 text-white text-xs font-semibold px-3 py-1 hover:bg-brand-700 disabled:opacity-50"
-                >
-                  {savingEdit ? '저장 중…' : '저장'}
-                </button>
+                </Button>
+                <Button size="sm" onClick={saveEditAnswers} loading={savingEdit}>
+                  저장
+                </Button>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={startEditAnswers}
-                className="text-xs font-medium text-brand-700 hover:underline"
-              >
+              <Button size="sm" variant="secondary" onClick={startEditAnswers}>
                 답 수정
-              </button>
+              </Button>
             ))}
         </div>
         {editing && (
-          <p className="px-4 pt-2 text-[11px] text-slate-400">
-            학생답을 탭하면 1→2→3→4→5→미응답 순으로 바뀝니다.
+          <p className="px-5 pb-2 text-[13px] text-slate-500">
+            학생답을 누르면 1→2→3→4→5→미응답 순으로 바뀌어요.
           </p>
         )}
         <table className="min-w-full text-sm">
-          <thead className="bg-slate-50 text-[11px] text-slate-400">
+          <thead className="bg-slate-50 text-[12px] text-slate-500">
             <tr>
               <th className="px-3 py-2 text-left font-semibold">문항</th>
               <th className="px-2 py-2 text-center font-semibold">배점</th>
@@ -515,29 +508,23 @@ export function KoreanMockResult() {
       </div>
 
       <div className="flex gap-2">
-        <Link
-          to={`/korean-mocks/${id}`}
-          className="flex-1 text-center rounded-xl border border-slate-300 text-slate-700 text-sm font-medium px-4 py-2.5 hover:bg-slate-100"
-        >
+        <Link to={`/korean-mocks/${id}`} className={buttonClass({ variant: 'secondary', block: true, className: 'bg-white' })}>
           모의고사로
         </Link>
-        <Link
-          to="/korean-mocks"
-          className="flex-1 text-center rounded-xl border border-slate-300 text-slate-700 text-sm font-medium px-4 py-2.5 hover:bg-slate-100"
-        >
+        <Link to="/korean-mocks" className={buttonClass({ variant: 'secondary', block: true, className: 'bg-white' })}>
           목록으로
         </Link>
       </div>
 
       {/* 등급컷 상세 오버레이 */}
       {showCutoffs && grade != null && cutoffRows.length > 0 && (
-        <div className="fixed inset-0 z-50 bg-slate-50 overflow-y-auto safe-top safe-bottom">
+        <div className="fixed inset-0 z-50 bg-surface overflow-y-auto safe-top safe-bottom anim-pop-in">
           <div className="max-w-lg mx-auto px-5 py-5">
             <header className="flex items-center gap-2 mb-4">
               <button
                 type="button"
                 onClick={() => setShowCutoffs(false)}
-                className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-slate-100 text-slate-600"
+                className="pressable h-10 w-10 inline-flex items-center justify-center rounded-full bg-white text-slate-600"
                 aria-label="닫기"
               >
                 ‹
@@ -548,7 +535,7 @@ export function KoreanMockResult() {
               </div>
             </header>
 
-            <div className="rounded-2xl bg-white border border-slate-200 p-5">
+            <div className="rounded-card bg-white p-5">
               {attempt.mockElectiveName && (
                 <span className="inline-block rounded-full bg-violet-500 text-white text-xs font-semibold px-3 py-1 mb-2">
                   {attempt.mockElectiveName}
@@ -609,30 +596,14 @@ export function KoreanMockResult() {
           const passageQ = pq && (!r?.correct || canEdit) ? pq : undefined
           const linkLabels = mockLinkLabels(linkByNumber.get(explNumber))
           return (
-            <div
-              className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 backdrop-blur-sm"
-              onClick={() => setExplNumber(null)}
+            <BottomSheet
+              open
+              onClose={() => setExplNumber(null)}
+              title={`${explNumber}번 ${r && !r.correct ? '오답 리뷰' : '해설'}`}
             >
-              <div
-                className="w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[85vh] overflow-y-auto"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="sticky top-0 bg-white border-b border-slate-100 px-5 py-3 flex items-center justify-between">
-                  <h3 className="text-base font-bold text-slate-900">
-                    {explNumber}번 {r && !r.correct ? '오답 리뷰' : '해설'}
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => setExplNumber(null)}
-                    className="text-slate-400 hover:text-slate-900 text-lg leading-none px-1"
-                    aria-label="닫기"
-                  >
-                    ✕
-                  </button>
-                </div>
-                <div className="p-5 space-y-3">
+                <div className="space-y-4">
                   {r && (
-                    <div className="flex items-center gap-4 text-sm">
+                    <div className="flex items-center gap-4 text-[15px]">
                       <span className="text-slate-500">
                         정답{' '}
                         <span className="font-bold text-slate-900">
@@ -761,8 +732,7 @@ export function KoreanMockResult() {
                     </p>
                   )}
                 </div>
-              </div>
-            </div>
+            </BottomSheet>
           )
         })()}
     </div>

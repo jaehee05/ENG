@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { Attempt } from '../lib/types'
+import { Badge, Card, ScoreValue, cx } from './ui'
 
 function fmtDate(ts: Attempt['createdAt']): string {
   if (!ts) return ''
@@ -20,6 +21,7 @@ interface Props {
   deletingId?: string | null
 }
 
+/** 내 응시 기록 — 접힌 채로 요약(횟수·최근·최고)만, 펼치면 회차별 줄. */
 export function MyAttemptsBox({
   attempts,
   buildResultPath,
@@ -40,79 +42,58 @@ export function MyAttemptsBox({
   const recent = sorted[0]
 
   return (
-    <details
-      className="rounded-lg border border-slate-200 bg-white overflow-hidden"
-      open={open}
-      onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}
-    >
-      <summary className="list-none cursor-pointer px-4 py-3 flex items-center justify-between gap-3 hover:bg-slate-50">
-        <div className="text-sm flex items-baseline gap-2 flex-wrap">
-          <span className="font-medium text-slate-900">내 응시 기록</span>
-          <span className="text-xs text-slate-500">{sorted.length}회</span>
-          {recent && recent.total > 0 && (
-            <span className="text-xs text-slate-500">
-              · 최근 {Math.round((recent.correct / recent.total) * 100)}%
-            </span>
-          )}
-          {best.total > 0 && (
-            <span className="text-xs text-slate-500">
-              · 최고 {Math.round(best.ratio * 100)}%
-            </span>
-          )}
-        </div>
-        <span className="text-slate-400 text-xs">{open ? '접기 −' : '펼치기 +'}</span>
-      </summary>
-      <ul className="divide-y divide-slate-100 border-t border-slate-100">
-        {sorted.map((a, i) => {
-          const ratio = a.total > 0 ? Math.round((a.correct / a.total) * 100) : 0
-          return (
-            <li
-              key={a.id}
-              className="px-4 py-2.5 flex items-center justify-between gap-3 text-sm"
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <span className="text-[11px] text-slate-400 w-9">
-                  {sorted.length - i}회차
+    <Card padded={false}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="pressable w-full flex items-center justify-between gap-3 px-5 py-4 text-left rounded-card hover:bg-slate-50 active:bg-slate-100"
+      >
+        <span className="min-w-0">
+          <span className="block text-[15px] font-semibold text-slate-900">
+            내 응시 기록 <span className="text-slate-400 font-medium tabular-nums">{sorted.length}회</span>
+          </span>
+          <span className="block text-[13px] text-slate-500 mt-0.5 tabular-nums">
+            {recent && recent.total > 0 && `최근 ${Math.round((recent.correct / recent.total) * 100)}%`}
+            {best.total > 0 && ` · 최고 ${Math.round(best.ratio * 100)}%`}
+          </span>
+        </span>
+        <svg
+          className={cx('shrink-0 text-slate-400 transition-transform', open && 'rotate-180')}
+          width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+      {open && (
+        <ul className="pb-2">
+          {sorted.map((a, i) => (
+            <li key={a.id} className="flex items-center gap-1 pr-3">
+              <Link
+                to={buildResultPath(a)}
+                className="pressable flex-1 min-w-0 flex items-center justify-between gap-3 px-5 py-3 rounded-2xl hover:bg-slate-50 active:bg-slate-100"
+              >
+                <span className="min-w-0 flex items-center gap-2">
+                  <span className="text-[15px] font-medium text-slate-900 tabular-nums">{sorted.length - i}회차</span>
+                  <span className="text-[13px] text-slate-500 tabular-nums">{fmtDate(a.createdAt)}</span>
+                  {a.practice && <Badge tone="amber">연습</Badge>}
                 </span>
-                <span className="text-[11px] text-slate-500">
-                  {fmtDate(a.createdAt)}
-                </span>
-                {a.practice && (
-                  <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
-                    연습
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2.5 shrink-0">
-                <span className="text-slate-600 text-xs">
-                  {a.correct}/{a.total}
-                </span>
-                <span
-                  className={`text-sm font-semibold ${ratio >= 80 ? 'text-brand-700' : ratio >= 50 ? 'text-slate-700' : 'text-red-600'}`}
+                <ScoreValue correct={a.correct} total={a.total} />
+              </Link>
+              {onDelete && (
+                <button
+                  type="button"
+                  onClick={() => onDelete(a)}
+                  disabled={deletingId === a.id}
+                  className="pressable shrink-0 h-9 px-2.5 rounded-xl text-[13px] font-medium text-slate-400 hover:text-red-500 hover:bg-red-50 active:bg-red-50 disabled:opacity-50"
                 >
-                  {ratio}%
-                </span>
-                <Link
-                  to={buildResultPath(a)}
-                  className="text-xs text-slate-500 hover:text-slate-900 underline-offset-2 hover:underline"
-                >
-                  보기
-                </Link>
-                {onDelete && (
-                  <button
-                    type="button"
-                    onClick={() => onDelete(a)}
-                    disabled={deletingId === a.id}
-                    className="text-xs text-slate-400 hover:text-red-600 underline-offset-2 hover:underline disabled:opacity-50"
-                  >
-                    {deletingId === a.id ? '삭제 중…' : '삭제'}
-                  </button>
-                )}
-              </div>
+                  {deletingId === a.id ? '삭제 중' : '삭제'}
+                </button>
+              )}
             </li>
-          )
-        })}
-      </ul>
-    </details>
+          ))}
+        </ul>
+      )}
+    </Card>
   )
 }

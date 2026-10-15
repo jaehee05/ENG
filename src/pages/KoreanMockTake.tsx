@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { Capacitor } from '@capacitor/core'
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import { useAuth } from '../contexts/useAuth'
@@ -8,6 +8,7 @@ import { readOmr } from '../lib/api'
 import { isVersionAtLeast, OMR_MIN_NATIVE_VERSION, OMR_PHOTO_ENABLED } from '../lib/features'
 import { createKoreanMockAttempt, getKoreanMock } from '../lib/firestore'
 import { resizeImageForUpload } from '../lib/imageResize'
+import { BottomCTA, Button, Card, PageHeader, SkeletonList, confirm, cx } from '../components/ui'
 import {
   getMockSubject,
   MOCK_SUBJECT_LABEL,
@@ -243,15 +244,18 @@ export function KoreanMockTake() {
   function openOmrPicker() {
     // 덮어쓰기 확인은 사진을 고르기 전에 받는다. 판독이 끝난 뒤 물으면 취소할 때
     // 수십 초 걸린 판독을 버리게 된다. 판독 중엔 화면을 막으니 그 사이 답이 바뀌지 않는다.
+    // 파일 선택 창은 iOS 가 ‘사용자가 누른 그 순간’에만 열어 준다. 확인창 답을
+    // await 한 뒤 click() 하면 조용히 막히므로, 확인 버튼을 누르는 클릭 안에서 연다.
     const marked = answers.filter((a) => a > 0).length
-    if (
-      marked > 0 &&
-      !window.confirm(
-        `이미 표시한 ${marked}문항의 답이 사진에서 읽은 답으로 바뀝니다. 계속할까요?`,
-      )
-    )
+    const open = () => omrInputRef.current?.click()
+    if (marked === 0) {
+      open()
       return
-    omrInputRef.current?.click()
+    }
+    void confirm(`이미 표시한 ${marked}문항의 답이 사진에서 읽은 답으로 바뀌어요. 계속할까요?`, {
+      confirmText: '사진 고르기',
+      onConfirm: open,
+    })
   }
 
   async function handleOmrFile(e: ChangeEvent<HTMLInputElement>) {
@@ -268,7 +272,7 @@ export function KoreanMockTake() {
         img = await resizeImageForUpload(file, OMR_MAX_DIMENSION, OMR_MAX_PIXELS, 0.7)
       }
       if (img.base64.length > OMR_MAX_BASE64) {
-        throw new Error('사진 용량이 너무 큽니다. 답안지만 나오게 다시 찍어 주세요.')
+        throw new Error('사진 용량이 너무 커요. 답안지만 나오게 다시 찍어 주세요.')
       }
       const result = await readOmr({
         image: img.base64,
@@ -293,12 +297,12 @@ export function KoreanMockTake() {
       const chosenMark = chosenElective ? electiveMarkOf(chosenElective.name) : null
       if (result.electiveMark && chosenMark && result.electiveMark !== chosenMark) {
         setOmrWarning(
-          `답안지의 선택 과목은 ‘${ELECTIVE_MARK_LABEL[result.electiveMark]}’로 칠해져 있는데, 지금 ‘${chosenElective!.name}’로 응시하고 있습니다. 맞는지 확인해 주세요.`,
+          `답안지의 선택 과목은 ‘${ELECTIVE_MARK_LABEL[result.electiveMark]}’로 칠해져 있는데, 지금 ‘${chosenElective!.name}’로 응시하고 있어요. 맞는지 확인해 주세요.`,
         )
       }
     } catch (err) {
       setOmrError(
-        `${err instanceof Error ? err.message : '판독에 실패했습니다.'} 직접 입력은 그대로 할 수 있습니다.`,
+        `${err instanceof Error ? err.message : '판독하지 못했어요.'} 직접 입력은 그대로 할 수 있어요.`,
       )
     } finally {
       setOmrReading(false)
@@ -317,20 +321,21 @@ export function KoreanMockTake() {
     // 사진으로 불러온 답이면 한 번 더 못 박는다. 채점 뒤엔 고칠 길이 없다.
     if (
       usedOmr &&
-      !window.confirm(
-        '사진에서 읽은 답을 종이 답안지와 모두 대조했나요?\n채점 후에는 판독 오류가 있어도 답을 수정할 수 없습니다.',
-      )
+      !(await confirm(
+        '사진에서 읽은 답을 종이 답안지와 모두 대조했나요?\n채점 후에는 판독 오류가 있어도 답을 고칠 수 없어요.',
+        { title: '답안 대조', confirmText: '모두 대조했어요' },
+      ))
     )
       return
     const unanswered = answers.filter((a) => a === 0).length
     if (unanswered > 0) {
       if (
-        !window.confirm(
-          `${unanswered}문항이 미응답입니다. 제출할까요? (미응답은 오답 처리)`,
-        )
+        !(await confirm(`${unanswered}문항이 비어 있어요. 제출할까요?\n비운 문항은 오답으로 채점돼요.`, {
+          confirmText: '제출',
+        }))
       )
         return
-    } else if (!window.confirm('제출하시겠습니까?')) {
+    } else if (!(await confirm('제출할까요?', { confirmText: '제출' }))) {
       return
     }
     setSubmitting(true)
@@ -372,8 +377,8 @@ export function KoreanMockTake() {
         : undefined,
   })
 
-  if (loading) return <p className="text-slate-500 text-sm">불러오는 중…</p>
-  if (error) return <p className="text-red-600 text-sm">{error}</p>
+  if (loading) return <SkeletonList rows={2} className="max-w-lg mx-auto" />
+  if (error) return <p className="text-[15px] text-red-500 px-1">{error}</p>
   if (!mock) return null
 
   const subj = getMockSubject(mock)
@@ -383,75 +388,56 @@ export function KoreanMockTake() {
     const canStart = !hasElectives || electiveIdx != null
     const total = mock.questions.length + (chosenElective?.questions.length ?? 0)
     return (
-      <div className="max-w-lg mx-auto pb-28">
-        <header className="flex items-center justify-between mb-5">
-          <Link
-            to={`/korean-mocks/${mock.id}`}
-            className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-slate-100 text-slate-600"
-            aria-label="뒤로"
-          >
-            ‹
-          </Link>
-          <h1 className="text-base font-bold text-slate-900">응시하기</h1>
-          <span className="w-9" />
-        </header>
+      <div className="max-w-lg mx-auto space-y-4">
+        <PageHeader title="응시하기" />
 
-        <div className="rounded-2xl bg-slate-100/70 p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h2 className="text-lg font-bold text-slate-900">{mock.title}</h2>
-              <p className="text-sm text-slate-500 mt-0.5">
-                {MOCK_SUBJECT_LABEL[subj]} · 총 {total}문항
-              </p>
-            </div>
-            <span className="shrink-0 inline-flex h-11 w-11 items-center justify-center rounded-full bg-brand-100 text-brand-700">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 2h6l2 2h3v18H4V4h3l2-2Z" />
-                <path d="M9 12l2 2 4-4" />
-              </svg>
-            </span>
+        <Card className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className="text-[17px] font-bold text-slate-900">{mock.title}</h2>
+            <p className="text-[13px] text-slate-500 mt-1 tabular-nums">
+              {MOCK_SUBJECT_LABEL[subj]} · 총 {total}문항
+            </p>
           </div>
-        </div>
+          <span className="shrink-0 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-700">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M9 2h6l2 2h3v18H4V4h3l2-2Z" />
+              <path d="M9 12l2 2 4-4" />
+            </svg>
+          </span>
+        </Card>
 
         {hasElectives && (
-          <div className="rounded-2xl bg-slate-100/70 p-5 mt-3">
-            <h3 className="text-base font-bold text-slate-900">응시 정보를 선택해주세요</h3>
-            <p className="text-xs text-slate-400 mt-0.5">선택과목</p>
-            <div className="mt-3 flex items-center justify-between gap-3">
-              <span className="text-sm text-slate-600 shrink-0">선택 과목</span>
-              <div className="flex flex-1 max-w-[16rem] rounded-full bg-white border border-slate-200 p-0.5">
-                {mock.electives!.map((el, i) => {
-                  const on = electiveIdx === i
-                  return (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => setElectiveIdx(i)}
-                      className={`flex-1 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                        on ? 'bg-brand-600 text-white' : 'text-slate-500'
-                      }`}
-                    >
-                      {el.name}
-                    </button>
-                  )
-                })}
-              </div>
+          <Card>
+            <h3 className="text-[17px] font-bold text-slate-900">선택과목을 골라 주세요</h3>
+            <p className="text-[13px] text-slate-500 mt-1">답안지에 칠한 과목과 같아야 해요.</p>
+            <div className="mt-4 grid grid-cols-2 gap-1 rounded-2xl bg-slate-100 p-1" role="radiogroup" aria-label="선택과목">
+              {mock.electives!.map((el, i) => {
+                const on = electiveIdx === i
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    onClick={() => setElectiveIdx(i)}
+                    className={cx(
+                      'pressable h-11 rounded-xl text-[15px] font-semibold',
+                      on ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500',
+                    )}
+                  >
+                    {el.name}
+                  </button>
+                )
+              })}
             </div>
-          </div>
+          </Card>
         )}
 
-        <div className="fixed bottom-0 lg:bottom-12 inset-x-0 safe-bottom bg-gradient-to-t from-white via-white to-transparent px-4 pt-6 pb-4">
-          <button
-            type="button"
-            onClick={beginTake}
-            disabled={!canStart}
-            className={`block w-full max-w-lg mx-auto text-center rounded-2xl py-4 text-[15px] font-bold transition ${
-              canStart ? 'bg-brand-600 text-white hover:bg-brand-700' : 'bg-slate-200 text-slate-400'
-            }`}
-          >
-            응시하기
-          </button>
-        </div>
+        <BottomCTA width="max-w-lg">
+          <Button size="lg" block onClick={beginTake} disabled={!canStart}>
+            {canStart ? '응시하기' : '선택과목을 먼저 골라 주세요'}
+          </Button>
+        </BottomCTA>
       </div>
     )
   }
@@ -466,30 +452,29 @@ export function KoreanMockTake() {
   const electiveCols = chunk(electiveItems, 17)
 
   return (
-    <div className="max-w-2xl mx-auto pb-36 lg:pb-48">
+    <div className="max-w-2xl mx-auto pb-40 lg:pb-52">
       <header className="flex items-center justify-between gap-3 mb-3">
         <button
           type="button"
           onClick={() => setStarted(false)}
-          className="shrink-0 whitespace-nowrap text-slate-400 hover:text-slate-700 text-sm"
+          className="pressable shrink-0 whitespace-nowrap h-9 px-2 -ml-2 rounded-xl text-[15px] font-medium text-slate-500 hover:bg-slate-200/60 active:bg-slate-200/60"
         >
           ‹ 이전
         </button>
         {/* min-w-0 이 없으면 제목이 줄지 않아 양옆 버튼이 눌리고,
             버튼 안 글자가 '제/출' 로 세로로 접힌다. */}
-        <h1 className="min-w-0 flex-1 text-center text-sm font-bold text-slate-900 truncate">
+        <h1 className="min-w-0 flex-1 text-center text-[15px] font-bold text-slate-900 truncate">
           {mock.title}
         </h1>
-        <button
-          type="button"
+        <Button
+          size="sm"
+          variant={answeredCount > 0 ? 'primary' : 'secondary'}
           onClick={handleSubmit}
-          disabled={submitting}
-          className={`shrink-0 whitespace-nowrap rounded-full text-sm font-semibold px-4 py-1.5 transition ${
-            answeredCount > 0 ? 'bg-brand-600 text-white hover:bg-brand-700' : 'bg-slate-200 text-slate-400'
-          } disabled:opacity-60`}
+          loading={submitting}
+          className="shrink-0 rounded-full px-4"
         >
-          {submitting ? '채점 중…' : '제출'}
-        </button>
+          제출
+        </Button>
       </header>
 
       {omrEnabled && (
@@ -503,24 +488,19 @@ export function KoreanMockTake() {
             className="hidden"
             onChange={handleOmrFile}
           />
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={openOmrPicker}
-              disabled={omrReading || submitting}
-              className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button size="sm" variant="secondary" onClick={openOmrPicker} disabled={omrReading || submitting} className="bg-white">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                 <path d="M4 7h3l2-3h6l2 3h3v13H4z" />
                 <circle cx="12" cy="13" r="3.5" />
               </svg>
               OMR 사진으로 불러오기
-            </button>
+            </Button>
             {needsCheck.size > 0 && (
               <button
                 type="button"
                 onClick={focusNextFlagged}
-                className="inline-flex items-center rounded-full bg-orange-100 px-3 py-1.5 text-xs font-bold text-orange-700 hover:bg-orange-200"
+                className="pressable h-9 inline-flex items-center rounded-xl bg-orange-100 px-3.5 text-[13px] font-bold text-orange-700 hover:bg-orange-200 active:bg-orange-200"
               >
                 확인 필요 {needsCheck.size}문항 ›
               </button>
@@ -529,23 +509,19 @@ export function KoreanMockTake() {
           {usedOmr && (
             // 판독 오류의 책임이 학생에게 있다는 것을 제출 전에 분명히 한다 —
             // 채점 뒤에는 답을 고칠 수 없다.
-            <div className="rounded-lg bg-orange-50 border border-orange-200 px-3 py-2 text-xs text-orange-800 space-y-0.5">
-              <p className="font-bold">사진에서 읽은 답입니다. 종이 답안지와 한 문항씩 직접 대조하세요.</p>
+            <div className="rounded-2xl bg-orange-50 px-4 py-3 text-[13px] text-orange-800 space-y-0.5">
+              <p className="font-bold">사진에서 읽은 답이에요. 종이 답안지와 한 문항씩 직접 대조하세요.</p>
               <p>
-                판독이 틀릴 수 있습니다. 주황색 문항은 꼭 확인하고, 나머지도 대조한 뒤 제출하세요.
-                채점 후에는 판독 오류가 있어도 답을 수정할 수 없습니다.
+                판독이 틀릴 수 있어요. 주황색 문항은 꼭 확인하고, 나머지도 대조한 뒤 제출하세요.
+                채점 후에는 판독 오류가 있어도 답을 고칠 수 없어요.
               </p>
             </div>
           )}
           {omrWarning && (
-            <p className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
-              {omrWarning}
-            </p>
+            <p className="rounded-2xl bg-amber-50 px-4 py-3 text-[13px] text-amber-800">{omrWarning}</p>
           )}
           {omrError && (
-            <p className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
-              {omrError}
-            </p>
+            <p className="rounded-2xl bg-red-50 px-4 py-3 text-[13px] text-red-700">{omrError}</p>
           )}
         </div>
       )}
@@ -577,36 +553,37 @@ export function KoreanMockTake() {
         ))}
       </div>
 
-      {error && <p className="text-sm text-red-600 mt-3">{error}</p>}
+      {error && <p className="text-[13px] text-red-500 mt-3">{error}</p>}
 
       {/* 판독 중엔 화면 전체를 막는다 — 그 사이 답을 고치면 결과가 덮어써 버린다. */}
       {omrReading && (
         <div
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-white/80 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-3 bg-surface/90 backdrop-blur-sm anim-dim-in"
           role="status"
           aria-live="polite"
         >
-          <span className="h-8 w-8 animate-spin rounded-full border-[3px] border-brand-200 border-t-brand-600" />
-          <p className="text-sm font-semibold text-slate-800">답안지를 읽는 중…</p>
-          <p className="text-xs text-slate-500">30초쯤 걸릴 수 있습니다.</p>
+          <span className="h-9 w-9 animate-spin rounded-full border-[3px] border-brand-100 border-t-brand-600" />
+          <p className="text-[17px] font-bold text-slate-900">답안지를 읽고 있어요</p>
+          <p className="text-[13px] text-slate-500">30초쯤 걸릴 수 있어요.</p>
         </div>
       )}
 
-      {/* 하단: 문제 네비 + 답 선택 (PC는 하단 탭바 위로) */}
-      <div className="fixed bottom-0 lg:bottom-12 inset-x-0 safe-bottom bg-white border-t border-slate-200 shadow-[0_-4px_16px_-8px_rgba(0,0,0,0.15)]">
-        <div className="max-w-lg mx-auto px-4 py-3">
-          <div className="flex items-center justify-between mb-2">
+      {/* 하단: 문제 네비 + 답 선택. 시험 중이라 탭바를 덮는다(PC는 하단 네비 위로). */}
+      <div className="fixed bottom-0 lg:bottom-12 inset-x-0 z-30 safe-bottom bg-white shadow-bar">
+        <div className="max-w-lg mx-auto px-4 pt-3 pb-3">
+          <div className="flex items-center justify-between mb-2.5">
             <button
               type="button"
               onClick={() => setFocused(Math.max(0, focused - 1))}
               disabled={focused <= 0}
-              className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-slate-100 text-slate-600 disabled:opacity-40"
+              aria-label="이전 문제"
+              className="pressable h-10 w-10 inline-flex items-center justify-center rounded-full bg-slate-100 text-slate-600 disabled:opacity-40"
             >
               ‹
             </button>
-            <span className="text-sm font-bold text-slate-900">
-              {focusedNumber}번 문제
-              <span className="ml-2 text-xs font-normal text-slate-400">
+            <span className="text-[16px] font-bold text-slate-900">
+              {focusedNumber}번
+              <span className="ml-2 text-[13px] font-medium text-slate-400 tabular-nums">
                 {answeredCount}/{items.length}
               </span>
             </span>
@@ -614,7 +591,8 @@ export function KoreanMockTake() {
               type="button"
               onClick={() => setFocused(Math.min(items.length - 1, focused + 1))}
               disabled={focused >= items.length - 1}
-              className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-slate-100 text-slate-600 disabled:opacity-40"
+              aria-label="다음 문제"
+              className="pressable h-10 w-10 inline-flex items-center justify-center rounded-full bg-slate-100 text-slate-600 disabled:opacity-40"
             >
               ›
             </button>
@@ -626,10 +604,12 @@ export function KoreanMockTake() {
                 <button
                   key={n}
                   type="button"
+                  aria-pressed={on}
                   onClick={() => pick(focused, n)}
-                  className={`flex-1 h-12 rounded-xl text-base font-bold transition ${
-                    on ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-500 active:bg-slate-200'
-                  }`}
+                  className={cx(
+                    'pressable flex-1 h-14 rounded-2xl text-[18px] font-bold tabular-nums',
+                    on ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600 active:bg-slate-200',
+                  )}
                 >
                   {n}
                 </button>

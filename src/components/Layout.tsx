@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode, type UIEvent } from 'react'
+import { useEffect, useRef, useState, type ReactNode, type UIEvent } from 'react'
 import { Link, NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { Capacitor } from '@capacitor/core'
 import { FirebaseMessaging } from '@capacitor-firebase/messaging'
@@ -152,6 +152,30 @@ export function Layout() {
   // 헤더는 바탕과 같은 색이라 평소엔 경계가 없다. 본문이 헤더 밑으로 밀려 올라갈
   // 때만 얇은 선을 그어, 내용이 헤더에 묻혀 보이지 않게 한다.
   const [scrolled, setScrolled] = useState(false)
+  // 하단 탭바 높이를 --tabbar-h 로 알린다. 화면 아래 고정 버튼(BottomCTA)이
+  // 탭바 바로 위에 앉으려면 필요하다 — 폭에 따라 탭바가 바뀌고(아이폰 탭바 /
+  // 아이패드 이상 가로 네비), 아이폰 홈 막대 여백도 기기마다 달라 재서 쓴다.
+  const mobileNavRef = useRef<HTMLElement>(null)
+  const wideNavRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    const root = document.documentElement
+    const update = () => {
+      const h = Math.max(
+        mobileNavRef.current?.offsetHeight ?? 0,
+        wideNavRef.current?.offsetHeight ?? 0,
+      )
+      root.style.setProperty('--tabbar-h', `${h}px`)
+    }
+    update()
+    const ro = new ResizeObserver(update)
+    if (mobileNavRef.current) ro.observe(mobileNavRef.current)
+    if (wideNavRef.current) ro.observe(wideNavRef.current)
+    return () => {
+      ro.disconnect()
+      root.style.removeProperty('--tabbar-h')
+    }
+  }, [])
+
   function onMainScroll(e: UIEvent<HTMLElement>) {
     const next = e.currentTarget.scrollTop > 4
     if (next !== scrolled) setScrolled(next)
@@ -354,7 +378,7 @@ export function Layout() {
       {/* 아이패드 세로(768) 이상: 하단 가로 네비 — 전체 메뉴 노출.
           관리자는 항목이 10개까지 늘어나 768px에서 빠듯하므로, 넘치면 가로 스크롤되게 둔다.
           (안쪽 flex에 mx-auto → 들어갈 땐 가운데 정렬, 넘칠 땐 왼쪽부터) */}
-      <nav className="hidden md:block sticky bottom-0 bg-white/95 backdrop-blur shadow-bar safe-bottom safe-x">
+      <nav ref={wideNavRef} className="hidden md:block sticky bottom-0 bg-white/95 backdrop-blur shadow-bar safe-bottom safe-x">
         <div className="max-w-6xl xl:max-w-7xl 2xl:max-w-screen-2xl mx-auto px-4 lg:px-6 h-12 flex items-center overflow-x-auto">
           <div className="flex items-center gap-0.5 lg:gap-1 mx-auto">
             {desktopNav.map((i) => (
@@ -379,7 +403,7 @@ export function Layout() {
       </nav>
 
       {/* 아이폰(768 미만) 하단 탭바 — 선 대신 옅은 그림자로 본문과 나눈다. */}
-      <nav className="md:hidden bg-white shadow-bar safe-bottom safe-x">
+      <nav ref={mobileNavRef} className="md:hidden bg-white shadow-bar safe-bottom safe-x">
         <div
           className="grid px-1 max-w-md mx-auto"
           style={{
