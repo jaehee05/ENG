@@ -8,6 +8,7 @@ import { readOmr } from '../lib/api'
 import { isVersionAtLeast, OMR_MIN_NATIVE_VERSION, OMR_PHOTO_ENABLED } from '../lib/features'
 import { createKoreanMockAttempt, getKoreanMock } from '../lib/firestore'
 import { resizeImageForUpload } from '../lib/imageResize'
+import { mergeReads, readByGrid, readElective, refineGrid } from '../lib/omrGrid'
 import { BottomCTA, Button, Card, PageHeader, SkeletonList, confirm, cx } from '../components/ui'
 import {
   getMockSubject,
@@ -267,20 +268,30 @@ export function KoreanMockTake() {
     setOmrError(null)
     setOmrWarning(null)
     try {
-      let img = await resizeImageForUpload(file, OMR_MAX_DIMENSION, OMR_MAX_PIXELS)
+      let img = await resizeImageForUpload(file, OMR_MAX_DIMENSION, OMR_MAX_PIXELS, undefined, true)
       if (img.base64.length > OMR_MAX_BASE64) {
-        img = await resizeImageForUpload(file, OMR_MAX_DIMENSION, OMR_MAX_PIXELS, 0.7)
+        img = await resizeImageForUpload(file, OMR_MAX_DIMENSION, OMR_MAX_PIXELS, 0.7, true)
       }
       if (img.base64.length > OMR_MAX_BASE64) {
         throw new Error('사진 용량이 너무 커요. 답안지만 나오게 다시 찍어 주세요.')
       }
+      const numbers = items.map((q) => q.number)
       const result = await readOmr({
         image: img.base64,
         mediaType: img.mediaType,
-        numbers: items.map((q) => q.number),
+        numbers,
         subject: getMockSubject(mock),
       })
-      const byNumber = new Map(result.answers.map((a) => [a.number, a]))
+      // 모델은 칸 위치만 믿고, 칠했는지는 사진 픽셀로 다시 잰다(omrGrid.ts).
+      let byGrid: ReturnType<typeof readByGrid> | null = null
+      let pixelElective: 1 | 2 | undefined
+      if (result.grid && img.pixels) {
+        const refined = refineGrid(img.pixels, result.grid, result.answers)
+        byGrid = readByGrid(img.pixels, refined.grid, numbers)
+        pixelElective = readElective(img.pixels, result.grid)
+      }
+      const merged = mergeReads(numbers, result.answers, byGrid)
+      const byNumber = new Map(merged.map((a) => [a.number, a]))
       const flagged = new Set<number>()
       const next = items.map((q, i) => {
         const a = byNumber.get(q.number)
@@ -295,9 +306,10 @@ export function KoreanMockTake() {
       // 선택과목은 알려만 준다. 사진이 틀렸을 수도, 학생이 잘못 칠했을 수도 있어서
       // 어느 쪽이 맞는지는 학생이 정해야 한다.
       const chosenMark = chosenElective ? electiveMarkOf(chosenElective.name) : null
-      if (result.electiveMark && chosenMark && result.electiveMark !== chosenMark) {
+      const electiveMark = pixelElective ?? result.electiveMark
+      if (electiveMark && chosenMark && electiveMark !== chosenMark) {
         setOmrWarning(
-          `답안지의 선택 과목은 ‘${ELECTIVE_MARK_LABEL[result.electiveMark]}’로 칠해져 있는데, 지금 ‘${chosenElective!.name}’로 응시하고 있어요. 맞는지 확인해 주세요.`,
+          `답안지의 선택 과목은 ‘${ELECTIVE_MARK_LABEL[electiveMark]}’로 칠해져 있는데, 지금 ‘${chosenElective!.name}’로 응시하고 있어요. 맞는지 확인해 주세요.`,
         )
       }
     } catch (err) {

@@ -4,6 +4,8 @@ interface ResizedImage {
   width: number
   height: number
   byteSize: number
+  /** withPixels 일 때만 — 보낸 JPEG 를 다시 푼 픽셀(OMR 칸 판독용). */
+  pixels?: ImageData
 }
 
 const MAX_DIMENSION = 1600
@@ -39,6 +41,7 @@ export async function resizeImageForUpload(
   maxDimension = MAX_DIMENSION,
   maxPixels = Infinity,
   quality = JPEG_QUALITY,
+  withPixels = false,
 ): Promise<ResizedImage> {
   const dataUrl = await readFileAsDataURL(file)
   const img = await loadImage(dataUrl)
@@ -60,7 +63,17 @@ export async function resizeImageForUpload(
   ctx.drawImage(img, 0, 0, w, h)
   const out = canvas.toDataURL('image/jpeg', quality)
   const base64 = out.includes(',') ? out.split(',')[1] : out
+  // 서버가 짚은 좌표는 보낸 JPEG 기준이라, 캔버스 원본이 아니라 압축을 거친 그
+  // 이미지를 다시 풀어 읽는다 — 두 쪽이 같은 픽셀을 보게.
+  let pixels: ImageData | undefined
+  if (withPixels) {
+    const sent = await loadImage(out)
+    ctx.clearRect(0, 0, w, h)
+    ctx.drawImage(sent, 0, 0, w, h)
+    pixels = ctx.getImageData(0, 0, w, h)
+  }
   return {
+    pixels,
     base64,
     mediaType: 'image/jpeg',
     width: w,

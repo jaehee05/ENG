@@ -1,4 +1,5 @@
 import type { WordEntry } from './types'
+import type { OmrGrid } from './omrGrid'
 
 interface ExtractGlossaryResponse {
   glossary: WordEntry[]
@@ -206,6 +207,8 @@ export interface OmrReadResult {
   answers: OmrAnswer[]
   /** 선택 과목 상자에 칠한 칸. 1=화법과 작문, 2=언어와 매체. */
   electiveMark?: 1 | 2
+  /** 모델이 짚은 칸 위치 — 클라이언트가 픽셀로 다시 읽는 데 쓴다(omrGrid.ts). */
+  grid?: OmrGrid
 }
 
 /**
@@ -240,7 +243,7 @@ export async function readOmr(input: {
     throw new Error(message)
   }
   const data = (await res.json()) as Partial<OmrReadResult>
-  return { answers: data.answers ?? [], electiveMark: data.electiveMark }
+  return { answers: data.answers ?? [], electiveMark: data.electiveMark, grid: data.grid }
 }
 
 /** 개발용 가짜 판독. 확인 필요(low·0)와 선택과목 불일치를 일부러 섞는다. */

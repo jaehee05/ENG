@@ -157,8 +157,10 @@ async function runCase({ name, image, answerPath }) {
   }
 
   if (data.grid) {
-    const { readByGrid } = await import(join(ROOT, 'src', 'lib', 'omrGrid.ts'))
-    const byGrid = readByGrid(img.rgba, data.grid, numbers)
+    const { readByGrid, refineGrid, mergeReads } = await import(join(ROOT, 'src', 'lib', 'omrGrid.ts'))
+    const refined = refineGrid(img.rgba, data.grid, data.answers)
+    console.log(`  [보정] 열 ${refined.grid.columns.length}/${data.grid.columns.length} 맞춤, 일치율 ${refined.quality.map((q) => q.toFixed(2)).join(' ')}`)
+    const byGrid = readByGrid(img.rgba, refined.grid, numbers)
     let gRight = 0
     let gLow = 0
     const gWrongHigh = []
@@ -173,8 +175,22 @@ async function runCase({ name, image, answerPath }) {
       `  [격자] ${gRight}/${numbers.length} 일치(읽은 줄 ${byGrid.size}), low ${gLow}` +
         (gWrongHigh.length ? `, ⚠ 틀렸는데 high: ${gWrongHigh.join(', ')}번` : ''),
     )
+    // 앱이 실제로 채우는 답 — 모델 답과 격자 답을 합친 것.
+    const merged = mergeReads(numbers, data.answers ?? [], byGrid)
+    let mRight = 0
+    let mLow = 0
+    const mWrongHigh = []
+    for (const a of merged) {
+      if (a.choice === expected.get(a.number)) mRight++
+      else if (a.confidence === 'high') mWrongHigh.push(a.number)
+      if (a.confidence === 'low') mLow++
+    }
+    console.log(
+      `  [합침·앱] ${mRight}/${numbers.length} 일치, low ${mLow}` +
+        (mWrongHigh.length ? `, ⚠ 틀렸는데 high: ${mWrongHigh.join(', ')}번` : ', 틀렸는데 high 없음'),
+    )
     if (process.env.OMR_DUMP) {
-      writeFileSync(join(process.env.OMR_DUMP, `${basename(image, extname(image))}.grid.json`), JSON.stringify({ grid: data.grid, w: img.w, h: img.h }))
+      writeFileSync(join(process.env.OMR_DUMP, `${basename(image, extname(image))}.grid.json`), JSON.stringify({ grid: data.grid, refined: refined.grid, w: img.w, h: img.h }))
     }
   } else {
     console.log('  [격자] 응답에 grid 없음')
