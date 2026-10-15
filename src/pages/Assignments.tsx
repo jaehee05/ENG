@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import { listAccounts } from '../lib/account'
 import type { UserAccount } from '../lib/types'
@@ -28,10 +27,22 @@ import {
   type MockSubject,
   type PersonalTodo,
 } from '../lib/types'
+import {
+  Badge,
+  Card,
+  EmptyState,
+  ListRow,
+  PageHeader,
+  Section,
+  SkeletonList,
+  cx,
+  inputClass,
+  type BadgeTone,
+} from '../components/ui'
 
-const SUBJECT_BADGE_CLASS: Record<MockSubject, string> = {
-  korean: 'bg-rose-50 text-rose-700 border-rose-200',
-  english: 'bg-sky-50 text-sky-700 border-sky-200',
+const SUBJECT_TONE: Record<MockSubject, BadgeTone> = {
+  korean: 'rose',
+  english: 'blue',
 }
 
 function assignmentPath(a: Assignment): string | null {
@@ -112,7 +123,7 @@ function DoneCircle({
   color?: string
   onToggle?: () => void
 }) {
-  const cls = `shrink-0 h-6 w-6 rounded-full border-2 flex items-center justify-center transition ${
+  const cls = `shrink-0 h-6 w-6 rounded-full border-2 flex items-center justify-center transition ${onToggle ? 'pressable ' : ''}${
     done ? 'border-transparent' : 'border-slate-300'
   }`
   const style = done ? { backgroundColor: color ?? '#2f8a3e' } : undefined
@@ -333,88 +344,106 @@ function StudentAssignments() {
     })
   }
 
-  return (
-    <div className="space-y-6">
-      <header className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-            나의 학습
-          </p>
-          <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
-            과제
-          </h1>
-          {!loading && (
-            <p className="text-xs text-slate-500 mt-1">
-              남은 과제 {totalOpen}개
-              {overallTotal > 0 && (
-                <>
-                  {' · '}오늘 {overallDone}/{overallTotal}
-                </>
+  /** 과제 한 줄 — 완료 원 + 제목(완료면 흐리게) + 마감·메모. 계획표와 카테고리 목록이 같이 쓴다. */
+  function assignmentRow(a: Assignment, color?: string) {
+    const done = isAssignmentDone(a, attempts)
+    const overdue = isOverdue(a) && !done
+    const mockSubj = a.type === 'korean_mock' ? mockSubjectById[a.refId] : undefined
+    return (
+      <ListRow
+        key={a.id}
+        to={assignmentPath(a) ?? undefined}
+        leading={<DoneCircle done={done} color={color} />}
+        title={
+          <span className="flex items-center gap-1.5 min-w-0">
+            {mockSubj && <Badge tone={SUBJECT_TONE[mockSubj]}>{MOCK_SUBJECT_LABEL[mockSubj]}</Badge>}
+            <span className={cx('truncate', done && 'text-slate-400 line-through')}>{a.refTitle}</span>
+          </span>
+        }
+        description={
+          a.dueAt || a.note ? (
+            <>
+              {a.dueAt && (
+                <span className={overdue ? 'text-red-500 font-medium' : ''}>
+                  {formatDate(a.dueAt)}까지{overdue && ' · 지남'}
+                </span>
               )}
-            </p>
-          )}
-        </div>
-      </header>
+              {a.dueAt && a.note && ' · '}
+              {a.note}
+            </>
+          ) : undefined
+        }
+      />
+    )
+  }
 
-      {loading && <p className="text-slate-500 text-sm">불러오는 중…</p>}
+  return (
+    <div className="space-y-7 max-w-2xl mx-auto">
+      <PageHeader
+        title="과제"
+        description={
+          loading ? undefined : (
+            <>
+              남은 과제 <span className="font-semibold text-slate-900">{totalOpen}개</span>
+              {overallTotal > 0 && <span className="tabular-nums"> · 완료 {overallDone}/{overallTotal}</span>}
+            </>
+          )
+        }
+      />
+
+      {loading && <SkeletonList rows={4} />}
 
       {/* 학습 계획표 캘린더 (마감일 기준) */}
       {!loading && (
-        <section className="space-y-3">
-          <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+        <div className="space-y-5">
+          <Card className="px-3 py-4 sm:px-5">
+            <div className="flex items-center justify-between px-1 pb-3">
               <button
                 type="button"
                 onClick={() => shiftMonth(-1)}
-                className="rounded-md px-2 py-1 text-slate-500 hover:bg-slate-100"
+                className="pressable h-10 w-10 inline-flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 active:bg-slate-100"
                 aria-label="이전 달"
               >
-                ‹
+                <ChevronIcon dir="left" />
               </button>
-              <div className="text-center leading-tight">
-                <p className="text-[11px] text-slate-400">{cursor.year}년</p>
-                <h2 className="text-sm font-semibold text-slate-900">
-                  {cursor.monthIndex + 1}월
-                </h2>
-              </div>
+              <h2 className="text-[17px] font-bold text-slate-900 tabular-nums">
+                {cursor.year}년 {cursor.monthIndex + 1}월
+              </h2>
               <button
                 type="button"
                 onClick={() => shiftMonth(1)}
-                className="rounded-md px-2 py-1 text-slate-500 hover:bg-slate-100"
+                className="pressable h-10 w-10 inline-flex items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 active:bg-slate-100"
                 aria-label="다음 달"
               >
-                ›
+                <ChevronIcon dir="right" />
               </button>
             </div>
 
-            <div className="grid grid-cols-7 text-center text-[10px] sm:text-xs font-medium text-slate-500 border-b border-slate-100">
+            <div className="grid grid-cols-7 text-center text-[12px] font-medium text-slate-400 pb-1">
               {WEEKDAY_LABELS.map((d, i) => (
-                <div
-                  key={d}
-                  className={`py-1.5 ${i === 0 ? 'text-red-500' : i === 6 ? 'text-sky-500' : ''}`}
-                >
+                <div key={d} className={cx('py-1', i === 0 && 'text-red-400', i === 6 && 'text-sky-500')}>
                   {d}
                 </div>
               ))}
             </div>
 
-            <div className="grid grid-cols-7">
+            <div className="grid grid-cols-7 gap-y-1">
               {monthCells.map((c, i) => {
                 const isToday = c.iso === today
                 const isSelected = c.iso === selectedDateISO
                 const status = dayStatus(c.iso)
                 const dow = i % 7
                 const numCls = isSelected
-                  ? 'bg-brand-600 text-white'
+                  ? 'bg-slate-900 text-white'
                   : status === 'allDone'
                     ? 'bg-brand-100 text-brand-700'
                     : status === 'incomplete'
-                      ? 'bg-red-100 text-red-600'
+                      ? 'bg-red-50 text-red-500'
                       : c.inMonth
                         ? dow === 0
-                          ? 'text-red-500'
+                          ? 'text-red-400'
                           : dow === 6
-                            ? 'text-sky-600'
+                            ? 'text-sky-500'
                             : 'text-slate-700'
                         : 'text-slate-300'
                 return (
@@ -422,14 +451,16 @@ function StudentAssignments() {
                     key={c.iso + i}
                     type="button"
                     onClick={() => setSelectedDateISO(c.iso)}
-                    className={`min-h-[44px] sm:min-h-[52px] border-r border-b border-slate-100 flex items-center justify-center ${
-                      i % 7 === 6 ? 'border-r-0' : ''
-                    } ${!c.inMonth ? 'bg-slate-50/50' : 'hover:bg-slate-50'}`}
+                    aria-pressed={isSelected}
+                    aria-label={`${c.iso}${status === 'incomplete' ? ', 남은 과제 있음' : status === 'allDone' ? ', 과제 완료' : ''}`}
+                    className="pressable h-11 sm:h-12 flex items-center justify-center rounded-xl"
                   >
                     <span
-                      className={`inline-flex items-center justify-center h-7 w-7 rounded-full text-xs font-semibold ${numCls} ${
-                        isToday && !isSelected ? 'ring-1 ring-slate-300' : ''
-                      }`}
+                      className={cx(
+                        'inline-flex items-center justify-center h-9 w-9 rounded-full text-[14px] font-semibold tabular-nums',
+                        numCls,
+                        isToday && !isSelected && 'ring-2 ring-slate-900/15',
+                      )}
                     >
                       {c.day}
                     </span>
@@ -437,63 +468,18 @@ function StudentAssignments() {
                 )
               })}
             </div>
-          </div>
+          </Card>
 
-          <div className="space-y-2">
-            <p className="text-center text-[11px] font-medium text-slate-400">
-              학습 계획 · {fmtDayHeading(selectedDateISO)}
-            </p>
-            {selectedDayAsn.length === 0 ? (
-              <p className="text-xs text-slate-400 py-5 text-center rounded-xl border border-dashed border-slate-200">
-                이 날 마감인 과제가 없습니다.
-              </p>
-            ) : (
-              <ul className="space-y-2">
-                {selectedDayAsn.map((a) => {
-                  const done = isAssignmentDone(a, attempts)
-                  const path = assignmentPath(a)
-                  const inner = (
-                    <>
-                      <span
-                        className={`shrink-0 h-5 w-5 rounded-full border-2 flex items-center justify-center ${
-                          done ? 'bg-brand-600 border-brand-600' : 'border-slate-300'
-                        }`}
-                      >
-                        {done && (
-                          <span className="h-2 w-2 rounded-full bg-white" aria-hidden />
-                        )}
-                      </span>
-                      <p
-                        className={`flex-1 min-w-0 text-sm truncate ${
-                          done ? 'text-slate-400 line-through' : 'text-slate-900'
-                        }`}
-                      >
-                        {a.refTitle}
-                      </p>
-                      {path && <span className="text-slate-300 text-lg shrink-0">→</span>}
-                    </>
-                  )
-                  return (
-                    <li key={a.id}>
-                      {path ? (
-                        <Link
-                          to={path}
-                          className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 hover:bg-slate-50"
-                        >
-                          {inner}
-                        </Link>
-                      ) : (
-                        <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
-                          {inner}
-                        </div>
-                      )}
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-          </div>
-        </section>
+          <Section title={fmtDayHeading(selectedDateISO)} description="이 날 마감인 과제">
+            <Card padded={false}>
+              {selectedDayAsn.length === 0 ? (
+                <EmptyState title="이 날 마감인 과제가 없어요" className="py-8" />
+              ) : (
+                selectedDayAsn.map((a) => assignmentRow(a))
+              )}
+            </Card>
+          </Section>
+        </div>
       )}
 
       {!loading &&
@@ -509,142 +495,85 @@ function StudentAssignments() {
           const totalCount = items.length + (isEtc ? todos.length : 0)
 
           return (
-            <section key={cat.key} className="space-y-2">
-              <div className="flex items-center gap-2">
-                <span
-                  className="inline-block h-2.5 w-2.5 rounded-full"
-                  style={{ backgroundColor: cat.color }}
-                  aria-hidden
-                />
-                <h2 className="text-sm font-semibold text-slate-800">{cat.label}</h2>
-                <span className="text-xs text-slate-400">
-                  {doneCount}/{totalCount}
+            <Section
+              key={cat.key}
+              title={
+                <span className="inline-flex items-center gap-2">
+                  <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: cat.color }} aria-hidden />
+                  {cat.label}
                 </span>
-              </div>
-
-              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden divide-y divide-slate-100">
-                {items.map((a) => {
-                  const done = isAssignmentDone(a, attempts)
-                  const overdue = isOverdue(a) && !done
-                  const path = assignmentPath(a)
-                  const mockSubj =
-                    a.type === 'korean_mock' ? mockSubjectById[a.refId] : undefined
-                  const inner = (
-                    <>
-                      <DoneCircle done={done} color={cat.color} />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          {mockSubj && (
-                            <span
-                              className={`shrink-0 inline-block rounded-full text-[10px] font-medium px-1.5 py-0.5 border ${SUBJECT_BADGE_CLASS[mockSubj]}`}
-                            >
-                              {MOCK_SUBJECT_LABEL[mockSubj]}
-                            </span>
-                          )}
-                          <p
-                            className={`text-sm truncate ${
-                              done ? 'text-slate-400 line-through' : 'text-slate-900'
-                            }`}
-                          >
-                            {a.refTitle}
-                          </p>
-                        </div>
-                        {(a.dueAt || a.note) && (
-                          <p className="text-[11px] text-slate-500 mt-0.5 truncate">
-                            {a.dueAt && (
-                              <span className={overdue ? 'text-red-600 font-medium' : ''}>
-                                마감 {formatDate(a.dueAt)}
-                                {overdue && ' (지남)'}
-                              </span>
-                            )}
-                            {a.dueAt && a.note && ' · '}
-                            {a.note}
-                          </p>
-                        )}
-                      </div>
-                      {path && <span className="text-slate-300 text-lg shrink-0">→</span>}
-                    </>
-                  )
-                  return (
-                    <div key={a.id}>
-                      {path ? (
-                        <Link
-                          to={path}
-                          className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50"
-                        >
-                          {inner}
-                        </Link>
-                      ) : (
-                        <div className="flex items-center gap-3 px-4 py-3">{inner}</div>
-                      )}
-                    </div>
-                  )
-                })}
+              }
+              action={<span className="tabular-nums">{doneCount}/{totalCount}</span>}
+            >
+              <Card padded={false}>
+                {items.map((a) => assignmentRow(a, cat.color))}
 
                 {/* 기타: 학생 개인 할 일 (직접 추가/완료) */}
                 {isEtc &&
                   sortedTodos.map((t) => (
-                    <div key={t.id} className="flex items-center gap-3 px-4 py-3 group">
-                      <DoneCircle
-                        done={t.done}
-                        color={etcMeta?.color ?? cat.color}
-                        onToggle={() => toggleTodo(t)}
-                      />
-                      <p
-                        className={`min-w-0 flex-1 text-sm truncate ${
-                          t.done ? 'text-slate-400 line-through' : 'text-slate-900'
-                        }`}
-                      >
-                        {t.text}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => removeTodo(t)}
-                        className="shrink-0 text-slate-300 hover:text-red-500 text-sm px-1"
-                        aria-label="삭제"
-                      >
-                        ✕
-                      </button>
-                    </div>
+                    <ListRow
+                      key={t.id}
+                      leading={
+                        <DoneCircle
+                          done={t.done}
+                          color={etcMeta?.color ?? cat.color}
+                          onToggle={() => toggleTodo(t)}
+                        />
+                      }
+                      title={<span className={cx(t.done && 'text-slate-400 line-through')}>{t.text}</span>}
+                      trailing={
+                        <button
+                          type="button"
+                          onClick={() => removeTodo(t)}
+                          className="pressable -mr-2 h-9 w-9 inline-flex items-center justify-center rounded-full text-slate-300 hover:text-red-500 hover:bg-red-50 active:bg-red-50"
+                          aria-label={`‘${t.text}’ 삭제`}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
+                            <path d="M6 6l12 12M18 6L6 18" />
+                          </svg>
+                        </button>
+                      }
+                    />
                   ))}
 
                 {isEtc && items.length === 0 && todos.length === 0 && (
-                  <p className="px-4 py-3 text-xs text-slate-400">
-                    직접 할 일을 추가해 보세요.
-                  </p>
+                  <p className="px-5 pt-3 pb-1 text-[13px] text-slate-500">직접 할 일을 추가해 보세요.</p>
                 )}
 
                 {/* 기타: 추가 입력 */}
                 {isEtc && (
-                  <form
-                    onSubmit={handleAddTodo}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-slate-50/60"
-                  >
-                    <span className="shrink-0 h-5 w-5 rounded-full border-2 border-dashed border-slate-300 flex items-center justify-center text-slate-400 text-sm">
-                      +
-                    </span>
+                  <form onSubmit={handleAddTodo} className="flex items-center gap-2 px-3 py-2">
                     <input
                       value={newTodo}
                       onChange={(e) => setNewTodo(e.target.value)}
                       placeholder="할 일 추가"
-                      className="flex-1 bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
+                      aria-label="할 일 추가"
+                      className={inputClass('h-11')}
                     />
                     {newTodo.trim() && (
                       <button
                         type="submit"
                         disabled={adding}
-                        className="shrink-0 rounded-md bg-slate-900 text-white text-xs font-medium px-3 py-1.5 hover:bg-slate-800 disabled:opacity-50"
+                        className="pressable shrink-0 h-11 px-4 rounded-xl bg-slate-900 text-white text-[14px] font-semibold disabled:opacity-50"
                       >
                         추가
                       </button>
                     )}
                   </form>
                 )}
-              </div>
-            </section>
+              </Card>
+            </Section>
           )
         })}
     </div>
+  )
+}
+
+function ChevronIcon({ dir }: { dir: 'left' | 'right' }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d={dir === 'left' ? 'M15 18l-6-6 6-6' : 'M9 6l6 6-6 6'} />
+    </svg>
   )
 }
 
@@ -685,18 +614,8 @@ function AdminAssignEntry() {
   }, [students, q])
 
   return (
-    <div className="space-y-5">
-      <header>
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-          관리
-        </p>
-        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
-          과제 부여
-        </h1>
-        <p className="text-xs text-slate-500 mt-1">
-          학생을 선택하면 그 학생의 과제 부여·현황 화면으로 이동합니다.
-        </p>
-      </header>
+    <div className="space-y-5 max-w-2xl mx-auto">
+      <PageHeader title="과제 부여" description="학생을 고르면 그 학생의 과제 부여·현황 화면으로 가요." />
 
       {students.length > 5 && (
         <input
@@ -704,36 +623,28 @@ function AdminAssignEntry() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="학생 이름·학교 검색"
-          className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          aria-label="학생 검색"
+          className={inputClass('bg-white')}
         />
       )}
 
       {loading ? (
-        <p className="text-slate-500 text-sm">불러오는 중…</p>
-      ) : filtered.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
-          활성 학생이 없습니다.
-        </div>
+        <SkeletonList rows={5} />
       ) : (
-        <div className="rounded-xl border border-slate-200 bg-white overflow-hidden divide-y divide-slate-100">
-          {filtered.map((s) => (
-            <Link
-              key={s.id}
-              to={`/admin/students/${s.id}`}
-              className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50"
-            >
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-slate-900 truncate">
-                  {s.displayName}
-                  {s.school ? (
-                    <span className="text-slate-400 font-normal"> · {s.school}</span>
-                  ) : null}
-                </p>
-              </div>
-              <span className="text-slate-300 text-lg shrink-0">→</span>
-            </Link>
-          ))}
-        </div>
+        <Card padded={false}>
+          {filtered.length === 0 ? (
+            <EmptyState title={q.trim() ? '검색 결과가 없어요' : '활성 학생이 없어요'} />
+          ) : (
+            filtered.map((s) => (
+              <ListRow
+                key={s.id}
+                to={`/admin/students/${s.id}`}
+                title={s.displayName}
+                description={s.school || undefined}
+              />
+            ))
+          )}
+        </Card>
       )}
     </div>
   )

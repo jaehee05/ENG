@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { cx } from './cx'
 
-export type BadgeTone = 'brand' | 'gray' | 'amber' | 'red' | 'blue' | 'dark'
+export type BadgeTone = 'brand' | 'gray' | 'amber' | 'red' | 'blue' | 'rose' | 'orange' | 'dark'
 
 const TONE: Record<BadgeTone, string> = {
   brand: 'bg-brand-50 text-brand-700',
@@ -9,6 +9,9 @@ const TONE: Record<BadgeTone, string> = {
   amber: 'bg-amber-50 text-amber-700',
   red: 'bg-red-50 text-red-600',
   blue: 'bg-sky-50 text-sky-700',
+  // 과목 색 — 국어(rose)·영어(blue). 빨강(red)은 오답·지남 같은 경고에만 쓴다.
+  rose: 'bg-rose-50 text-rose-700',
+  orange: 'bg-orange-50 text-orange-700',
   dark: 'bg-slate-900 text-white',
 }
 
