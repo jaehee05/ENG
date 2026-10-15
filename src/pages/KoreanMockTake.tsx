@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Capacitor } from '@capacitor/core'
+import { CapacitorUpdater } from '@capgo/capacitor-updater'
 import { useAuth } from '../contexts/useAuth'
 import { useBackNav } from '../contexts/useBackNav'
 import { readOmr } from '../lib/api'
-import { OMR_PHOTO_ENABLED } from '../lib/features'
+import { isVersionAtLeast, OMR_MIN_NATIVE_VERSION, OMR_PHOTO_ENABLED } from '../lib/features'
 import { createKoreanMockAttempt, getKoreanMock } from '../lib/firestore'
 import { resizeImageForUpload } from '../lib/imageResize'
 import {
@@ -166,8 +168,19 @@ export function KoreanMockTake() {
   const [needsCheck, setNeedsCheck] = useState<Set<number>>(() => new Set())
   /** 이번 응시에서 판독 결과를 한 번이라도 적용했는지 — 응시 기록의 answerSource. */
   const [usedOmr, setUsedOmr] = useState(false)
+  // 앱은 카메라 권한 문구가 든 네이티브 빌드에서만 — 그 전 빌드에서 카메라를 열면
+  // 앱이 죽는다(features.ts). 버전을 알기 전까지는 감춰 둔다.
+  const [nativeSupportsOmr, setNativeSupportsOmr] = useState(
+    () => !Capacitor.isNativePlatform(),
+  )
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
+    CapacitorUpdater.current()
+      .then((r) => setNativeSupportsOmr(isVersionAtLeast(r.native, OMR_MIN_NATIVE_VERSION)))
+      .catch(() => setNativeSupportsOmr(false))
+  }, [])
   // 개발 서버에서는 스위치와 상관없이 보여, 가짜 응답(?omrMock=)으로 흐름을 볼 수 있게 한다.
-  const omrEnabled = OMR_PHOTO_ENABLED || import.meta.env.DEV
+  const omrEnabled = (OMR_PHOTO_ENABLED && nativeSupportsOmr) || import.meta.env.DEV
 
   useEffect(() => {
     if (!id) return

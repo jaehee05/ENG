@@ -15,11 +15,29 @@
 export const WORDBOOK_ENABLED = false
 
 /**
- * 모의고사 응시 화면의 ‘OMR 사진으로 불러오기’ (2026-10-15 추가, 꺼 둠).
+ * 모의고사 응시 화면의 ‘OMR 사진으로 불러오기’ (2026-10-15 켬).
  *
- * 사진을 고를 때 iOS 가 카메라·사진 보관함 권한 문구(Info.plist)를 요구하는데,
- * 그 문구가 없는 앱에서 카메라를 열면 앱이 그대로 죽는다. Info.plist 는 네이티브
- * 쪽이라 Capgo OTA 로는 안 나가고 앱스토어 빌드로만 나간다. 그 빌드가 학생들
- * 기기에 깔린 뒤에 켠다. 개발 서버에서는 이 값과 상관없이 보인다.
+ * 사진을 고를 때 iOS 가 카메라 권한 문구(Info.plist)를 요구하는데, 그 문구가 없는
+ * 앱에서 카메라를 열면 앱이 그대로 죽는다. Info.plist 는 네이티브 쪽이라 Capgo
+ * OTA 로는 안 나가고 앱스토어 빌드로만 나간다. 그래서 웹은 바로 켜고, 앱은
+ * 문구가 들어간 빌드(OMR_MIN_NATIVE_VERSION 이상)에서만 보인다.
+ * 개발 서버에서는 이 값과 상관없이 보인다.
  */
-export const OMR_PHOTO_ENABLED = false
+export const OMR_PHOTO_ENABLED = true
+
+/**
+ * 카메라·사진 권한 문구가 처음 들어간 네이티브 앱 버전(CFBundleShortVersionString).
+ * 1.0 에는 문구가 없다 — 그 앱에서 버튼을 보이면 카메라를 고르는 순간 죽는다.
+ */
+export const OMR_MIN_NATIVE_VERSION = '1.1'
+
+/** '1.10' > '1.9' 처럼 점으로 나눈 숫자끼리 비교한다. */
+export function isVersionAtLeast(version: string, min: string): boolean {
+  const a = version.split('.').map((n) => parseInt(n, 10) || 0)
+  const b = min.split('.').map((n) => parseInt(n, 10) || 0)
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const d = (a[i] ?? 0) - (b[i] ?? 0)
+    if (d !== 0) return d > 0
+  }
+  return true
+}
