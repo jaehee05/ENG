@@ -14,62 +14,22 @@ import {
 import { MyAttemptsBox } from '../components/MyAttemptsBox'
 import { highlightHead } from '../lib/highlightWord'
 import { isVisibleToStudent, type Attempt, type VocabSet } from '../lib/types'
+import {
+  Badge,
+  BottomCTA,
+  Button,
+  Card,
+  ListRow,
+  ScoreValue,
+  Section,
+  SkeletonList,
+  buttonClass,
+  confirm,
+  cx,
+  inputClass,
+} from '../components/ui'
 
 const renderExampleWithBoldWord = highlightHead
-
-function StartBox({
-  total,
-  testUsed,
-  testLimit,
-  href,
-}: {
-  total: number
-  testUsed: number
-  testLimit: number | null
-  href: string
-}) {
-  const remaining = testLimit !== null ? Math.max(0, testLimit - testUsed) : null
-  const testBlocked = remaining !== null && remaining === 0
-
-  return (
-    <div className="rounded-lg border border-brand-200 bg-brand-50/40 p-4 space-y-3">
-      <div className="flex items-baseline justify-between gap-3 flex-wrap">
-        <p className="text-sm text-slate-600">전체 {total}단어</p>
-        {testLimit !== null && (
-          <p className="text-sm">
-            <span className="text-slate-500">응시:</span>{' '}
-            <strong className="text-slate-900">{testUsed}회 사용</strong>
-            {' · '}
-            <strong className={remaining === 0 ? 'text-red-600' : 'text-brand-700'}>
-              {remaining}회 남음
-            </strong>
-            <span className="text-slate-500"> / 총 {testLimit}회</span>
-          </p>
-        )}
-      </div>
-      <div className="flex gap-2 flex-wrap">
-        {testBlocked ? (
-          <span
-            className="rounded-md bg-slate-200 text-slate-500 text-sm font-medium px-5 py-2.5 cursor-not-allowed"
-            title="응시 횟수를 모두 사용했습니다."
-          >
-            응시 횟수 초과
-          </span>
-        ) : (
-          <Link
-            to={href}
-            className="rounded-md bg-brand-600 text-white text-sm font-semibold px-5 py-2.5 hover:bg-brand-700 transition"
-          >
-            시험 보기
-            {remaining !== null && (
-              <span className="ml-1 font-normal">(남은 {remaining}회)</span>
-            )}
-          </Link>
-        )}
-      </div>
-    </div>
-  )
-}
 
 export function VocabDetail() {
   const { id } = useParams<{ id: string }>()
@@ -131,12 +91,13 @@ export function VocabDetail() {
    */
   async function handleDeleteAttempt(a: Attempt) {
     if (
-      !window.confirm(
-        `${a.studentName ? `${a.studentName} · ` : ''}${formatDate(a.createdAt) || '날짜 없음'} 응시 기록(${a.correct}/${a.total})을 삭제하시겠습니까?\n` +
+      !(await confirm(
+        `${a.studentName ? `${a.studentName} · ` : ''}${formatDate(a.createdAt) || '날짜 없음'} 응시 기록(${a.correct}/${a.total})을 삭제할까요?\n` +
           (a.practice
-            ? '연습 기록이라 응시 횟수에는 영향이 없습니다.'
-            : '응시 횟수 제한이 있으면 한 번 더 풀 수 있게 됩니다.'),
-      )
+            ? '연습 기록이라 응시 횟수에는 영향이 없어요.'
+            : '응시 횟수 제한이 있으면 한 번 더 풀 수 있게 돼요.'),
+        { danger: true, confirmText: '삭제' },
+      ))
     )
       return
     setDeletingAttemptId(a.id)
@@ -179,9 +140,10 @@ export function VocabDetail() {
   async function handleDelete() {
     if (!set) return
     if (
-      !window.confirm(
-        `"${set.title}" 시험지를 삭제하시겠습니까?\n이 시험지의 학생 응시 기록은 그대로 남습니다.\n교재에서 만든 DAY 시험지면 진행도도 함께 되돌아가, 같은 번호로 다시 만들 수 있습니다.`,
-      )
+      !(await confirm(
+        `‘${set.title}’ 시험지를 삭제할까요?\n학생 응시 기록은 그대로 남아요. 교재에서 만든 DAY 시험지면 진행도도 함께 되돌아가, 같은 번호로 다시 만들 수 있어요.`,
+        { danger: true, confirmText: '삭제' },
+      ))
     )
       return
     setDeleting(true)
@@ -202,94 +164,82 @@ export function VocabDetail() {
     label: set?.seriesId ? '교재' : undefined,
   })
 
-  if (loading) return <p className="text-slate-500 text-sm">불러오는 중...</p>
-  if (error) return <p className="text-red-600 text-sm">{error}</p>
+  if (loading) return <SkeletonList rows={4} className="max-w-2xl mx-auto" />
+  if (error) return <p className="text-[15px] text-red-500 px-1">{error}</p>
   if (!set) return null
 
+  const testUsed = myAttempts.filter((a) => !a.practice).length
+  const testLimit = isAdmin ? null : (set.maxAttempts ?? null)
+  const remaining = testLimit !== null ? Math.max(0, testLimit - testUsed) : null
+  const testBlocked = remaining === 0
+
   return (
-    <div className="space-y-5 max-w-3xl mx-auto">
-      <header className="flex items-start justify-between gap-3 flex-wrap">
-        <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-            단어 시험지
-          </p>
-          {editingTitle ? (
-            <div className="flex items-center gap-2 flex-wrap">
-              <input
-                type="text"
-                value={titleDraft}
-                onChange={(e) => setTitleDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') saveTitle()
-                  if (e.key === 'Escape') setEditingTitle(false)
-                }}
-                autoFocus
-                className="flex-1 min-w-[10rem] rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-lg font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500"
-              />
-              <button
-                type="button"
-                onClick={saveTitle}
-                disabled={savingTitle || !titleDraft.trim()}
-                className="rounded-md bg-slate-900 text-white text-xs font-medium px-3 py-1.5 hover:bg-slate-800 disabled:opacity-50"
-              >
-                {savingTitle ? '저장 중…' : '저장'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setEditingTitle(false)}
-                disabled={savingTitle}
-                className="text-xs text-slate-500 hover:text-slate-900 px-1"
-              >
-                취소
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
-                {set.title}
-              </h1>
-              {isAdmin && (
-                <button
-                  type="button"
-                  onClick={startTitleEdit}
-                  className="text-xs text-slate-500 hover:text-slate-900 px-1"
-                >
-                  편집
-                </button>
-              )}
-            </div>
-          )}
-          <p className="text-xs text-slate-500 mt-1">
-            {set.words.length}단어 · {set.createdByName}
-          </p>
-        </div>
-        {isAdmin && !editingTitle && (
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={deleting}
-            className="text-xs text-slate-400 hover:text-red-600 px-1 disabled:opacity-50"
-          >
-            {deleting ? '삭제 중…' : '삭제'}
-          </button>
+    <div className="space-y-6 max-w-2xl mx-auto">
+      <header className="px-1 space-y-1.5">
+        {editingTitle ? (
+          <div className="flex items-center gap-2 flex-wrap">
+            <input
+              type="text"
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') saveTitle()
+                if (e.key === 'Escape') setEditingTitle(false)
+              }}
+              autoFocus
+              aria-label="시험지 제목"
+              className={inputClass('flex-1 min-w-[10rem] bg-white text-[18px] font-bold')}
+            />
+            <Button size="sm" onClick={saveTitle} loading={savingTitle} disabled={!titleDraft.trim()}>
+              저장
+            </Button>
+            <Button size="sm" variant="text" onClick={() => setEditingTitle(false)} disabled={savingTitle}>
+              취소
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-start justify-between gap-3">
+            <h1 className="min-w-0 text-[24px] sm:text-[26px] font-bold text-slate-900 tracking-tight leading-tight">
+              {set.title}
+            </h1>
+            {isAdmin && (
+              <div className="shrink-0 flex items-center">
+                <Button size="sm" variant="text" onClick={startTitleEdit}>
+                  제목 편집
+                </Button>
+                <Button size="sm" variant="text" className="text-red-500" onClick={handleDelete} loading={deleting}>
+                  삭제
+                </Button>
+              </div>
+            )}
+          </div>
         )}
+        <p className="text-[15px] text-slate-500">
+          {set.words.length}단어 · {set.createdByName}
+        </p>
       </header>
 
-      <StartBox
-        total={set.words.length}
-        testUsed={myAttempts.filter((a) => !a.practice).length}
-        testLimit={isAdmin ? null : (set.maxAttempts ?? null)}
-        href={`/vocab/${set.id}/take`}
-      />
+      {/* 응시 횟수 — 제한이 있을 때만 숫자를 크게 */}
+      {testLimit !== null && (
+        <Card className="grid grid-cols-2">
+          <div>
+            <p className="text-[13px] text-slate-500">남은 응시</p>
+            <p className={cx('text-[28px] font-bold tabular-nums leading-tight mt-1', remaining === 0 ? 'text-red-500' : 'text-slate-900')}>
+              {remaining}회
+            </p>
+          </div>
+          <div>
+            <p className="text-[13px] text-slate-500">사용 / 전체</p>
+            <p className="text-[28px] font-bold tabular-nums leading-tight mt-1 text-slate-900">
+              {testUsed}<span className="text-slate-400 text-[20px]"> / {testLimit}</span>
+            </p>
+          </div>
+        </Card>
+      )}
 
-      <div className="flex justify-end">
-        <Link
-          to={`/vocab/${set.id}/sheet`}
-          className="text-sm text-slate-500 hover:text-slate-900 underline"
-        >
-          시험지로 보기 / 인쇄
-        </Link>
-      </div>
+      <Card padded={false}>
+        <ListRow to={`/vocab/${set.id}/sheet`} title="시험지로 보기·인쇄" />
+      </Card>
 
       {myAttempts.length > 0 && (
         <MyAttemptsBox
@@ -301,128 +251,94 @@ export function VocabDetail() {
       )}
 
       {isAdmin && allAttempts.length > 0 && (
-        <section className="rounded-lg border border-slate-200 bg-white overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-100 flex items-baseline gap-2 flex-wrap">
-            <h2 className="text-sm font-medium text-slate-900">학생 응시 기록</h2>
-            <span className="text-xs text-slate-500">{allAttempts.length}건</span>
-          </div>
-          <ul className="divide-y divide-slate-100">
-            {allAttempts.map((a) => {
-              const ratio = a.total > 0 ? Math.round((a.correct / a.total) * 100) : 0
-              return (
-                <li
-                  key={a.id}
-                  className="px-4 py-2.5 flex items-center gap-2.5 text-sm"
-                >
-                  <Link
-                    to={`/vocab/student/${a.studentUid}`}
-                    className="min-w-0 truncate font-medium text-slate-800 hover:underline"
-                  >
-                    {a.studentName || '(이름 없음)'}
-                  </Link>
-                  {a.practice && (
-                    <span className="shrink-0 text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
-                      연습
+        <Section title="학생 응시 기록" action={<span className="tabular-nums">{allAttempts.length}건</span>}>
+          <Card padded={false}>
+            {allAttempts.map((a) => (
+              <div key={a.id} className="flex items-center gap-1 pr-3">
+                <ListRow
+                  className="flex-1 min-w-0"
+                  to={`/vocab/${set.id}/result/${a.id}`}
+                  chevron={false}
+                  title={
+                    <span className="inline-flex items-center gap-1.5 max-w-full">
+                      <span className="truncate">{a.studentName || '(이름 없음)'}</span>
+                      {a.practice && <Badge tone="amber">연습</Badge>}
                     </span>
-                  )}
-                  <span className="ml-auto shrink-0 text-[11px] text-slate-500">
-                    {formatDate(a.createdAt)}
-                  </span>
-                  <span className="shrink-0 text-xs text-slate-600">
-                    {a.correct}/{a.total}
-                  </span>
-                  <span
-                    className={`shrink-0 text-sm font-semibold ${ratio >= 80 ? 'text-brand-700' : ratio >= 50 ? 'text-slate-700' : 'text-red-600'}`}
-                  >
-                    {ratio}%
-                  </span>
-                  <Link
-                    to={`/vocab/${set.id}/result/${a.id}`}
-                    className="shrink-0 text-xs text-slate-500 hover:text-slate-900 underline underline-offset-2"
-                  >
-                    보기
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteAttempt(a)}
-                    disabled={deletingAttemptId === a.id}
-                    className="shrink-0 text-xs text-slate-400 hover:text-red-600 underline underline-offset-2 disabled:opacity-50"
-                  >
-                    {deletingAttemptId === a.id ? '삭제 중…' : '삭제'}
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-        </section>
+                  }
+                  description={formatDate(a.createdAt)}
+                  trailing={<ScoreValue correct={a.correct} total={a.total} />}
+                />
+                <Link
+                  to={`/vocab/student/${a.studentUid}`}
+                  className="pressable shrink-0 h-9 px-2.5 inline-flex items-center rounded-xl text-[13px] font-medium text-slate-500 hover:bg-slate-100 active:bg-slate-100"
+                >
+                  학생
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteAttempt(a)}
+                  disabled={deletingAttemptId === a.id}
+                  className="pressable shrink-0 h-9 px-2.5 rounded-xl text-[13px] font-medium text-slate-400 hover:text-red-500 hover:bg-red-50 active:bg-red-50 disabled:opacity-50"
+                >
+                  {deletingAttemptId === a.id ? '삭제 중' : '삭제'}
+                </button>
+              </div>
+            ))}
+          </Card>
+        </Section>
       )}
 
-      <ul className="space-y-4">
-        {set.words.map((w, i) => {
-          const senses =
-            w.senses && w.senses.length > 0
-              ? w.senses
-              : [
-                  {
-                    pos: w.pos,
-                    ko: w.ko,
-                    definitionEn: w.definitionEn,
-                    synonyms: w.synonyms,
-                    examples:
-                      w.example || w.exampleKo
-                        ? [{ en: w.example ?? '', ko: w.exampleKo }]
-                        : [],
-                  },
-                ]
-          return (
-            <li
-              key={i}
-              className="rounded-lg border border-slate-200 bg-white overflow-hidden"
-            >
-              <div className="px-5 pt-4 pb-2 border-b border-slate-100">
-                <p className="text-xs font-mono text-slate-400 tracking-wider">
-                  {String(i + 1).padStart(4, '0')}
-                </p>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 px-5 py-4">
-                <div className="sm:col-span-3">
-                  <p className="text-2xl font-bold text-slate-900 leading-tight">{w.en}</p>
-                  {w.ipa && (
-                    <p className="text-sm text-slate-500 mt-1">[{w.ipa}]</p>
-                  )}
+      <Section title={`단어 ${set.words.length}개`}>
+        <ul className="space-y-3">
+          {set.words.map((w, i) => {
+            const senses =
+              w.senses && w.senses.length > 0
+                ? w.senses
+                : [
+                    {
+                      pos: w.pos,
+                      ko: w.ko,
+                      definitionEn: w.definitionEn,
+                      synonyms: w.synonyms,
+                      examples:
+                        w.example || w.exampleKo
+                          ? [{ en: w.example ?? '', ko: w.exampleKo }]
+                          : [],
+                    },
+                  ]
+            return (
+              <li key={i} className="rounded-card bg-white p-5">
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="text-[22px] font-bold text-slate-900 leading-tight break-words">{w.en}</p>
+                  <span className="shrink-0 text-[12px] text-slate-300 tabular-nums">{i + 1}</span>
                 </div>
-                <div className="sm:col-span-9 space-y-3">
+                {w.ipa && <p className="text-[14px] text-slate-500 mt-1">[{w.ipa}]</p>}
+                <div className="mt-3 space-y-3">
                   {senses.map((s, si) => (
-                    <div key={si} className="space-y-1.5">
-                      <p className="text-sm leading-relaxed text-slate-800">
-                        {s.pos && (
-                          <span className="font-medium text-slate-700 mr-2">{s.pos}</span>
-                        )}
-                        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-slate-900 text-white text-[10px] font-bold mr-1.5 align-middle">
-                          {si + 1}
-                        </span>
-                        <span className="font-semibold text-slate-900">{s.ko}</span>
-                        {s.definitionEn && (
-                          <span className="text-slate-600"> [{s.definitionEn}]</span>
-                        )}
-                        {s.synonyms && s.synonyms.length > 0 && (
-                          <span className="text-slate-500">
-                            {' '}= {s.synonyms.join(', ')}
+                    <div key={si} className="space-y-2">
+                      <p className="text-[15px] leading-relaxed text-slate-800">
+                        {senses.length > 1 && (
+                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-slate-900 text-white text-[11px] font-bold mr-1.5 align-[1px]">
+                            {si + 1}
                           </span>
+                        )}
+                        {s.pos && <span className="font-medium text-slate-500 mr-1.5">{s.pos}</span>}
+                        <span className="font-semibold text-slate-900">{s.ko}</span>
+                        {s.definitionEn && <span className="text-slate-500"> [{s.definitionEn}]</span>}
+                        {s.synonyms && s.synonyms.length > 0 && (
+                          <span className="text-slate-500"> = {s.synonyms.join(', ')}</span>
                         )}
                       </p>
                       {s.examples && s.examples.length > 0 && (
-                        <div className="rounded-md bg-slate-100 px-4 py-3 space-y-2">
+                        <div className="rounded-2xl bg-slate-50 px-4 py-3 space-y-2">
                           {s.examples.map((ex, ei) => (
                             <div key={ei} className="space-y-0.5">
                               {ex.en && (
-                                <p className="text-sm leading-relaxed text-slate-800">
+                                <p className="text-[14px] leading-relaxed text-slate-800">
                                   {renderExampleWithBoldWord(ex.en, w.en)}
                                 </p>
                               )}
-                              {ex.ko && (
-                                <p className="text-sm text-slate-600">{ex.ko}</p>
-                              )}
+                              {ex.ko && <p className="text-[14px] text-slate-500">{ex.ko}</p>}
                             </div>
                           ))}
                         </div>
@@ -430,11 +346,24 @@ export function VocabDetail() {
                     </div>
                   ))}
                 </div>
-              </div>
-            </li>
-          )
-        })}
-      </ul>
+              </li>
+            )
+          })}
+        </ul>
+      </Section>
+
+      {/* 주 행동 — 시험 보기 */}
+      <BottomCTA>
+        {testBlocked ? (
+          <Button size="lg" block disabled>
+            응시 횟수를 모두 썼어요
+          </Button>
+        ) : (
+          <Link to={`/vocab/${set.id}/take`} className={buttonClass({ size: 'lg', block: true })}>
+            시험 보기{remaining !== null && <span className="font-medium opacity-80"> · {remaining}회 남음</span>}
+          </Link>
+        )}
+      </BottomCTA>
     </div>
   )
 }

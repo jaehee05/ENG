@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import {
   formatDate,
@@ -9,59 +9,33 @@ import {
 } from '../lib/firestore'
 import { groupBySeries, visibleSetsFor } from '../lib/vocabGroups'
 import { sheetStatuses, type SheetStatus } from '../lib/vocabStatus'
+import { Card, EmptyState, ListRow, PageHeader, ScoreValue, Section, SkeletonList } from '../components/ui'
 
-/** DAY 한 줄. 응시 전/후 모양이 달라 묶어 둔다. */
+/** DAY 한 줄. 응시 전엔 ›, 응시 후엔 최고 점수. */
 function DayRow({ day, st }: { day: number; st: SheetStatus }) {
-  const rate = st.bestRate
   return (
-    <li>
-      <Link
-        to={`/vocab/${st.set.id}`}
-        className="flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-slate-50 active:bg-slate-100"
-      >
-        <div className="min-w-0 flex items-center gap-3">
-          <span className="shrink-0 inline-flex items-center justify-center min-w-11 rounded-md bg-slate-100 text-slate-700 text-xs font-semibold px-2 py-1">
-            DAY {day}
+    <ListRow
+      to={`/vocab/${st.set.id}`}
+      leading={
+        <span className="inline-flex h-10 min-w-[3.25rem] items-center justify-center rounded-xl bg-slate-100 px-2 text-[13px] font-bold text-slate-700 tabular-nums">
+          DAY {day}
+        </span>
+      }
+      title={
+        <>
+          {st.set.words.length}단어
+          <span className="ml-1.5 text-[13px] font-normal text-slate-400">
+            {st.set.format === 'choice' ? '5지선다' : '주관식'}
           </span>
-          <div className="min-w-0">
-            <p className="text-[15px] font-medium text-slate-900 truncate">
-              {st.set.words.length}단어
-              <span className="ml-1.5 text-xs font-normal text-slate-400">
-                {st.set.format === 'choice' ? '5지선다' : '주관식'}
-              </span>
-            </p>
-            {st.last && (
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                최근 응시 {formatDate(st.last.createdAt)}
-                {st.tries.length > 1 && ` · ${st.tries.length}회`}
-              </p>
-            )}
-          </div>
-        </div>
-        {st.best ? (
-          <span className="shrink-0 text-right">
-            <span
-              className={`block text-sm font-semibold ${
-                rate === null
-                  ? 'text-slate-500'
-                  : rate >= 80
-                    ? 'text-brand-700'
-                    : rate >= 60
-                      ? 'text-amber-700'
-                      : 'text-red-600'
-              }`}
-            >
-              {st.best.correct}/{st.best.total}
-            </span>
-            {rate !== null && (
-              <span className="block text-[10px] text-slate-400">{rate}%</span>
-            )}
-          </span>
-        ) : (
-          <span className="text-slate-300 text-lg shrink-0">→</span>
-        )}
-      </Link>
-    </li>
+        </>
+      }
+      description={
+        st.last
+          ? `최근 응시 ${formatDate(st.last.createdAt)}${st.tries.length > 1 ? ` · ${st.tries.length}회` : ''}`
+          : undefined
+      }
+      trailing={st.best ? <ScoreValue correct={st.best.correct} total={st.best.total} /> : undefined}
+    />
   )
 }
 
@@ -116,51 +90,38 @@ export function VocabSeriesDetail() {
   const todo = useMemo(() => days.filter((d) => d.st.best === null), [days])
   const done = useMemo(() => days.filter((d) => d.st.best !== null), [days])
 
-  if (loading) return <p className="text-slate-500 text-sm">불러오는 중…</p>
-  if (error) return <p className="text-red-600 text-sm">{error}</p>
+  if (loading) return <SkeletonList rows={5} className="max-w-2xl mx-auto" />
+  if (error) return <p className="text-[15px] text-red-500 px-1">{error}</p>
 
   return (
-    <div className="space-y-5 max-w-3xl mx-auto">
-      <header>
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-          교재
-        </p>
-        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
-          {title}
-        </h1>
-        <p className="text-sm text-slate-500 mt-1">
-          전체 {days.length}개 · 응시 {done.length} · 잔여 {todo.length}
-        </p>
-      </header>
+    <div className="space-y-7 max-w-2xl mx-auto">
+      <PageHeader
+        title={title}
+        description={
+          <span className="tabular-nums">
+            전체 {days.length}개 · 응시 {done.length} · 남음 {todo.length}
+          </span>
+        }
+      />
 
-      <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-slate-700">
-          풀어야 할 시험지 ({todo.length})
-        </h2>
-        {todo.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
-            이 교재는 전부 응시했어요.
-          </div>
-        ) : (
-          <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white overflow-hidden">
-            {todo.map((d) => (
-              <DayRow key={d.st.set.id} day={d.day} st={d.st} />
-            ))}
-          </ul>
-        )}
-      </section>
+      <Section title={`풀어야 할 시험지 ${todo.length}`}>
+        <Card padded={false}>
+          {todo.length === 0 ? (
+            <EmptyState title="이 교재는 전부 응시했어요" />
+          ) : (
+            todo.map((d) => <DayRow key={d.st.set.id} day={d.day} st={d.st} />)
+          )}
+        </Card>
+      </Section>
 
       {done.length > 0 && (
-        <section className="space-y-2">
-          <h2 className="text-sm font-semibold text-slate-500">
-            이미 응시한 시험지 ({done.length})
-          </h2>
-          <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-slate-50/60 overflow-hidden">
+        <Section title={`이미 응시한 시험지 ${done.length}`}>
+          <Card padded={false}>
             {done.map((d) => (
               <DayRow key={d.st.set.id} day={d.day} st={d.st} />
             ))}
-          </ul>
-        </section>
+          </Card>
+        </Section>
       )}
     </div>
   )

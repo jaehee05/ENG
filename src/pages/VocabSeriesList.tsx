@@ -10,6 +10,7 @@ import {
 import { groupBySeries, visibleSetsFor, type SeriesGroup } from '../lib/vocabGroups'
 import { sheetStatuses } from '../lib/vocabStatus'
 import type { Attempt, VocabSet } from '../lib/types'
+import { Badge, Card, EmptyState, ListRow, PageHeader, ScoreValue, Section, SkeletonList } from '../components/ui'
 
 interface Row {
   group: SeriesGroup
@@ -78,100 +79,68 @@ export function VocabSeriesList() {
   )
 
   return (
-    <div className="space-y-5 max-w-4xl mx-auto">
-      <header>
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-          학습
-        </p>
-        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
-          단어 시험지
-        </h1>
-        <p className="text-sm text-slate-500 mt-1">
-          교재를 누르면 DAY 시험지가 순서대로 나옵니다.
-        </p>
-      </header>
+    <div className="space-y-7 max-w-2xl mx-auto">
+      <PageHeader title="단어 시험지" description="교재를 누르면 DAY 시험지가 순서대로 나와요." />
 
-      {loading && <p className="text-slate-500 text-sm">불러오는 중…</p>}
-      {error && <p className="text-red-600 text-sm">{error}</p>}
-      {!loading && rows.length === 0 && loose.length === 0 && (
-        <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
-          아직 배정된 시험지가 없어요.
+      {loading && <SkeletonList rows={3} />}
+      {error && <p className="text-[15px] text-red-500 px-1">{error}</p>}
+      {!loading && !error && rows.length === 0 && loose.length === 0 && (
+        <Card padded={false}>
+          <EmptyState title="아직 배정된 시험지가 없어요" description="선생님이 시험지를 배정하면 여기에 나와요." />
+        </Card>
+      )}
+
+      {rows.length > 0 && (
+        <div className="space-y-3">
+          {rows.map(({ group, taken, untaken, nextDay }) => {
+            const pct = group.days.length > 0 ? Math.round((taken / group.days.length) * 100) : 0
+            return (
+              <Link
+                key={group.series.id}
+                to={`/vocab/series/${group.series.id}`}
+                className="pressable block rounded-card bg-white p-5 hover:bg-slate-50 active:bg-slate-100"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 className="text-[17px] font-bold text-slate-900 truncate">{group.series.title}</h2>
+                    <p className="text-[13px] text-slate-500 mt-0.5 tabular-nums">
+                      DAY {group.days.length}개 · 응시 {taken} · 남음 {untaken}
+                    </p>
+                  </div>
+                  {nextDay === null ? (
+                    <Badge tone="brand" size="md">전부 완료</Badge>
+                  ) : (
+                    <Badge tone="dark" size="md">다음 DAY {nextDay}</Badge>
+                  )}
+                </div>
+                {/* 진행 막대 — 몇 DAY 남았는지 한눈에 */}
+                <div className="mt-4 flex items-center gap-3">
+                  <div className="h-2 flex-1 rounded-full bg-slate-100 overflow-hidden" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+                    <div className="h-full rounded-full bg-brand-500" style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className="text-[13px] font-semibold text-slate-600 tabular-nums w-10 text-right">{pct}%</span>
+                </div>
+              </Link>
+            )
+          })}
         </div>
       )}
 
-      <div className="space-y-3">
-        {rows.map(({ group, taken, untaken, nextDay }) => (
-          <Link
-            key={group.series.id}
-            to={`/vocab/series/${group.series.id}`}
-            className="block rounded-lg border border-slate-200 bg-white p-4 hover:border-brand-300 hover:shadow-md transition"
-          >
-            <div className="flex items-baseline justify-between gap-3">
-              <h2 className="text-base font-semibold text-slate-900 truncate">
-                {group.series.title}
-              </h2>
-              <span className="text-xs text-slate-400 whitespace-nowrap">
-                DAY {group.days.length}개
-              </span>
-            </div>
-            <div className="flex items-center gap-2 mt-2 flex-wrap">
-              {nextDay === null ? (
-                <span className="inline-block rounded-full bg-brand-100 text-brand-700 text-[11px] font-semibold px-2 py-0.5">
-                  전부 완료
-                </span>
-              ) : (
-                <span className="inline-block rounded-full bg-slate-900 text-white text-[11px] font-semibold px-2 py-0.5">
-                  다음 DAY {nextDay}
-                </span>
-              )}
-              <span className="text-xs text-slate-500">
-                응시 {taken} · 잔여 {untaken}
-              </span>
-            </div>
-            {/* 진행 막대 — 몇 DAY 남았는지 한눈에 */}
-            <div className="mt-2.5 h-1.5 rounded-full bg-slate-100 overflow-hidden">
-              <div
-                className="h-full bg-brand-500"
-                style={{
-                  width: `${group.days.length > 0 ? (taken / group.days.length) * 100 : 0}%`,
-                }}
-              />
-            </div>
-          </Link>
-        ))}
-      </div>
-
       {/* 교재가 생기기 전에 만든 시험지. 묶을 데가 없어 그대로 낸다. */}
       {looseStatuses.length > 0 && (
-        <section className="space-y-2">
-          <h2 className="text-sm font-semibold text-slate-700">기타 시험지</h2>
-          <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white overflow-hidden">
+        <Section title="기타 시험지">
+          <Card padded={false}>
             {looseStatuses.map((st) => (
-              <li key={st.set.id}>
-                <Link
-                  to={`/vocab/${st.set.id}`}
-                  className="flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-slate-50 active:bg-slate-100"
-                >
-                  <div className="min-w-0">
-                    <p className="text-[15px] font-medium text-slate-900 truncate">
-                      {st.set.title}
-                    </p>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      {st.set.words.length}단어 · {formatDate(st.set.createdAt)}
-                    </p>
-                  </div>
-                  {st.best ? (
-                    <span className="text-xs text-slate-500 shrink-0">
-                      {st.best.correct}/{st.best.total}
-                    </span>
-                  ) : (
-                    <span className="text-slate-300 text-lg shrink-0">→</span>
-                  )}
-                </Link>
-              </li>
+              <ListRow
+                key={st.set.id}
+                to={`/vocab/${st.set.id}`}
+                title={st.set.title}
+                description={`${st.set.words.length}단어 · ${formatDate(st.set.createdAt)}`}
+                trailing={st.best ? <ScoreValue correct={st.best.correct} total={st.best.total} /> : undefined}
+              />
             ))}
-          </ul>
-        </section>
+          </Card>
+        </Section>
       )}
     </div>
   )
