@@ -20,7 +20,7 @@ import {
  */
 
 // 통과 확인된 계열색 (brand-700). 흰 바탕 대비 3:1 이상.
-const SERIES = '#4b8b4b'
+const SERIES = '#2b7a38'
 const GRID = '#eef2f7'
 const AXIS_INK = '#94a3b8'
 const LABEL_INK = '#334155'

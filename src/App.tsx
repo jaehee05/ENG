@@ -1,3 +1,4 @@
+import { UiHost } from './components/ui'
 import { useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
@@ -68,6 +69,7 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <BlurOnNavigate />
+        <UiHost />
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />

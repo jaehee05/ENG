@@ -5,6 +5,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type MouseEvent,
 } from 'react'
+import { confirm } from '../components/ui/dialog'
 
 interface Options {
   /** 모달이 열려 있는지. 닫혀 있으면 Esc 리스너를 걸지 않는다. */
@@ -45,9 +46,9 @@ export function useBackdropDismiss({
 }: Options) {
   const pressedBackdrop = useRef(false)
 
-  const requestClose = useCallback(() => {
+  const requestClose = useCallback(async () => {
     if (disabled) return
-    if (dirty && !window.confirm(confirmMessage)) return
+    if (dirty && !(await confirm(confirmMessage, { confirmText: '닫기', danger: true }))) return
     onDismiss()
   }, [disabled, dirty, confirmMessage, onDismiss])
 
@@ -56,13 +57,17 @@ export function useBackdropDismiss({
     function onKeyDown(e: KeyboardEvent) {
       if (e.key !== 'Escape') return
       e.preventDefault()
-      requestClose()
+      void requestClose()
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [open, requestClose])
 
   return {
+    /** 닫기 버튼·끌어내리기처럼 배경 말고 다른 데서 닫을 때. 같은 규칙을 거친다. */
+    requestClose() {
+      void requestClose()
+    },
     onPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
       pressedBackdrop.current = e.target === e.currentTarget
     },
@@ -71,7 +76,7 @@ export function useBackdropDismiss({
       pressedBackdrop.current = false
       // 모달 내부에서 올라온 클릭이거나, 누르기는 안쪽에서 시작한 경우 무시
       if (e.target !== e.currentTarget || !startedOnBackdrop) return
-      requestClose()
+      void requestClose()
     },
   }
 }

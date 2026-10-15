@@ -50,7 +50,7 @@ function ScoreRing({ score, total }: { score: number; total: number }) {
           cy="100"
           r={r}
           fill="none"
-          stroke="#87b987"
+          stroke="#4f9f55"
           strokeWidth="14"
           strokeLinecap="round"
           strokeDasharray={c}
