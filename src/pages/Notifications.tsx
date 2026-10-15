@@ -9,6 +9,7 @@ import {
   markNotificationRead,
 } from '../lib/firestore'
 import type { UserNotification } from '../lib/types'
+import { Button, Card, EmptyState, PageHeader, SkeletonList, confirm, cx } from '../components/ui'
 
 function fmtDateTime(ts: { toDate: () => Date } | null | undefined): string {
   if (!ts) return ''
@@ -93,7 +94,8 @@ export function Notifications() {
 
   async function handleDeleteAll() {
     if (!profile) return
-    if (!window.confirm('알림함의 모든 알림을 삭제할까요? 되돌릴 수 없어요.')) return
+    if (!(await confirm('알림함의 모든 알림을 삭제할까요?\n되돌릴 수 없어요.', { danger: true, confirmText: '모두 삭제' })))
+      return
     setBusy(true)
     try {
       await deleteAllNotificationsForUser(profile.id)
@@ -128,119 +130,103 @@ export function Notifications() {
   const unread = items.filter((n) => !n.readAt).length
 
   return (
-    <div className="max-w-lg mx-auto">
+    <div className="max-w-lg mx-auto space-y-4">
       {/* 뒤로가기는 헤더가 그린다 — 화면마다 자리와 모양이 달라지지 않게. */}
-      <header className="flex items-center gap-2 mb-2">
-        <h1 className="flex-1 text-base font-bold text-slate-900">알림</h1>
-        {items.length > 0 ? (
-          <button
-            type="button"
-            onClick={() => setEditing((v) => !v)}
-            className="h-9 min-w-[2.25rem] px-2 inline-flex items-center justify-center rounded-full bg-slate-100 text-slate-600 text-sm font-medium"
-          >
-            {editing ? '완료' : '편집'}
-          </button>
-        ) : (
-          <span className="w-9" />
-        )}
-      </header>
+      <PageHeader
+        title="알림"
+        action={
+          items.length > 0 && (
+            <Button size="sm" variant="secondary" className="bg-white" onClick={() => setEditing((v) => !v)}>
+              {editing ? '완료' : '편집'}
+            </Button>
+          )
+        }
+      />
 
       {editing && items.length > 0 && (
-        <div className="flex items-center justify-between px-1 py-2">
-          <span className="text-xs text-slate-400">
-            {unread > 0 ? `안 읽음 ${unread}` : '모두 확인함'}
-          </span>
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between px-1">
+          <span className="text-[13px] text-slate-500">{unread > 0 ? `안 읽음 ${unread}` : '모두 확인했어요'}</span>
+          <div className="flex items-center gap-1">
             {unread > 0 && (
-              <button
-                type="button"
+              <Button
+                size="sm"
+                variant="text"
                 onClick={() => profile && markAllNotificationsRead(profile.id).then(load)}
                 disabled={busy}
-                className="text-xs text-slate-500 hover:text-slate-900"
               >
                 모두 읽음
-              </button>
+              </Button>
             )}
-            <button
-              type="button"
-              onClick={handleDeleteAll}
-              disabled={busy}
-              className="text-xs text-red-500 hover:text-red-700"
-            >
+            <Button size="sm" variant="text" className="text-red-500" onClick={handleDeleteAll} disabled={busy}>
               모두 삭제
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
-      {loading && <p className="text-slate-500 text-sm py-6 text-center">불러오는 중…</p>}
-      {!loading && items.length === 0 && (
-        <p className="text-slate-400 text-sm py-16 text-center">알림이 없어요.</p>
+      {loading ? (
+        <SkeletonList rows={4} />
+      ) : items.length === 0 ? (
+        <Card padded={false}>
+          <EmptyState title="알림이 없어요" />
+        </Card>
+      ) : (
+        <Card padded={false}>
+          <ul>
+            {items.map((n) => {
+              const cfg = kindOf(n.kind)
+              const inner = (
+                <div className="flex items-start gap-3 px-5 py-4">
+                  <span className={cx('shrink-0 inline-flex h-11 w-11 items-center justify-center rounded-full', cfg.iconBg)}>
+                    {cfg.icon}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px]">
+                      <span className={cx('font-bold', cfg.labelCls)}>{cfg.label}</span>
+                      <span className="text-slate-400"> · {fmtDateTime(n.createdAt)}</span>
+                    </p>
+                    <p className={cx('mt-0.5 text-[15px] truncate', n.readAt ? 'text-slate-500' : 'text-slate-900 font-semibold')}>
+                      {n.title}
+                    </p>
+                    {n.body && (
+                      <p className="mt-0.5 text-[14px] text-slate-500 line-clamp-2 whitespace-pre-wrap">{n.body}</p>
+                    )}
+                  </div>
+                  {!n.readAt && !editing && <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-red-500" aria-label="안 읽음" />}
+                  {editing && (
+                    <button
+                      type="button"
+                      aria-label="삭제"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        void handleDeleteOne(n.id)
+                      }}
+                      className="pressable shrink-0 self-center h-9 rounded-xl bg-red-50 text-red-500 text-[13px] font-semibold px-3"
+                    >
+                      삭제
+                    </button>
+                  )}
+                </div>
+              )
+              const rowCls = 'pressable block w-full text-left rounded-card hover:bg-slate-50 active:bg-slate-100'
+              return (
+                <li key={n.id}>
+                  {n.link && !editing ? (
+                    <Link to={n.link} onClick={() => handleItemClick(n)} className={rowCls}>
+                      {inner}
+                    </Link>
+                  ) : (
+                    <button type="button" onClick={() => !editing && handleItemClick(n)} className={rowCls}>
+                      {inner}
+                    </button>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        </Card>
       )}
-
-      <ul>
-        {items.map((n) => {
-          const cfg = kindOf(n.kind)
-          const inner = (
-            <div className="flex items-start gap-3 py-4">
-              <span
-                className={`shrink-0 inline-flex h-11 w-11 items-center justify-center rounded-full ${cfg.iconBg}`}
-              >
-                {cfg.icon}
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm">
-                  <span className={`font-bold ${cfg.labelCls}`}>{cfg.label}</span>
-                  <span className="text-slate-400"> · {fmtDateTime(n.createdAt)}</span>
-                </p>
-                <p
-                  className={`mt-0.5 text-[15px] truncate ${
-                    n.readAt ? 'text-slate-500' : 'text-slate-900 font-semibold'
-                  }`}
-                >
-                  {n.title}
-                </p>
-                {n.body && (
-                  <p className="mt-0.5 text-sm text-slate-500 line-clamp-2 whitespace-pre-wrap">
-                    {n.body}
-                  </p>
-                )}
-              </div>
-              {editing && (
-                <button
-                  type="button"
-                  aria-label="삭제"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    void handleDeleteOne(n.id)
-                  }}
-                  className="shrink-0 self-center rounded-full bg-red-50 text-red-500 text-xs font-medium px-3 py-1.5"
-                >
-                  삭제
-                </button>
-              )}
-            </div>
-          )
-          return (
-            <li key={n.id} className="border-b border-slate-100 last:border-0">
-              {n.link && !editing ? (
-                <Link to={n.link} onClick={() => handleItemClick(n)} className="block">
-                  {inner}
-                </Link>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => !editing && handleItemClick(n)}
-                  className="w-full text-left"
-                >
-                  {inner}
-                </button>
-              )}
-            </li>
-          )
-        })}
-      </ul>
     </div>
   )
 }

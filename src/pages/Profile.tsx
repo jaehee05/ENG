@@ -1,12 +1,12 @@
-import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import { accountSubjects } from '../lib/types'
+import { Card, PageHeader } from '../components/ui'
 
 function Row({ label, value }: { label: string; value?: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 px-4 py-3.5">
-      <span className="text-sm text-slate-500">{label}</span>
-      <span className="text-sm font-medium text-slate-900 text-right truncate">
+    <div className="flex items-center justify-between gap-4 px-5 py-3.5 min-h-[56px]">
+      <span className="shrink-0 text-[15px] text-slate-500">{label}</span>
+      <span className="min-w-0 text-[15px] font-medium text-slate-900 text-right truncate">
         {value || '—'}
       </span>
     </div>
@@ -22,41 +22,28 @@ export function Profile() {
 
   return (
     <div className="space-y-5 max-w-lg mx-auto">
-      <header>
-        <Link to="/more" className="text-xs text-slate-500 hover:text-slate-900">
-          ← 더보기
-        </Link>
-        <h1 className="mt-2 text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
-          내 정보 관리
-        </h1>
-      </header>
+      <PageHeader title="내 정보" />
 
-      <div className="flex items-center gap-3">
-        <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-brand-100 text-brand-700 text-xl font-semibold">
+      <Card className="flex items-center gap-4">
+        <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand-700 text-[22px] font-bold">
           {profile?.displayName?.slice(0, 1) ?? '?'}
         </span>
         <div className="min-w-0">
-          <p className="text-lg font-semibold text-slate-900 truncate">
-            {profile?.displayName}
-          </p>
-          <p className="text-xs text-slate-500">
-            {profile?.role === 'admin' ? '관리자' : '학생'}
-          </p>
+          <p className="text-[19px] font-bold text-slate-900 truncate">{profile?.displayName}</p>
+          <p className="text-[13px] text-slate-500 mt-0.5">{profile?.role === 'admin' ? '관리자' : '학생'}</p>
         </div>
-      </div>
+      </Card>
 
-      <div className="rounded-2xl bg-slate-100/80 overflow-hidden divide-y divide-slate-200/70">
+      <Card padded={false}>
         <Row label="이름" value={profile?.displayName} />
         <Row label="학교" value={profile?.school} />
         <Row label="수강 과목" value={subjects} />
         <Row label="학생 연락처" value={profile?.phone} />
         <Row label="학부모 연락처" value={profile?.parentPhone} />
         <Row label="이메일" value={profile?.email} />
-      </div>
+      </Card>
 
-      <p className="text-xs text-slate-400 px-1">
-        정보 수정이 필요하면 담당 선생님께 문의해 주세요.
-      </p>
+      <p className="text-[13px] text-slate-500 px-1">정보를 고쳐야 하면 담당 선생님께 말씀해 주세요.</p>
     </div>
   )
 }

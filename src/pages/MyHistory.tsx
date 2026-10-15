@@ -4,6 +4,17 @@ import { useAuth } from '../contexts/useAuth'
 import { deleteAttempt, listAttemptsForUser } from '../lib/firestore'
 import { WORDBOOK_ENABLED } from '../lib/features'
 import { MOCK_SUBJECT_LABEL, type Attempt, type MockSubject } from '../lib/types'
+import {
+  Badge,
+  Card,
+  EmptyState,
+  PageHeader,
+  ScoreValue,
+  SkeletonList,
+  confirm,
+  cx,
+  type BadgeTone,
+} from '../components/ui'
 
 const TYPE_LABEL: Record<Attempt['type'], string> = {
   vocab: '단어 시험지',
@@ -12,9 +23,9 @@ const TYPE_LABEL: Record<Attempt['type'], string> = {
   korean_mock: '모의고사',
 }
 
-const SUBJECT_BADGE_CLASS: Record<MockSubject, string> = {
-  korean: 'bg-rose-50 text-rose-700 border-rose-200',
-  english: 'bg-sky-50 text-sky-700 border-sky-200',
+const SUBJECT_TONE: Record<MockSubject, BadgeTone> = {
+  korean: 'rose',
+  english: 'blue',
 }
 
 type Filter = 'all' | Attempt['type']
@@ -74,12 +85,13 @@ export function MyHistory() {
 
   async function handleDelete(a: Attempt) {
     if (
-      !window.confirm(
-        `${a.refTitle}\n${fmtDate(a.createdAt) || '날짜 없음'} · ${a.correct}/${a.total} 기록을 삭제하시겠습니까?` +
+      !(await confirm(
+        `${a.refTitle}\n${fmtDate(a.createdAt) || '날짜 없음'} · ${a.correct}/${a.total} 기록을 삭제할까요?` +
           (a.practice
-            ? '\n연습 기록이라 응시 횟수에는 영향이 없습니다.'
-            : '\n응시 횟수 제한이 있으면 한 번 더 풀 수 있게 됩니다.'),
-      )
+            ? '\n연습 기록이라 응시 횟수에는 영향이 없어요.'
+            : '\n응시 횟수 제한이 있으면 한 번 더 풀 수 있게 돼요.'),
+        { danger: true, confirmText: '삭제' },
+      ))
     )
       return
     setDeletingId(a.id)
@@ -142,42 +154,41 @@ export function MyHistory() {
   }
 
   return (
-    <div className="space-y-5 max-w-4xl mx-auto">
-      <header>
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-          나의 학습
-        </p>
-        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
-          내 기록
-        </h1>
-      </header>
+    <div className="space-y-6 max-w-2xl mx-auto">
+      <PageHeader title="내 기록" />
 
-      {loading && <p className="text-slate-500 text-sm">불러오는 중...</p>}
-      {error && <p className="text-red-600 text-sm">{error}</p>}
-      {deleteError && <p className="text-red-600 text-sm">{deleteError}</p>}
+      {error && <p className="text-[15px] text-red-500 px-1">{error}</p>}
+      {deleteError && <p className="text-[15px] text-red-500 px-1">{deleteError}</p>}
 
-      {!loading && (
+      {loading ? (
+        <SkeletonList rows={4} />
+      ) : (
         <>
-          <div className="flex items-center gap-1 text-xs flex-wrap">
-            {HISTORY_FILTERS.map((k) => (
-              <button
-                key={k}
-                onClick={() => setFilter(k)}
-                className={`px-3 py-1.5 rounded-full transition ${
-                  filter === k
-                    ? 'bg-slate-900 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                {k === 'all' ? '전체' : TYPE_LABEL[k]}
-              </button>
-            ))}
+          <div className="flex items-center gap-1.5 flex-wrap" role="tablist">
+            {HISTORY_FILTERS.map((k) => {
+              const on = filter === k
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  role="tab"
+                  aria-selected={on}
+                  onClick={() => setFilter(k)}
+                  className={cx(
+                    'pressable h-9 px-4 rounded-full text-[14px] font-semibold',
+                    on ? 'bg-slate-900 text-white' : 'bg-white text-slate-500 hover:bg-slate-50 active:bg-slate-100',
+                  )}
+                >
+                  {k === 'all' ? '전체' : TYPE_LABEL[k]}
+                </button>
+              )
+            })}
           </div>
 
           {buckets.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
-              아직 기록이 없습니다.
-            </div>
+            <Card padded={false}>
+              <EmptyState title="아직 기록이 없어요" description="시험을 보면 여기에 쌓여요." />
+            </Card>
           ) : (
             <div className="space-y-3">
               {buckets.map((b) => {
@@ -190,87 +201,65 @@ export function MyHistory() {
                 )
                 const isOpen = expanded.has(b.key)
                 return (
-                  <div
-                    key={b.key}
-                    className="rounded-lg border border-slate-200 bg-white overflow-hidden"
-                  >
+                  <Card key={b.key} padded={false}>
                     <button
                       type="button"
                       onClick={() => toggle(b.key)}
-                      className="w-full text-left px-4 py-3 hover:bg-slate-50 flex items-start justify-between gap-3"
+                      aria-expanded={isOpen}
+                      className="pressable w-full text-left px-5 py-4 rounded-card flex items-center justify-between gap-3 hover:bg-slate-50 active:bg-slate-100"
                     >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span
-                            className={`inline-block rounded text-xs font-medium px-2 py-0.5 ${
-                              b.type === 'korean_mock'
-                                ? `border ${SUBJECT_BADGE_CLASS[b.mockSubject ?? 'korean']}`
-                                : 'bg-brand-50 text-brand-700'
-                            }`}
-                          >
+                      <span className="min-w-0">
+                        <span className="flex items-center gap-1.5 min-w-0">
+                          <Badge tone={b.type === 'korean_mock' ? SUBJECT_TONE[b.mockSubject ?? 'korean'] : 'brand'}>
                             {bucketLabel(b)}
-                          </span>
-                          <span className="text-base font-semibold text-slate-900 truncate">
-                            {b.refTitle}
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-500 mt-1">
+                          </Badge>
+                          <span className="text-[15px] font-semibold text-slate-900 truncate">{b.refTitle}</span>
+                        </span>
+                        <span className="block text-[13px] text-slate-500 mt-1 tabular-nums">
                           {b.attempts.length}회 응시
                           {best.total > 0 && (
                             <> · 최고 {best.correct}/{best.total} ({Math.round(best.ratio * 100)}%)</>
                           )}
-                        </p>
-                      </div>
-                      <span className="text-slate-400 text-sm shrink-0 mt-1">
-                        {isOpen ? '−' : '+'}
+                        </span>
                       </span>
+                      <svg
+                        className={cx('shrink-0 text-slate-400 transition-transform', isOpen && 'rotate-180')}
+                        width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden
+                      >
+                        <path d="M6 9l6 6 6-6" />
+                      </svg>
                     </button>
                     {isOpen && (
-                      <ul className="divide-y divide-slate-100 border-t border-slate-100">
-                        {b.attempts.map((a, i) => {
-                          const ratio = a.total > 0 ? Math.round((a.correct / a.total) * 100) : 0
-                          return (
-                            <li key={a.id} className="px-4 py-2.5 flex items-center justify-between gap-3 text-sm">
-                              <div className="flex items-center gap-3 min-w-0">
-                                <span className="text-xs text-slate-400 w-8">
+                      <ul className="pb-2">
+                        {b.attempts.map((a, i) => (
+                          <li key={a.id} className="flex items-center gap-1 pr-3">
+                            <Link
+                              to={resultPath(a)}
+                              className="pressable flex-1 min-w-0 flex items-center justify-between gap-3 px-5 py-3 rounded-2xl hover:bg-slate-50 active:bg-slate-100"
+                            >
+                              <span className="min-w-0 flex items-center gap-2">
+                                <span className="text-[15px] font-medium text-slate-900 tabular-nums">
                                   {b.attempts.length - i}회차
                                 </span>
-                                <span className="text-slate-500 text-xs">
-                                  {fmtDate(a.createdAt)}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-3 shrink-0">
-                                <span className="text-slate-700">
-                                  {a.correct}/{a.total}
-                                </span>
-                                <span
-                                  className={`text-sm font-medium ${ratio >= 80 ? 'text-brand-700' : ratio >= 50 ? 'text-slate-700' : 'text-red-600'}`}
-                                >
-                                  {ratio}%
-                                </span>
-                                <Link
-                                  to={resultPath(a)}
-                                  className="text-xs text-brand-700 hover:underline"
-                                >
-                                  다시 보기
-                                </Link>
-                                {isAdmin && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDelete(a)}
-                                    disabled={deletingId === a.id}
-                                    className="text-xs text-slate-400 hover:text-red-600 disabled:opacity-50"
-                                  >
-                                    {deletingId === a.id ? '삭제 중…' : '삭제'}
-                                  </button>
-                                )}
-                              </div>
-                            </li>
-                          )
-                        })}
+                                <span className="text-[13px] text-slate-500 tabular-nums">{fmtDate(a.createdAt)}</span>
+                              </span>
+                              <ScoreValue correct={a.correct} total={a.total} />
+                            </Link>
+                            {isAdmin && (
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(a)}
+                                disabled={deletingId === a.id}
+                                className="pressable shrink-0 h-9 px-2.5 rounded-xl text-[13px] font-medium text-slate-400 hover:text-red-500 hover:bg-red-50 active:bg-red-50 disabled:opacity-50"
+                              >
+                                {deletingId === a.id ? '삭제 중' : '삭제'}
+                              </button>
+                            )}
+                          </li>
+                        ))}
                       </ul>
                     )}
-                  </div>
+                  </Card>
                 )
               })}
             </div>
