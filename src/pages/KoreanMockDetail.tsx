@@ -50,10 +50,21 @@ import {
   type MockSubject,
   type WordEntry,
 } from '../lib/types'
+import {
+  Badge,
+  BottomCTA,
+  Button,
+  Card,
+  SkeletonList,
+  buttonClass,
+  confirm,
+  cx,
+  type BadgeTone,
+} from '../components/ui'
 
-const SUBJECT_BADGE_CLASS: Record<MockSubject, string> = {
-  korean: 'bg-rose-50 text-rose-700 border-rose-200',
-  english: 'bg-sky-50 text-sky-700 border-sky-200',
+const SUBJECT_TONE: Record<MockSubject, BadgeTone> = {
+  korean: 'rose',
+  english: 'blue',
 }
 
 /** 지금 시각 'HH:MM:SS' — 저장됐는지 눈으로 확인하는 용도. */
@@ -448,7 +459,12 @@ export function KoreanMockDetail() {
   }
 
   async function handleDeleteAttempt(a: Attempt) {
-    if (!window.confirm(`${a.studentName} 님의 응시 기록을 삭제할까요? (되돌릴 수 없음)`))
+    if (
+      !(await confirm(`${a.studentName} 님의 응시 기록을 삭제할까요?\n되돌릴 수 없어요.`, {
+        danger: true,
+        confirmText: '삭제',
+      }))
+    )
       return
     const prev = allAttempts
     setAllAttempts((cur) => cur.filter((x) => x.id !== a.id))
@@ -506,7 +522,7 @@ export function KoreanMockDetail() {
 
   async function handleDelete() {
     if (!mock) return
-    if (!window.confirm(`"${mock.title}" 모의고사를 삭제하시겠습니까?`)) return
+    if (!(await confirm(`‘${mock.title}’ 모의고사를 삭제할까요?`, { danger: true, confirmText: '삭제' }))) return
     try {
       await deleteKoreanMock(mock.id)
       navigate('/admin/korean-mocks')
@@ -545,7 +561,7 @@ export function KoreanMockDetail() {
 
   async function handleRemovePdf() {
     if (!mock || !mock.explanationPdfUrl) return
-    if (!window.confirm('해설 PDF를 삭제하시겠습니까?')) return
+    if (!(await confirm('해설 PDF를 삭제할까요?', { danger: true, confirmText: '삭제' }))) return
     setPdfError(null)
     setPdfBusy(true)
     try {
@@ -620,89 +636,65 @@ export function KoreanMockDetail() {
     confirmMessage: '입력 중인 해설/지문이 저장되지 않습니다. 닫을까요?',
   })
 
-  if (loading) return <p className="text-slate-500 text-sm">불러오는 중…</p>
-  if (error) return <p className="text-red-600 text-sm">{error}</p>
+  if (loading) return <SkeletonList rows={3} className="max-w-2xl mx-auto" />
+  if (error) return <p className="text-[15px] text-red-500 px-1">{error}</p>
   if (!mock) return null
 
   const mockSubject = getMockSubject(mock)
 
   return (
-    <div className="space-y-5 max-w-3xl mx-auto">
-      <header className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-            모의고사
-          </p>
-          <div className="flex items-center gap-2 flex-wrap">
-            <span
-              className={`inline-block rounded-full text-[11px] font-medium px-2 py-0.5 border ${SUBJECT_BADGE_CLASS[getMockSubject(mock)]}`}
-            >
-              {MOCK_SUBJECT_LABEL[getMockSubject(mock)]}
-            </span>
-            <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
+    <div className={cx('space-y-6 mx-auto', isAdmin ? 'max-w-3xl' : 'max-w-2xl')}>
+      <header className="px-1 space-y-2">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <Badge tone={SUBJECT_TONE[mockSubject]}>{MOCK_SUBJECT_LABEL[mockSubject]}</Badge>
+            <h1 className="mt-1.5 text-[24px] sm:text-[26px] font-bold text-slate-900 tracking-tight leading-tight">
               {mock.title}
             </h1>
           </div>
-          <p className="text-xs text-slate-500 mt-1">
-            문항 {mock.questions.length}개 · 등록 {formatDate(mock.createdAt)} ·{' '}
-            {mock.createdByName}
-          </p>
+          {isAdmin && (
+            <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end">
+              {/* 입력해 둔 해설을 원고 형식 .md 로 내보낸다. 저장된 값에는 선지
+                  번호가 없으므로(화면이 붙인다) 파일에는 여기서 붙여 적는다. */}
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => downloadMarkdown(`${mock.title} 해설.md`, mockToMarkdown(mock))}
+              >
+                해설 .md
+              </Button>
+              {/* 내보낸 원고를 고쳐 다시 올린다. 앱에서 한 칸씩 치는 것보다 빠르다. */}
+              <input
+                ref={mdInputRef}
+                type="file"
+                accept=".md,.markdown,.txt,text/markdown,text/plain"
+                className="hidden"
+                onChange={(e) => {
+                  void handleMdPick(e.target.files?.[0] ?? null)
+                  // 같은 파일을 다시 골라도 onChange 가 오게 비워 둔다.
+                  e.target.value = ''
+                }}
+              />
+              <Button size="sm" variant="secondary" onClick={() => mdInputRef.current?.click()}>
+                해설 올리기
+              </Button>
+              <Button size="sm" variant="text" className="text-red-500" onClick={handleDelete}>
+                삭제
+              </Button>
+            </div>
+          )}
         </div>
-        {isAdmin && (
-          <div className="flex items-center gap-2 shrink-0">
-            {/* 입력해 둔 해설을 원고 형식 .md 로 내보낸다. 저장된 값에는 선지
-                번호가 없으므로(화면이 붙인다) 파일에는 여기서 붙여 적는다. */}
-            <button
-              type="button"
-              onClick={() =>
-                downloadMarkdown(`${mock.title} 해설.md`, mockToMarkdown(mock))
-              }
-              className="rounded-md border border-slate-300 text-slate-600 text-xs font-medium px-2.5 py-1.5 hover:bg-slate-100"
-            >
-              해설 .md
-            </button>
-            {/* 내보낸 원고를 고쳐 다시 올린다. 앱에서 한 칸씩 치는 것보다 빠르다. */}
-            <input
-              ref={mdInputRef}
-              type="file"
-              accept=".md,.markdown,.txt,text/markdown,text/plain"
-              className="hidden"
-              onChange={(e) => {
-                void handleMdPick(e.target.files?.[0] ?? null)
-                // 같은 파일을 다시 골라도 onChange 가 오게 비워 둔다.
-                e.target.value = ''
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => mdInputRef.current?.click()}
-              className="rounded-md border border-slate-300 text-slate-600 text-xs font-medium px-2.5 py-1.5 hover:bg-slate-100"
-            >
-              해설 올리기
-            </button>
-            <button
-              type="button"
-              onClick={handleDelete}
-              className="text-xs text-slate-400 hover:text-red-600 px-1"
-            >
-              삭제
-            </button>
-          </div>
-        )}
+        <p className="text-[15px] text-slate-500">
+          {mock.questions.length}문항 · {formatDate(mock.createdAt)} · {mock.createdByName}
+        </p>
       </header>
 
       {!isAdmin && (
-        <div className="rounded-lg border border-brand-200 bg-brand-50/40 p-4">
-          <p className="text-sm text-slate-700 mb-3">
-            본인이 푼 답안을 OMR 방식으로 입력하면 자동으로 채점됩니다.
+        <Card>
+          <p className="text-[15px] text-slate-700 leading-relaxed">
+            종이에 푼 답을 OMR처럼 입력하면 바로 채점해요. OMR 카드 사진으로 답을 불러올 수도 있어요.
           </p>
-          <Link
-            to={`/korean-mocks/${mock.id}/take`}
-            className="inline-block rounded-md bg-brand-600 text-white text-sm font-semibold px-5 py-2.5 hover:bg-brand-700 transition"
-          >
-            답안 입력하기
-          </Link>
-        </div>
+        </Card>
       )}
 
       {myAttempts.length > 0 && (
@@ -1435,6 +1427,15 @@ export function KoreanMockDetail() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 학생의 주 행동 — 답안 입력 */}
+      {!isAdmin && (
+        <BottomCTA>
+          <Link to={`/korean-mocks/${mock.id}/take`} className={buttonClass({ size: 'lg', block: true })}>
+            답안 입력하기
+          </Link>
+        </BottomCTA>
       )}
     </div>
   )
