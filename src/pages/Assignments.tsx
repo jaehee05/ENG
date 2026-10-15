@@ -115,7 +115,7 @@ function DoneCircle({
   const cls = `shrink-0 h-6 w-6 rounded-full border-2 flex items-center justify-center transition ${
     done ? 'border-transparent' : 'border-slate-300'
   }`
-  const style = done ? { backgroundColor: color ?? '#62a762' } : undefined
+  const style = done ? { backgroundColor: color ?? '#2f8a3e' } : undefined
   const inner = done ? (
     <svg
       width="12"
