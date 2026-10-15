@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { listAnnouncements } from '../lib/firestore'
 import type { Announcement } from '../lib/types'
+import { Badge, Card, EmptyState, PageHeader, SkeletonList } from '../components/ui'
 
 function fmtDate(ts: { toDate: () => Date } | null | undefined): string {
   if (!ts) return ''
@@ -36,48 +37,31 @@ export function Notice() {
   }, [])
 
   return (
-    <div className="space-y-5 max-w-3xl mx-auto">
-      <header>
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
-          KJHEDU
-        </p>
-        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight">
-          공지사항
-        </h1>
-      </header>
+    <div className="space-y-5 max-w-2xl mx-auto">
+      <PageHeader title="공지사항" />
 
-      {loading && <p className="text-slate-500 text-sm">불러오는 중…</p>}
-      {!loading && items.length === 0 && (
-        <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
-          등록된 공지가 없어요.
-        </div>
-      )}
-
-      <ul className="space-y-2">
-        {items.map((a) => (
-          <li
-            key={a.id}
-            className="rounded-lg border border-slate-200 bg-white p-4"
-          >
-            <div className="flex items-center gap-2 flex-wrap">
-              {a.pinned && (
-                <span className="inline-block rounded bg-amber-50 text-amber-700 text-[10px] font-medium px-1.5 py-0.5 border border-amber-200">
-                  📌
-                </span>
-              )}
-              <p className="text-[15px] font-semibold text-slate-900">
-                {a.title}
+      {loading ? (
+        <SkeletonList rows={3} />
+      ) : items.length === 0 ? (
+        <Card padded={false}>
+          <EmptyState title="등록된 공지가 없어요" />
+        </Card>
+      ) : (
+        <ul className="space-y-3">
+          {items.map((a) => (
+            <li key={a.id} className="rounded-card bg-white p-5">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {a.pinned && <Badge tone="amber">고정</Badge>}
+                <p className="text-[17px] font-bold text-slate-900">{a.title}</p>
+              </div>
+              <p className="text-[13px] text-slate-500 mt-1 tabular-nums">
+                {a.createdByName} · {fmtDate(a.createdAt)}
               </p>
-            </div>
-            <p className="text-[11px] text-slate-500 mt-1">
-              {a.createdByName} · {fmtDate(a.createdAt)}
-            </p>
-            <p className="text-sm text-slate-700 mt-2 whitespace-pre-wrap leading-relaxed">
-              {a.body}
-            </p>
-          </li>
-        ))}
-      </ul>
+              <p className="text-[15px] text-slate-700 mt-3 whitespace-pre-wrap leading-relaxed">{a.body}</p>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
