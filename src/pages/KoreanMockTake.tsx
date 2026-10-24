@@ -86,12 +86,14 @@ function BubbleRow({
         type="button"
         onClick={onFocus}
         aria-label={`${number}번 문제로 이동`}
-        className="flex justify-center gap-[3px] py-1 w-full"
+        className="flex justify-center gap-[3px] px-[2px] py-1 w-full min-w-0"
       >
+        {/* 칸 폭은 고정하지 않고 줄어들게 둔다 — 16px 고정이면 문번 칸과 합쳐 열 최소 폭
+            (7rem)을 넘어서, 좁은 폰에서 열이 최소 폭까지 줄면 5번 칸이 잘렸다. */}
         {[1, 2, 3, 4, 5].map((n) => (
           <span
             key={n}
-            className={`w-[16px] h-[22px] inline-flex items-center justify-center rounded-full text-[9px] font-semibold border ${
+            className={`flex-1 min-w-0 max-w-[16px] h-[22px] inline-flex items-center justify-center rounded-full text-[9px] font-semibold border ${
               sel === n
                 ? 'bg-slate-900 text-white border-slate-900'
                 : 'bg-white text-slate-400 border-slate-300'
