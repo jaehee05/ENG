@@ -606,6 +606,21 @@ export interface MockGradeCut {
   minScore: number
 }
 
+/**
+ * 전국단위 통계. 선택과목마다 다른 값은 선택과목 이름을 키로 둔다 — 선택과목이 없는
+ * 시험은 '_common' 키. 선택과목 문항은 번호가 같아도(35~45) 과목마다 다른
+ * 문제라서, 선택률도 과목별로 나눠 둔다. 공통 문항 선택률은 '_common' 키.
+ * (선택과목 이름을 바꾸면 그 과목 값은 다시 넣어야 한다.)
+ */
+export interface MockNationalStats {
+  /** 과목 키 → 원점수 등급컷. */
+  cutoffs?: Record<string, MockGradeCut[]>
+  /** 등급별 표준점수 컷 (선택과목과 상관없이 하나). minScore 자리에 표준점수. */
+  stdCutoffs?: MockGradeCut[]
+  /** 과목 키 → 문항 번호 → 선지 1~5 선택률(%). */
+  rates?: Record<string, Record<string, number[]>>
+}
+
 /** 모의고사 과목. 기존 레코드는 'korean'으로 간주. */
 export type MockSubject = 'korean' | 'english'
 
@@ -624,6 +639,8 @@ export interface KoreanMock {
   examinerComment?: string
   /** AI 산출 등급컷 (원점수 기준). */
   gradeCutoffs?: MockGradeCut[]
+  /** 전국단위(실제 시행) 통계. 관리자가 공개 자료를 옮겨 적는다. 결과 화면 '전국단위' 탭. */
+  national?: MockNationalStats
   /** 해설 PDF 다운로드 URL(Storage). 설정 시 채점 후 학생에게 제공, 없으면 생략. */
   explanationPdfUrl?: string
   /** 해설 PDF 원본 파일명(표시용). */

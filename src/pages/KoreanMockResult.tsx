@@ -4,12 +4,21 @@ import { useAuth } from '../contexts/useAuth'
 import { GlossedPassage } from '../components/GlossedPassage'
 import {
   getAttempt,
+  listKoreanMockAttempts,
   updateKoreanMockAttemptAnswers,
   watchKoreanMock,
 } from '../lib/firestore'
+import { hasNationalStats, nationalStats, teamStats } from '../lib/mockStats'
+import {
+  AnswerCompareOmr,
+  GradeCutTable,
+  ScoreHero,
+  SourceTabs,
+  WrongRateTop,
+  type StatsSource,
+} from '../components/MockResultStats'
 import {
   choiceMark,
-  gradeFromScore,
   hasMockExplanation,
   isBlankHtml,
   hasMockPassage,
@@ -24,58 +33,12 @@ import {
   type MockSubject,
 } from '../lib/types'
 import {
-  Badge,
   BottomSheet,
   Button,
-  Card,
   PageHeader,
   SkeletonList,
   buttonClass,
-  type BadgeTone,
 } from '../components/ui'
-
-const SUBJECT_TONE: Record<MockSubject, BadgeTone> = {
-  korean: 'rose',
-  english: 'blue',
-}
-
-/** 원형 점수 게이지. */
-function ScoreRing({ score, total }: { score: number; total: number }) {
-  const pct = total > 0 ? Math.max(0, Math.min(1, score / total)) : 0
-  const r = 82
-  const c = 2 * Math.PI * r
-  return (
-    <div className="relative inline-flex items-center justify-center">
-      <svg width="200" height="200" viewBox="0 0 200 200" className="-rotate-90">
-        <circle
-          cx="100"
-          cy="100"
-          r={r}
-          fill="none"
-          stroke="#e2e8f0"
-          strokeWidth="14"
-        />
-        <circle
-          cx="100"
-          cy="100"
-          r={r}
-          fill="none"
-          stroke="#4f9f55"
-          strokeWidth="14"
-          strokeLinecap="round"
-          strokeDasharray={c}
-          strokeDashoffset={c * (1 - pct)}
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-5xl font-bold text-slate-900 tabular-nums">
-          {score}
-        </span>
-        <span className="text-xs text-slate-400 mt-1">{total}점 만점 중</span>
-      </div>
-    </div>
-  )
-}
 
 /**
  * 오답 리뷰 지문. 영어는 어휘를 탭하면 뜻이 뜨는 GlossedPassage로,
@@ -136,12 +99,6 @@ function MockPassageReview({
   )
 }
 
-function fmtAttemptDate(ts: Attempt['createdAt']): string {
-  if (!ts) return ''
-  const d = ts.toDate()
-  return `${String(d.getFullYear()).slice(2)}년 ${d.getMonth() + 1}월 ${d.getDate()}일 응시`
-}
-
 export function KoreanMockResult() {
   const { id, attemptId } = useParams<{ id: string; attemptId: string }>()
   const { profile } = useAuth()
@@ -149,7 +106,9 @@ export function KoreanMockResult() {
   const [mock, setMock] = useState<KoreanMock | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [showCutoffs, setShowCutoffs] = useState(false)
+  /** 이 시험의 전체 응시 기록 — OUR-TEAM 통계용. */
+  const [teamAttempts, setTeamAttempts] = useState<Attempt[] | null>(null)
+  const [source, setSource] = useState<StatsSource | null>(null)
   const [explNumber, setExplNumber] = useState<number | null>(null)
   const [editing, setEditing] = useState(false)
   const [editResults, setEditResults] = useState<KoreanMockResult[] | null>(null)
@@ -171,6 +130,14 @@ export function KoreanMockResult() {
   useEffect(() => {
     if (!id) return
     return watchKoreanMock(id, setMock)
+  }, [id])
+
+  useEffect(() => {
+    if (!id) return
+    listKoreanMockAttempts(id)
+      .then(setTeamAttempts)
+      // 통계를 못 읽어도 내 결과는 보여야 한다 — 내 기록만으로 계산한다.
+      .catch(() => setTeamAttempts([]))
   }, [id])
 
   // 문항 번호 → 배점 (공통 + 선택과목 전체에서 조회, 없으면 2점).
@@ -248,85 +215,87 @@ export function KoreanMockResult() {
   }
   const totalPoints = results.reduce((s, r) => s + pointsOf(r.number), 0)
   const score = results.reduce((s, r) => s + (r.correct ? pointsOf(r.number) : 0), 0)
-  const correctCount = results.filter((r) => r.correct).length
-  const wrongCount = results.length - correctCount
-  // 선택과목마다 등급컷이 다르다: 응시한 선택과목 등급컷 우선, 없으면 공통.
-  const activeCutoffs = (() => {
-    if (attempt.mockElectiveName && mock?.electives) {
-      const el = mock.electives.find((e) => e.name === attempt.mockElectiveName)
-      if (el?.gradeCutoffs && el.gradeCutoffs.length) return el.gradeCutoffs
-    }
-    return mock?.gradeCutoffs
-  })()
-  const grade = gradeFromScore(score, activeCutoffs)
-  // 6등급부터는 "6등급 이하"로 표기.
-  const gradeLabel = (g: number) => (g >= 6 ? '6등급 이하' : `${g}등급`)
-
-  // 등급컷 상세 행: 1~5등급 + 6등급 이하.
-  const cutoffRows = (() => {
-    if (!activeCutoffs || activeCutoffs.length === 0)
-      return [] as { grade: number; label: string; score: number | null; below: boolean }[]
-    const under = [...activeCutoffs]
-      .filter((c) => c.grade <= 5)
-      .sort((a, b) => a.grade - b.grade)
-    const rows = under.map((c) => ({
-      grade: c.grade,
-      label: `${c.grade}등급`,
-      score: c.minScore as number | null,
-      below: false,
-    }))
-    rows.push({ grade: 6, label: '6등급 이하', score: null, below: true })
-    return rows
-  })()
+  // OUR-TEAM 은 늘 있고(내 기록 하나뿐이어도), 전국단위는 관리자가 넣어 둔 시험만.
+  const me: Attempt = { ...attempt, koreanMockResults: results }
+  const sources: StatsSource[] = hasNationalStats(mock) ? ['team', 'national'] : ['team']
+  const activeSource: StatsSource = source && sources.includes(source) ? source : sources[sources.length - 1]
+  const stats = mock
+    ? activeSource === 'national'
+      ? nationalStats(mock, me)
+      : teamStats(mock, me, teamAttempts ?? [])
+    : null
+  const commonNumbers = mock?.questions.map((q) => q.number) ?? []
+  const commonSet = new Set(commonNumbers)
+  const commonScore = results.reduce(
+    (s, r) => s + (r.correct && commonSet.has(r.number) ? pointsOf(r.number) : 0),
+    0,
+  )
+  const electiveNames = mock?.electives?.map((e) => e.name) ?? []
+  const sourceNote =
+    activeSource === 'national'
+      ? '전국단위 모집단 환산'
+      : `OUR-TEAM ${stats?.sampleSize ?? 0}명 기준`
+  const heroParts = [
+    ...(attempt.mockElectiveName && commonNumbers.length
+      ? [
+          { label: '공통', value: `${commonScore}점` },
+          { label: attempt.mockElectiveName, value: `${score - commonScore}점` },
+        ]
+      : []),
+    { label: '표준점수', value: stats?.std != null ? String(stats.std) : '-' },
+    { label: '백분위', value: stats?.pct != null ? String(stats.pct) : '-' },
+  ]
+  /** 결과 OMR 줄을 누르면 해설 — 정오표와 같은 조건. */
+  const openable = (num: number) => {
+    const r = results.find((x) => x.number === num)
+    return (
+      explByNumber.has(num) ||
+      linkByNumber.has(num) ||
+      (passageByNumber.has(num) && (!r?.correct || canEdit))
+    )
+  }
 
   return (
-    <div className="space-y-4 max-w-lg mx-auto">
-      <PageHeader title="시험 결과" />
+    <div className="space-y-6 max-w-lg mx-auto">
+      <PageHeader title="결과" />
 
-      {/* 점수 카드 */}
-      <Card className="p-6 text-center">
-        {attempt.createdAt && (
-          <p className="text-[13px] text-slate-400">{fmtAttemptDate(attempt.createdAt)}</p>
-        )}
-        <h2 className="text-[20px] font-bold text-slate-900 mt-1">{attempt.refTitle}</h2>
-        <Badge tone={SUBJECT_TONE[subj]} size="md" className="mt-2">
-          {MOCK_SUBJECT_LABEL[subj]}
-        </Badge>
-        <div className="mt-4 flex justify-center">
-          <ScoreRing score={score} total={totalPoints} />
-        </div>
-      </Card>
+      <ScoreHero
+        title={attempt.refTitle}
+        studentName={attempt.studentName}
+        score={score}
+        totalPoints={totalPoints}
+        grade={stats?.grade ?? null}
+        source={activeSource}
+        parts={heroParts}
+      />
 
-      {/* 등급 카드 (등급컷 있을 때) — 탭하면 등급컷 상세 */}
-      {grade != null && (
-        <button
-          type="button"
-          onClick={() => setShowCutoffs(true)}
-          className="pressable w-full text-left rounded-card bg-white p-5 hover:bg-slate-50 active:bg-slate-100"
-        >
-          <div className="flex items-center gap-2.5">
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-amber-100 text-amber-700">
-              🏆
-            </span>
-            <div className="flex-1">
-              <p className="text-[15px] font-bold text-slate-900">등급</p>
-              <p className="text-[13px] text-slate-500">이번 시험에서 나의 위치는?</p>
-            </div>
-            <span className="text-slate-300 text-lg">›</span>
-          </div>
-          <p className="mt-3 text-4xl font-extrabold text-amber-600 tracking-tight">
-            {gradeLabel(grade)}
-          </p>
-          <div className="mt-3 h-2 w-full rounded-full bg-slate-100 overflow-hidden">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-amber-300 to-amber-500"
-              style={{ width: `${totalPoints > 0 ? Math.round((score / totalPoints) * 100) : 0}%` }}
-            />
-          </div>
-          <p className="mt-1.5 text-[13px] text-slate-500 tabular-nums">
-            원점수 {score}점 / {totalPoints}점 · 등급컷 보기
-          </p>
-        </button>
+      {stats && (
+        <>
+          <SourceTabs value={activeSource} onChange={setSource} options={sources} />
+          <GradeCutTable
+            stats={stats}
+            electiveNames={electiveNames}
+            myGrade={stats.grade}
+            note={activeSource === 'national' ? '전국단위 모집단 환산' : undefined}
+          />
+          <WrongRateTop
+            stats={stats}
+            results={results}
+            commonNumbers={commonNumbers}
+            note={`${electiveNames.length ? '공통과목 기준 · ' : ''}${sourceNote}`}
+          />
+          <AnswerCompareOmr
+            results={results}
+            commonNumbers={commonNumbers}
+            electiveName={attempt.mockElectiveName}
+            commonTitle={electiveNames.length ? '공통과목' : MOCK_SUBJECT_LABEL[subj]}
+            stats={stats}
+            note={`숫자=${activeSource === 'national' ? '전국단위 모집단 환산' : 'OUR-TEAM'} 선택률(%)`}
+            onRowClick={(num) => {
+              if (!editing && openable(num)) setExplNumber(num)
+            }}
+          />
+        </>
       )}
 
       {/* 출제자 한마디 */}
@@ -352,24 +321,6 @@ export function KoreanMockResult() {
           </div>
         </div>
       )}
-
-      {/* 정답/오답 */}
-      <div className="rounded-card bg-white p-5 grid grid-cols-2">
-        <div className="flex flex-col items-center gap-1 border-r border-slate-100">
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-brand-50 text-brand-600 text-lg">
-            ○
-          </span>
-          <span className="text-[13px] text-slate-500">정답</span>
-          <span className="text-[24px] font-bold text-slate-900 tabular-nums">{correctCount}</span>
-        </div>
-        <div className="flex flex-col items-center gap-1">
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-red-50 text-red-500 text-lg">
-            ✕
-          </span>
-          <span className="text-[13px] text-slate-500">오답</span>
-          <span className="text-[24px] font-bold text-slate-900 tabular-nums">{wrongCount}</span>
-        </div>
-      </div>
 
       {mock?.explanationPdfUrl && (
         <a
@@ -515,75 +466,6 @@ export function KoreanMockResult() {
           목록으로
         </Link>
       </div>
-
-      {/* 등급컷 상세 오버레이 */}
-      {showCutoffs && grade != null && cutoffRows.length > 0 && (
-        <div className="fixed inset-0 z-50 bg-surface overflow-y-auto safe-top safe-bottom anim-pop-in">
-          <div className="max-w-lg mx-auto px-5 py-5">
-            <header className="flex items-center gap-2 mb-4">
-              <button
-                type="button"
-                onClick={() => setShowCutoffs(false)}
-                className="pressable h-10 w-10 inline-flex items-center justify-center rounded-full bg-white text-slate-600"
-                aria-label="닫기"
-              >
-                ‹
-              </button>
-              <div className="flex-1 text-center pr-9">
-                <h2 className="text-base font-bold text-slate-900">등급컷</h2>
-                <p className="text-xs text-slate-400 truncate">{attempt.refTitle}</p>
-              </div>
-            </header>
-
-            <div className="rounded-card bg-white p-5">
-              {attempt.mockElectiveName && (
-                <span className="inline-block rounded-full bg-violet-500 text-white text-xs font-semibold px-3 py-1 mb-2">
-                  {attempt.mockElectiveName}
-                </span>
-              )}
-              <h3 className="text-xl font-bold text-slate-900">추정 등급컷</h3>
-              <div className="mt-4 space-y-1">
-                {cutoffRows.map((r) => {
-                  const isMe = r.below ? grade >= 6 : grade === r.grade
-                  return (
-                    <div
-                      key={r.grade}
-                      className={`flex items-center gap-3 px-4 py-3.5 rounded-xl ${
-                        isMe ? 'bg-gradient-to-r from-amber-300 to-amber-500 shadow-sm' : ''
-                      }`}
-                    >
-                      <span
-                        className={`shrink-0 text-sm font-bold ${
-                          isMe ? 'text-white' : 'text-slate-500'
-                        }`}
-                      >
-                        {r.label}
-                      </span>
-                      <span
-                        className={`flex-1 border-b border-dotted ${
-                          isMe ? 'border-white/50' : 'border-slate-300'
-                        }`}
-                      />
-                      <span
-                        className={`shrink-0 text-lg font-bold tabular-nums ${
-                          isMe ? 'text-white' : 'text-slate-900'
-                        }`}
-                      >
-                        {r.score != null ? `${r.score} 점` : '- 점'}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-              <p className="mt-4 text-center text-sm text-slate-500">
-                내 원점수{' '}
-                <span className="font-bold text-slate-900">{score}점</span> ·{' '}
-                <span className="font-bold text-amber-600">{gradeLabel(grade)}</span>
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* 문항 해설 모달 */}
       {explNumber != null &&

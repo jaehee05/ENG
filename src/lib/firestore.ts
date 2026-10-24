@@ -903,6 +903,8 @@ export async function updateKoreanMock(
       | 'gradeCutoffs'
     >
   > & {
+    /** 전국단위 통계. null 이면 지운다. */
+    national?: KoreanMock['national'] | null
     /** 해설 PDF 설정 정보. null 이면 해설 PDF 를 제거(필드 삭제). */
     explanationPdf?: {
       url: string
@@ -930,6 +932,9 @@ export async function updateKoreanMock(
     update.gradeCutoffs = patch.gradeCutoffs.length
       ? patch.gradeCutoffs
       : deleteField()
+  }
+  if (patch.national !== undefined) {
+    update.national = patch.national ?? deleteField()
   }
   if (patch.explanationPdf !== undefined) {
     if (patch.explanationPdf === null) {
