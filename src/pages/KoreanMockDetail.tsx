@@ -28,6 +28,7 @@ import {
 import { MyAttemptsBox } from '../components/MyAttemptsBox'
 import { estimateMockCutoffs, extractGlossary, translatePassage } from '../lib/api'
 import { MockCutoffEditor } from '../components/MockCutoffEditor'
+import { NationalStatsEditor } from '../components/NationalStatsEditor'
 import { ExamFilePicker } from '../components/ExamFilePicker'
 import { RichTextEditor } from '../components/RichTextEditor'
 import { useBackdropDismiss } from '../lib/useBackdropDismiss'
@@ -1220,6 +1221,18 @@ export function KoreanMockDetail() {
             )}
           </div>
         </div>
+      )}
+
+      {/* 관리자: 전국단위 통계 (결과 화면 '전국단위' 탭) */}
+      {isAdmin && (
+        <section className="space-y-3">
+          <h2 className="text-base font-semibold text-slate-900">전국단위 통계</h2>
+          <NationalStatsEditor
+            key={mock.id}
+            mock={mock}
+            onSaved={(national) => setMock({ ...mock, national })}
+          />
+        </section>
       )}
 
       {/* 관리자: 해설 PDF */}
