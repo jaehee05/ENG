@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Capacitor } from '@capacitor/core'
 import { CapacitorUpdater } from '@capgo/capacitor-updater'
+import { startOtaFallback } from './lib/otaFallback'
 import './index.css'
 import App from './App.tsx'
 
@@ -12,6 +13,8 @@ if (Capacitor.isNativePlatform()) {
   void CapacitorUpdater.notifyAppReady().catch(() => {
     // 첫 설치엔 normal — 무시
   })
+  // Capgo 가 막혔을 때 웹(Vercel)에서 직접 받는 예비 통로.
+  startOtaFallback()
 }
 
 createRoot(document.getElementById('root')!).render(
