@@ -225,16 +225,22 @@ export function WrongRateTop({
   )
 }
 
-/** 결과 OMR 의 칸 하나 — 정답은 초록으로 칠하고, 내가 고른 오답은 빨강. 아래 선택률. */
+/**
+ * 결과 OMR 의 칸 하나. 맞힌 문항은 정답을 초록으로 칠하고, 틀린 문항은 내가 고른 오답만
+ * 빨강으로 칠한다 — 그때 정답은 진한 초록 테두리로만. 아래 선택률.
+ */
 function ResultBubble({
   n,
   correct,
   mineWrong,
+  missed,
   rate,
 }: {
   n: number
   correct: boolean
   mineWrong: boolean
+  /** 이 문항을 틀렸거나 비웠는지 — 정답 칸을 칠하지 않고 테두리만. */
+  missed: boolean
   rate: number | undefined
 }) {
   return (
@@ -242,11 +248,13 @@ function ResultBubble({
       <span
         className={cx(
           'inline-flex w-[18px] h-[24px] items-center justify-center rounded-full text-[10px] font-semibold tabular-nums',
-          correct
+          correct && !missed
             ? 'bg-[#10b981] text-white'
-            : mineWrong
-              ? 'bg-[#ef4444] text-white'
-              : 'border-[1.5px] border-[#efb5b0] text-[#e8877f] bg-white/40',
+            : correct
+              ? 'border-[2.5px] border-[#10b981] text-[#059669] font-bold bg-white/60'
+                : mineWrong
+                ? 'bg-[#ef4444] text-white'
+                : 'border-[1.5px] border-[#efb5b0] text-[#e8877f] bg-white/40',
         )}
       >
         {n}
@@ -292,6 +300,7 @@ export function AnswerCompareOmr({
         n={n}
         correct={r?.correctAnswer === n}
         mineWrong={!!r && !r.correct && r.userAnswer === n}
+        missed={!r?.correct}
         rate={rates?.[n - 1]}
       />
     ))
