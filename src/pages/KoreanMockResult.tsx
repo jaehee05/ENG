@@ -8,7 +8,7 @@ import {
   updateKoreanMockAttemptAnswers,
   watchKoreanMock,
 } from '../lib/firestore'
-import { hasStats, savedStats, teamStats } from '../lib/mockStats'
+import { blendedTeamStats, hasStats, savedStats, teamStats } from '../lib/mockStats'
 import {
   AnswerCompareOmr,
   GradeCutTable,
@@ -223,7 +223,7 @@ export function KoreanMockResult() {
     ? activeSource === 'national'
       ? savedStats(mock, me, mock.national!, null)
       : mock.team && hasStats(mock.team)
-        ? savedStats(mock, me, mock.team, mock.team.sampleSize ?? null)
+        ? blendedTeamStats(mock, me, teamAttempts ?? [])
         : teamStats(mock, me, teamAttempts ?? [])
     : null
   const commonNumbers = mock?.questions.map((q) => q.number) ?? []

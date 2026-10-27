@@ -94,30 +94,8 @@ function toRates(counts: number[], n: number): number[] {
   return counts.map((c) => (n > 0 ? Math.round((c / n) * 1000) / 10 : 0))
 }
 
-/**
- * OUR-TEAM 통계. 등급은 시험지에 넣어 둔 등급컷(AI 추정 포함)을 그대로 쓰고,
- * 표준점수·백분위·선택률은 우리 학생 응시 기록에서 낸다.
- * - 표준점수 = 100 + 20 × (원점수 − 평균) / 표준편차 (전원 점수로)
- * - 백분위 = 나와 같거나 낮은 점수 비율
- */
-export function teamStats(
-  mock: KoreanMock,
-  me: Attempt,
-  teamAttempts: Attempt[],
-): MockStatsView {
-  const points = pointsMap(mock)
-  const myRaw = rawScore(me, points)
-  // 내 응시가 목록에 없거나(방금 제출해 아직 안 읽혔거나) 재응시면 내 것으로 바꿔 넣는다.
-  const pool = firstAttemptPerStudent(teamAttempts).filter((a) => a.studentUid !== me.studentUid)
-  pool.push(me)
-
-  const raws = pool.map((a) => rawScore(a, points))
-  const n = raws.length
-  const mean = raws.reduce((s, x) => s + x, 0) / n
-  const sd = Math.sqrt(raws.reduce((s, x) => s + (x - mean) ** 2, 0) / n)
-  const stdOf = (raw: number) => (sd > 0 ? Math.round(100 + (20 * (raw - mean)) / sd) : null)
-
-  const myKey = electiveKey(me.mockElectiveName)
+/** 응시 기록의 단순 집계 — 문항 번호 → 선지 1~5 고른 수, 그 문항을 본 사람 수. */
+function countChoices(mock: KoreanMock, pool: Attempt[], myKey: string) {
   const commonNumbers = new Set(mock.questions.map((q) => q.number))
   const counts = new Map<number, number[]>()
   const totals = new Map<number, number>()
@@ -132,6 +110,68 @@ export function teamStats(
       totals.set(r.number, (totals.get(r.number) ?? 0) + 1)
     }
   }
+  return { counts, totals }
+}
+
+/** 학생 한 명당 첫 응시만, 내 것은 지금 보는 응시로 바꿔 넣은 풀. */
+function poolWithMe(me: Attempt, teamAttempts: Attempt[]): Attempt[] {
+  // 내 응시가 목록에 없거나(방금 제출해 아직 안 읽혔거나) 재응시면 내 것으로 바꿔 넣는다.
+  const pool = firstAttemptPerStudent(teamAttempts).filter((a) => a.studentUid !== me.studentUid)
+  pool.push(me)
+  return pool
+}
+
+/**
+ * OUR-TEAM 통계 — 저장된 AI 추정치(mock.team)에 실제 응시 기록을 섞는다.
+ * 추정치를 표본 sampleSize 명분의 응답으로 보고, 실제 학생은 한 명당 한 명분으로 더한다:
+ * - 표본 수 = sampleSize + 실제 응시 학생 수 (학생당 첫 응시만)
+ * - 선택률 = (추정 선택률 × sampleSize + 실제 고른 수 × 100) / (sampleSize + 그 문항 본 학생 수)
+ * 등급컷·표준점수 컷은 추정치 그대로 — 내 등급·표준점수·백분위도 그걸로 읽는다.
+ */
+export function blendedTeamStats(mock: KoreanMock, me: Attempt, teamAttempts: Attempt[]): MockStatsView {
+  const team = mock.team ?? {}
+  const base = savedStats(mock, me, team, null)
+  const n0 = team.sampleSize && team.sampleSize > 0 ? team.sampleSize : 100
+  const pool = poolWithMe(me, teamAttempts)
+  const { counts, totals } = countChoices(mock, pool, electiveKey(me.mockElectiveName))
+  const rates = new Map<number, number[]>()
+  for (const num of new Set([...base.rates.keys(), ...counts.keys()])) {
+    const ai = base.rates.get(num)
+    const c = counts.get(num) ?? [0, 0, 0, 0, 0]
+    const real = totals.get(num) ?? 0
+    // 추정치가 없는 문항은 실제 기록만.
+    const w = ai ? n0 : 0
+    const n = w + real
+    rates.set(
+      num,
+      c.map((x, i) => (n > 0 ? Math.round(((w * (ai?.[i] ?? 0) + x * 100) / n) * 10) / 10 : 0)),
+    )
+  }
+  return { ...base, rates, sampleSize: n0 + pool.length }
+}
+
+/**
+ * OUR-TEAM 통계(추정치가 없는 시험). 등급은 시험지에 넣어 둔 등급컷(AI 추정 포함)을 그대로 쓰고,
+ * 표준점수·백분위·선택률은 우리 학생 응시 기록에서 낸다.
+ * - 표준점수 = 100 + 20 × (원점수 − 평균) / 표준편차 (전원 점수로)
+ * - 백분위 = 나와 같거나 낮은 점수 비율
+ */
+export function teamStats(
+  mock: KoreanMock,
+  me: Attempt,
+  teamAttempts: Attempt[],
+): MockStatsView {
+  const points = pointsMap(mock)
+  const myRaw = rawScore(me, points)
+  const pool = poolWithMe(me, teamAttempts)
+  const raws = pool.map((a) => rawScore(a, points))
+  const n = raws.length
+  const mean = raws.reduce((s, x) => s + x, 0) / n
+  const sd = Math.sqrt(raws.reduce((s, x) => s + (x - mean) ** 2, 0) / n)
+  const stdOf = (raw: number) => (sd > 0 ? Math.round(100 + (20 * (raw - mean)) / sd) : null)
+
+  const myKey = electiveKey(me.mockElectiveName)
+  const { counts, totals } = countChoices(mock, pool, myKey)
   const rates = new Map<number, number[]>()
   for (const [num, c] of counts) rates.set(num, toRates(c, totals.get(num) ?? 0))
 
