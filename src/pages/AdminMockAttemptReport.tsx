@@ -8,6 +8,7 @@ import {
   setMockGradeOverride,
 } from '../lib/firestore'
 import { ReportSummary } from '../components/ReportSummary'
+import { gradeLabel, LOWEST_GRADE } from '../lib/mockStats'
 import { convertAngleInText } from '../lib/angleBrackets'
 import { fmtReportDate, isoKST, todayLabel } from '../lib/reportFormat'
 import {
@@ -33,11 +34,6 @@ import {
  * 관리자 화면의 문구는 여기에 들어오면 안 된다 — 학생과 학부모가 읽는
  * 문서다. 등급을 채우는 칸만 .no-print 로 화면에 남긴다.
  */
-
-/** 6등급부터는 아래를 묶어 적는다 — 결과 화면과 같은 표기. */
-function gradeLabel(g: number): string {
-  return g >= 6 ? '6등급 이하' : `${g}등급`
-}
 
 /** 문항 표를 몇 칸으로 갈라 놓을지. A4 한 장에 45문항을 담는 폭이다. */
 const ANSWER_COLUMN_COUNT = 3
@@ -120,12 +116,12 @@ export function AdminMockAttemptReport() {
   )
 
   /**
-   * 등급컷 표의 칸. 1~5등급을 늘어놓고 그 아래를 '6등급 이하'로 묶는다 —
+   * 등급컷 표의 칸. 1~4등급을 늘어놓고 그 아래를 '5등급 이하'로 묶는다 —
    * 결과 화면과 같은 묶음이다.
    */
   const cutoffRows = useMemo(() => {
     const under = cutoffs
-      .filter((c) => c.grade <= 5 && Number.isFinite(c.minScore))
+      .filter((c) => c.grade < LOWEST_GRADE && Number.isFinite(c.minScore))
       .sort((a, b) => a.grade - b.grade)
     if (under.length === 0) return []
     return [
@@ -134,11 +130,11 @@ export function AdminMockAttemptReport() {
         label: `${c.grade}등급`,
         score: c.minScore as number | null,
       })),
-      { grade: 6, label: '6등급 이하', score: null as number | null },
+      { grade: LOWEST_GRADE, label: gradeLabel(LOWEST_GRADE), score: null as number | null },
     ]
   }, [cutoffs])
 
-  /** '6등급 이하' 칸에 적을 기준 점수 — 가장 낮은 등급컷. */
+  /** '5등급 이하' 칸에 적을 기준 점수 — 4등급까지 중 가장 낮은 컷. */
   const lowestCut = useMemo(
     () =>
       cutoffRows.reduce(
@@ -161,9 +157,9 @@ export function AdminMockAttemptReport() {
   const grade = gradeFromScore(scored.raw, cutoffs) ?? gradeOverrides[overrideKey] ?? null
   /** 등급컷으로 나온 등급은 못 바꾼다. 비어 있을 때만 손으로 채운다. */
   const canFillGrade = gradeFromScore(scored.raw, cutoffs) == null
-  /** 등급컷 표에서 학생이 받은 칸인지. 7·8·9등급은 '6등급 이하' 칸에 든다. */
+  /** 등급컷 표에서 학생이 받은 칸인지. 5등급부터는 '5등급 이하' 칸에 든다. */
   const isMyCutoffCell = (cellGrade: number) =>
-    grade != null && (cellGrade === 6 ? grade >= 6 : grade === cellGrade)
+    grade != null && (cellGrade === LOWEST_GRADE ? grade >= LOWEST_GRADE : grade === cellGrade)
 
   async function handleGradeFill(value: string) {
     const g = value === '' ? null : Number(value)

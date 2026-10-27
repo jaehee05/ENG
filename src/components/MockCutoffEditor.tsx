@@ -1,6 +1,6 @@
 import type { MockGradeCut } from '../lib/types'
 
-// 1~5등급 컷만 입력. 6등급부터는 "6등급 이하"로 처리.
+// 1~5등급 컷만 입력. 화면에는 5등급부터 "5등급 이하"로 나온다.
 const GRADES = [1, 2, 3, 4, 5]
 
 /**
