@@ -227,7 +227,7 @@ export function WrongRateTop({
 
 /**
  * 결과 OMR 의 칸 하나. 맞힌 문항은 정답을 초록으로 칠하고, 틀린 문항은 내가 고른 오답만
- * 빨강으로 칠한다 — 그때 정답은 진한 초록 테두리로만. 아래 선택률.
+ * 빨강으로 칠한다 — 그때 정답은 연한 초록 빗금으로만. 아래 선택률.
  */
 function ResultBubble({
   n,
@@ -239,7 +239,7 @@ function ResultBubble({
   n: number
   correct: boolean
   mineWrong: boolean
-  /** 이 문항을 틀렸거나 비웠는지 — 정답 칸을 칠하지 않고 테두리만. */
+  /** 이 문항을 틀렸거나 비웠는지 — 정답 칸을 칠하지 않고 빗금만. */
   missed: boolean
   rate: number | undefined
 }) {
@@ -251,7 +251,7 @@ function ResultBubble({
           correct && !missed
             ? 'bg-[#10b981] text-white'
             : correct
-              ? 'border-[2.5px] border-[#10b981] text-[#059669] font-bold bg-white/60'
+              ? 'border-[1.5px] border-[#86d9b5] text-[#059669] bg-[repeating-linear-gradient(135deg,rgba(16,185,129,0.28)_0_2px,transparent_2px_5px)]'
                 : mineWrong
                 ? 'bg-[#ef4444] text-white'
                 : 'border-[1.5px] border-[#efb5b0] text-[#e8877f] bg-white/40',
