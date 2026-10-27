@@ -28,7 +28,7 @@ import {
 import { MyAttemptsBox } from '../components/MyAttemptsBox'
 import { estimateMockCutoffs, extractGlossary, translatePassage } from '../lib/api'
 import { MockCutoffEditor } from '../components/MockCutoffEditor'
-import { NationalStatsEditor } from '../components/NationalStatsEditor'
+import { MockStatsEditor } from '../components/MockStatsEditor'
 import { ExamFilePicker } from '../components/ExamFilePicker'
 import { RichTextEditor } from '../components/RichTextEditor'
 import { useBackdropDismiss } from '../lib/useBackdropDismiss'
@@ -1223,14 +1223,26 @@ export function KoreanMockDetail() {
         </div>
       )}
 
-      {/* 관리자: 전국단위 통계 (결과 화면 '전국단위' 탭) */}
+      {/* 관리자: 결과 화면 통계 ('전국단위'·'OUR-TEAM' 탭). 전국단위를 먼저 — OUR-TEAM 추정이 그걸 견준다. */}
       {isAdmin && (
         <section className="space-y-3">
           <h2 className="text-base font-semibold text-slate-900">전국단위 통계</h2>
-          <NationalStatsEditor
-            key={mock.id}
+          <MockStatsEditor
+            key={`${mock.id}-national`}
             mock={mock}
+            target="national"
             onSaved={(national) => setMock({ ...mock, national })}
+          />
+        </section>
+      )}
+      {isAdmin && (
+        <section className="space-y-3">
+          <h2 className="text-base font-semibold text-slate-900">OUR-TEAM 통계</h2>
+          <MockStatsEditor
+            key={`${mock.id}-team`}
+            mock={mock}
+            target="team"
+            onSaved={(team) => setMock({ ...mock, team })}
           />
         </section>
       )}

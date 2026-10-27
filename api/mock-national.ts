@@ -6,23 +6,32 @@ export const config = {
 }
 
 /**
- * 전국단위 통계 AI 추정. 사설 모의고사는 공개 통계가 없고 우리 학생 표본은 너무 작아서,
- * 문제지·정답·해설을 보고 전국 수험생 모집단이었다면 나왔을 수치를 어림한다.
+ * 결과 화면 통계 AI 추정. 사설 모의고사는 공개 통계가 없고 우리 학생 표본은 너무 작아서,
+ * 문제지·정답·해설을 보고 어림한다. population 으로 두 집단을 나눈다:
+ *  - 'national': 전국단위 — 상위권이 두꺼운, 잘하는 응시자 집단
+ *  - 'team'    : OUR-TEAM — 학원 학생 약 100명. 전국단위보다 등급컷·정답률이 낮다.
+ *                reference 로 전국단위 추정치를 받으면 그보다 낮게 맞춘다.
  * 한 번에 다 시키면 60초를 넘기므로 클라이언트가 나눠 부른다:
  *  - part 'cutoffs': 과목별 원점수 등급컷 1~8 + 등급별 표준점수
  *  - part 'rates'  : 한 묶음(공통 또는 선택과목 하나) 문항의 선지별 선택률
  */
 
-const COMMON_RULES = `당신은 수능 국어 출제·채점 통계 전문가입니다. 사설 실전 모의고사를 전국 수능 응시생 모집단(약 45만 명, 재수생 포함)이 본다고 가정하고, 그때 나왔을 통계를 추정합니다.
+const POPULATION = {
+  national: `사설 실전 모의고사를 실력 좋은 전국 응시자 집단이 본다고 가정하고, 그때 나왔을 통계를 추정합니다. 이 시험을 사서 푸는 사람들은 상위권·재수생 비중이 높아 일반 수능 모집단보다 잘합니다 — 같은 시험이라도 등급컷과 정답률을 평가원 기준보다 조금 높게 잡으세요.`,
+  team: `이 모의고사를 한 학원 학생 약 100명이 본다고 가정하고, 그 안에서의 통계를 추정합니다. 이 집단은 전국 응시자 집단보다 평균 실력이 낮습니다 — 등급컷은 전국단위보다 대체로 4~8점 낮고, 정답률도 문항마다 조금씩 낮습니다(어려운 문항일수록 더 많이 낮다). 표본이 작아 숫자가 덜 매끈해도 됩니다.`,
+}
+
+const COMMON_RULES = `당신은 수능 국어 출제·채점 통계 전문가입니다.
 시험지 본문이 있으면 지문 길이·난도, 선지의 매력도를 실제로 판단하세요. 본문이 없으면 문항 해설과 배점, 문항 위치(독서 후반 장문 세트·문학 복합 세트는 대체로 어렵다)를 근거로 판단하세요.
 숫자는 그럴듯하게 들쭉날쭉해야 합니다 — 모든 문항을 비슷한 값으로 채우지 마세요.`
 
 const CUTOFF_RULES = `${COMMON_RULES}
+- 등급은 이 집단 안의 상대평가로 매깁니다.
 
 원점수 등급컷:
 - 등급 1~8 각각 "이 원점수 이상이면 해당 등급"인 정수. 상대평가 누적 비율 4/11/23/40/60/77/89/96%.
 - 선택과목마다 따로 낸다(공통 + 그 선택과목 총점 기준). 선택과목이 어려우면 그 과목 컷이 조금 낮다.
-- 최근 수능 국어 1등급컷은 대체로 80~92점. 실전 사설은 평가원보다 조금 어렵게 나오는 편.
+- 최근 수능 국어 1등급컷은 대체로 80~92점. 실전 사설은 평가원보다 조금 어렵게 나오는 편이지만, 응시 집단이 잘하는지 못하는지도 반영하세요.
 
 등급별 표준점수:
 - 등급 1~8 각 등급컷에 해당하는 표준점수(평균 100, 표준편차 20 체계, 정수). 선택과목과 상관없이 하나.
@@ -128,6 +137,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const body = (req.body ?? {}) as {
     part?: 'cutoffs' | 'rates'
+    population?: 'national' | 'team'
+    /** team 일 때 견줄 전국단위 추정치(사람이 읽을 글). 이보다 낮게 맞춘다. */
+    reference?: string
     title?: string
     examText?: string
     /** part 'cutoffs': 과목 키 → 그 과목 총점(공통 포함). */
@@ -145,6 +157,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ? `\n\n[시험지 본문]\n${body.examText.slice(0, 60000)}`
       : ''
   const questions = groups.map((g) => `[${g.label}]\n${questionLines(g.questions)}`).join('\n\n')
+  const population = body.population === 'team' ? 'team' : 'national'
+  const reference =
+    population === 'team' && typeof body.reference === 'string' && body.reference.trim()
+      ? `\n\n[같은 시험의 전국단위 추정치 — 이보다 낮게]\n${body.reference.slice(0, 8000)}`
+      : ''
+  // 집단 설명은 system 이 아니라 user 쪽에 — system 을 두 집단이 같이 써야 캐시가 맞는다.
+  const who = `[응시 집단]\n${POPULATION[population]}\n\n`
   const client = new Anthropic({ apiKey })
 
   try {
@@ -155,9 +174,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return
       }
       const user =
+        who +
         `[시험] ${String(body.title ?? '')}\n` +
         `[과목별 총점] ${totals.map(([k, t]) => `${k}: ${t}점`).join(', ')}\n\n` +
-        `[문항]\n${questions}${paper}`
+        `[문항]\n${questions}${reference}${paper}`
       const out = await ask(client, CUTOFF_RULES, user, {
         type: 'object',
         properties: {
@@ -186,7 +206,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return
     }
 
-    const user = `[시험] ${String(body.title ?? '')}\n\n[선택률을 낼 문항]\n${questions}${paper}`
+    const user = `${who}[시험] ${String(body.title ?? '')}\n\n[선택률을 낼 문항]\n${questions}${reference}${paper}`
     const out = await ask(client, RATES_RULES, user, {
       type: 'object',
       properties: {

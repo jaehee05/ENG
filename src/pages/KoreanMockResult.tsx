@@ -8,7 +8,7 @@ import {
   updateKoreanMockAttemptAnswers,
   watchKoreanMock,
 } from '../lib/firestore'
-import { hasNationalStats, nationalStats, teamStats } from '../lib/mockStats'
+import { hasStats, savedStats, teamStats } from '../lib/mockStats'
 import {
   AnswerCompareOmr,
   GradeCutTable,
@@ -215,14 +215,16 @@ export function KoreanMockResult() {
   }
   const totalPoints = results.reduce((s, r) => s + pointsOf(r.number), 0)
   const score = results.reduce((s, r) => s + (r.correct ? pointsOf(r.number) : 0), 0)
-  // OUR-TEAM 은 늘 있고(내 기록 하나뿐이어도), 전국단위는 관리자가 넣어 둔 시험만.
+  // OUR-TEAM 은 늘 있고(추정치가 없으면 우리 학생 응시 기록으로), 전국단위는 관리자가 넣어 둔 시험만.
   const me: Attempt = { ...attempt, koreanMockResults: results }
-  const sources: StatsSource[] = hasNationalStats(mock) ? ['team', 'national'] : ['team']
+  const sources: StatsSource[] = hasStats(mock?.national) ? ['team', 'national'] : ['team']
   const activeSource: StatsSource = source && sources.includes(source) ? source : sources[sources.length - 1]
   const stats = mock
     ? activeSource === 'national'
-      ? nationalStats(mock, me)
-      : teamStats(mock, me, teamAttempts ?? [])
+      ? savedStats(mock, me, mock.national!, null)
+      : mock.team && hasStats(mock.team)
+        ? savedStats(mock, me, mock.team, mock.team.sampleSize ?? null)
+        : teamStats(mock, me, teamAttempts ?? [])
     : null
   const commonNumbers = mock?.questions.map((q) => q.number) ?? []
   const commonSet = new Set(commonNumbers)
@@ -265,7 +267,7 @@ export function KoreanMockResult() {
         score={score}
         totalPoints={totalPoints}
         grade={stats?.grade ?? null}
-        source={activeSource}
+        gradeOpenEnded={stats?.gradeOpenEnded ?? false}
         parts={heroParts}
       />
 

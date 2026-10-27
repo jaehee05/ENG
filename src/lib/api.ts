@@ -1,4 +1,4 @@
-import { questionPoints, type KoreanMock, type KoreanMockQuestion, type MockNationalStats, type WordEntry } from './types'
+import { questionPoints, type KoreanMock, type KoreanMockQuestion, type MockGradeCut, type MockNationalStats, type WordEntry } from './types'
 import { COMMON_KEY } from './mockStats'
 import type { OmrGrid } from './omrGrid'
 
@@ -223,11 +223,22 @@ async function postNational<T>(body: unknown): Promise<T> {
   return (await res.json()) as T
 }
 
+/** OUR-TEAM 추정 때 AI 가 견줄 전국단위 값 — 사람이 읽는 글로. */
+function cutsText(c: MockGradeCut[] | undefined): string {
+  return (c ?? []).map((x) => `${x.grade}등급 ${x.minScore}`).join(', ')
+}
+
 /**
- * 전국단위 통계 AI 추정 — 등급컷·표준점수 한 번, 묶음(공통·선택과목)마다 선택률 한 번씩
+ * 결과 화면 통계 AI 추정 — 등급컷·표준점수 한 번, 묶음(공통·선택과목)마다 선택률 한 번씩
  * 나란히 부른다. 하나로 부르면 서버 60초를 넘긴다.
+ * population 'team'(OUR-TEAM, 약 100명)은 reference(전국단위 값)가 있으면 그보다 낮게 맞춘다.
  */
-export async function estimateNationalStats(mock: KoreanMock, examText?: string): Promise<MockNationalStats> {
+export async function estimateMockStats(
+  mock: KoreanMock,
+  population: 'national' | 'team',
+  examText?: string,
+  reference?: MockNationalStats,
+): Promise<MockNationalStats> {
   const toInput = (qs: KoreanMockQuestion[]) =>
     qs.map((q) => ({ number: q.number, answer: q.answer, points: questionPoints(q), hint: questionHint(q) }))
   const electives = mock.electives ?? []
@@ -239,12 +250,30 @@ export async function estimateNationalStats(mock: KoreanMock, examText?: string)
   const totals: Record<string, number> = electives.length
     ? Object.fromEntries(electives.map((el) => [el.name, commonPts + el.questions.reduce((s, q) => s + questionPoints(q), 0)]))
     : { [COMMON_KEY]: commonPts }
-  const shared = { title: mock.title, examText: examText || undefined }
+  const shared = { title: mock.title, examText: examText || undefined, population }
+  const useRef = population === 'team' && reference
+
+  const cutRef = useRef
+    ? [
+        ...Object.entries(reference.cutoffs ?? {}).map(([k, c]) => `원점수 컷(${k === COMMON_KEY ? '전체' : k}): ${cutsText(c)}`),
+        reference.stdCutoffs?.length ? `표준점수 컷: ${cutsText(reference.stdCutoffs)}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n')
+    : undefined
+  const rateRef = (key: string) => {
+    const r = useRef ? reference.rates?.[key] : undefined
+    if (!r) return undefined
+    return Object.entries(r)
+      .map(([num, v]) => `${num}번 ${v.map((x) => x.toFixed(1)).join(' ')}`)
+      .join('\n')
+  }
 
   const [cuts, ...rateParts] = await Promise.all([
     postNational<{ cutoffs: MockNationalStats['cutoffs']; stdCutoffs: MockNationalStats['stdCutoffs'] }>({
       ...shared,
       part: 'cutoffs',
+      reference: cutRef,
       totals,
       groups: groups.map(({ label, questions }) => ({ label, questions })),
     }),
@@ -252,6 +281,7 @@ export async function estimateNationalStats(mock: KoreanMock, examText?: string)
       postNational<{ rates: Record<string, number[]> }>({
         ...shared,
         part: 'rates',
+        reference: rateRef(g.key),
         groups: [{ label: g.label, questions: g.questions }],
       }),
     ),

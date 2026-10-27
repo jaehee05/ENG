@@ -4,15 +4,19 @@ import {
   type Attempt,
   type KoreanMock,
   type MockGradeCut,
+  type MockNationalStats,
 } from './types'
 
 /**
- * 모의고사 결과 화면의 통계 — OUR-TEAM(우리 학생 응시 기록)과 전국단위(관리자가
- * 옮겨 적은 공개 자료) 두 가지를 같은 모양으로 만든다. 화면은 어느 쪽인지 모르고 그린다.
+ * 모의고사 결과 화면의 통계 — OUR-TEAM 과 전국단위 두 가지를 같은 모양으로 만든다.
+ * 둘 다 보통은 관리자가 저장해 둔 AI 추정치(mock.team / mock.national)다. OUR-TEAM 추정치가
+ * 없는 시험만 우리 학생 응시 기록에서 직접 낸다. 화면은 어느 쪽인지 모르고 그린다.
  */
 export interface MockStatsView {
   /** 내 등급 (등급컷이 없으면 null). */
   grade: number | null
+  /** 등급컷이 5등급까지만 있어 그 아래를 가를 수 없을 때 — 'N등급 이하'로 보인다. */
+  gradeOpenEnded: boolean
   /** 내 표준점수 (계산할 자료가 없으면 null). */
   std: number | null
   /** 내 백분위 (계산할 자료가 없으면 null). */
@@ -23,7 +27,7 @@ export interface MockStatsView {
   stdCutoffs: MockGradeCut[]
   /** 문항 번호 → 선지 1~5 선택률(%). 내 선택과목 문항 기준. */
   rates: Map<number, number[]>
-  /** OUR-TEAM 에서 통계에 쓴 응시 수. 전국단위는 null. */
+  /** OUR-TEAM 표본 수(추정치는 저장된 값). 전국단위는 null. */
   sampleSize: number | null
 }
 
@@ -142,8 +146,10 @@ export function teamStats(
     .map((c) => ({ grade: c.grade, minScore: stdOf(c.minScore) }))
     .filter((c): c is MockGradeCut => c.minScore != null)
 
+  const grade = gradeFromScore(myRaw, myCuts)
   return {
-    grade: gradeFromScore(myRaw, myCuts),
+    grade,
+    gradeOpenEnded: isOpenEnded(grade, myCuts),
     std: n >= 2 ? stdOf(myRaw) : null,
     pct: n >= 2 ? Math.round((raws.filter((x) => x <= myRaw).length / n) * 100) : null,
     cutoffs,
@@ -175,9 +181,14 @@ function interpolateStd(raw: number, rawCuts: MockGradeCut[], stdCuts: MockGrade
   return Math.round(y0 + ((raw - x0) * (y1 - y0)) / (x1 - x0))
 }
 
-/** 전국단위 통계가 하나라도 들어 있는지. 없으면 탭을 감춘다. */
-export function hasNationalStats(mock: KoreanMock | null | undefined): boolean {
-  const n = mock?.national
+/** 맨 아래 등급컷보다 못하면 그 다음 등급이 나오는데, 컷이 8등급까지 없으면 그 아래도 섞여 있다. */
+function isOpenEnded(grade: number | null, cuts: MockGradeCut[]): boolean {
+  const last = Math.max(0, ...cuts.map((c) => c.grade))
+  return grade != null && last < 8 && grade > last
+}
+
+/** 저장된 통계(전국단위·OUR-TEAM 추정치)가 하나라도 들어 있는지. */
+export function hasStats(n: MockNationalStats | null | undefined): boolean {
   if (!n) return false
   return (
     Object.values(n.cutoffs ?? {}).some((c) => c.length > 0) ||
@@ -186,9 +197,16 @@ export function hasNationalStats(mock: KoreanMock | null | undefined): boolean {
   )
 }
 
-/** 전국단위 통계. 비어 있는 칸은 비운 채로 둔다 — 지어내지 않는다. */
-export function nationalStats(mock: KoreanMock, me: Attempt): MockStatsView {
-  const n = mock.national ?? {}
+/**
+ * 저장된 통계(전국단위 또는 OUR-TEAM 추정치)로 내 등급·표준점수·백분위를 읽는다.
+ * 비어 있는 칸은 비운 채로 둔다.
+ */
+export function savedStats(
+  mock: KoreanMock,
+  me: Attempt,
+  n: MockNationalStats,
+  sampleSize: number | null,
+): MockStatsView {
   const myKey = electiveKey(me.mockElectiveName)
   const myRaw = rawScore(me, pointsMap(mock))
   const cutoffs = n.cutoffs ?? {}
@@ -200,14 +218,16 @@ export function nationalStats(mock: KoreanMock, me: Attempt): MockStatsView {
   for (const key of new Set([COMMON_KEY, myKey])) {
     for (const [num, r] of Object.entries(n.rates?.[key] ?? {})) rates.set(Number(num), r)
   }
+  const grade = gradeFromScore(myRaw, myCuts)
   return {
-    grade: gradeFromScore(myRaw, myCuts),
+    grade,
+    gradeOpenEnded: isOpenEnded(grade, myCuts),
     std,
     pct: std != null ? pctFromStd(std) : null,
     cutoffs,
     stdCutoffs,
     rates,
-    sampleSize: null,
+    sampleSize,
   }
 }
 

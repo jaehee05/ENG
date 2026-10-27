@@ -905,6 +905,8 @@ export async function updateKoreanMock(
   > & {
     /** 전국단위 통계. null 이면 지운다. */
     national?: KoreanMock['national'] | null
+    /** OUR-TEAM 통계. null 이면 지운다. */
+    team?: KoreanMock['team'] | null
     /** 해설 PDF 설정 정보. null 이면 해설 PDF 를 제거(필드 삭제). */
     explanationPdf?: {
       url: string
@@ -935,6 +937,9 @@ export async function updateKoreanMock(
   }
   if (patch.national !== undefined) {
     update.national = patch.national ?? deleteField()
+  }
+  if (patch.team !== undefined) {
+    update.team = patch.team ?? deleteField()
   }
   if (patch.explanationPdf !== undefined) {
     if (patch.explanationPdf === null) {
