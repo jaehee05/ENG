@@ -314,9 +314,10 @@ export function AnswerCompareOmr({
       <div className="rounded-xl bg-[#fffbe8] p-2.5 space-y-2.5">
         <OmrCard title={commonTitle} tone="result" className="rounded-none">
           <div className="grid grid-cols-2">
-            <OmrColumn items={commonRows.slice(0, mid)} tone="result" renderAnswers={render} rowHeight={rowHeight} onRowClick={onRowClick} numClass={resultNum} />
+            <OmrColumn items={commonRows.slice(0, mid)} rowLines tone="result" renderAnswers={render} rowHeight={rowHeight} onRowClick={onRowClick} numClass={resultNum} />
             <OmrColumn
               items={commonRows.slice(mid)}
+              rowLines
               tone="result"
               renderAnswers={render}
               rowHeight={rowHeight}
@@ -329,7 +330,7 @@ export function AnswerCompareOmr({
         {electiveRows.length > 0 && (
           <div className="grid grid-cols-2">
             <OmrCard title={electiveName ?? '선택과목'} tone="result" className="rounded-none">
-              <OmrColumn items={electiveRows} alignToFive tone="result" renderAnswers={render} rowHeight={rowHeight} onRowClick={onRowClick} numClass={resultNum} />
+              <OmrColumn items={electiveRows} rowLines tone="result" renderAnswers={render} rowHeight={rowHeight} onRowClick={onRowClick} numClass={resultNum} />
             </OmrCard>
           </div>
         )}
