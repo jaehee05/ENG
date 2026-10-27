@@ -19,7 +19,7 @@ export function ScoreHero({
   score,
   totalPoints,
   grade,
-  source,
+  gradeOpenEnded,
   parts,
 }: {
   title: string
@@ -27,7 +27,8 @@ export function ScoreHero({
   score: number
   totalPoints: number
   grade: number | null
-  source: StatsSource
+  /** 등급컷이 5등급까지뿐이라 그 아래를 못 가를 때 — 'N등급 이하'. */
+  gradeOpenEnded: boolean
   /** 아래 줄 — 공통·선택·표준점수·백분위. 값이 없으면 '-'. */
   parts: { label: string; value: string }[]
 }) {
@@ -50,8 +51,8 @@ export function ScoreHero({
       {grade != null && (
         <div className="mt-4 flex justify-center">
           <span className="inline-flex items-baseline gap-1 rounded-full bg-[#d9f99d] px-5 py-1.5 text-[#14532d] shadow-sm">
-            {source === 'team' && grade >= 6 ? (
-              <span className="text-[15px] font-extrabold">6등급 이하</span>
+            {gradeOpenEnded ? (
+              <span className="text-[15px] font-extrabold">{grade}등급 이하</span>
             ) : (
               <>
                 <span className="text-[24px] font-black tabular-nums">{grade}</span>

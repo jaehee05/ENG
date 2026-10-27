@@ -621,6 +621,12 @@ export interface MockNationalStats {
   rates?: Record<string, Record<string, number[]>>
 }
 
+/** OUR-TEAM 통계(AI 추정). 전국단위와 같은 모양에 표본 수를 더한다. */
+export interface MockTeamStats extends MockNationalStats {
+  /** 화면에 'OUR-TEAM N명 기준'으로 나오는 수. */
+  sampleSize?: number
+}
+
 /** 모의고사 과목. 기존 레코드는 'korean'으로 간주. */
 export type MockSubject = 'korean' | 'english'
 
@@ -639,8 +645,13 @@ export interface KoreanMock {
   examinerComment?: string
   /** AI 산출 등급컷 (원점수 기준). */
   gradeCutoffs?: MockGradeCut[]
-  /** 전국단위(실제 시행) 통계. 관리자가 공개 자료를 옮겨 적는다. 결과 화면 '전국단위' 탭. */
+  /** 전국단위 통계(보통 AI 추정, 관리자 저장). 결과 화면 '전국단위' 탭. */
   national?: MockNationalStats
+  /**
+   * OUR-TEAM 통계(AI 추정, 관리자 저장). 있으면 결과 화면 'OUR-TEAM' 탭이 실제 응시 기록
+   * 대신 이걸 쓴다 — 실제 표본이 너무 작아서.
+   */
+  team?: MockTeamStats
   /** 해설 PDF 다운로드 URL(Storage). 설정 시 채점 후 학생에게 제공, 없으면 생략. */
   explanationPdfUrl?: string
   /** 해설 PDF 원본 파일명(표시용). */
