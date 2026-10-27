@@ -15,7 +15,7 @@ import {
 export interface MockStatsView {
   /** 내 등급 (등급컷이 없으면 null). */
   grade: number | null
-  /** 등급컷이 5등급까지만 있어 그 아래를 가를 수 없을 때 — 'N등급 이하'로 보인다. */
+  /** 5등급 이하는 가르지 않는다 — grade 는 5, 화면엔 '5등급 이하'. */
   gradeOpenEnded: boolean
   /** 내 표준점수 (계산할 자료가 없으면 null). */
   std: number | null
@@ -186,14 +186,12 @@ export function teamStats(
     .map((c) => ({ grade: c.grade, minScore: stdOf(c.minScore) }))
     .filter((c): c is MockGradeCut => c.minScore != null)
 
-  const grade = gradeFromScore(myRaw, myCuts)
   return {
-    grade,
-    gradeOpenEnded: isOpenEnded(grade, myCuts),
+    ...gradeView(myRaw, myCuts),
     std: n >= 2 ? stdOf(myRaw) : null,
     pct: n >= 2 ? Math.round((raws.filter((x) => x <= myRaw).length / n) * 100) : null,
-    cutoffs,
-    stdCutoffs: n >= 2 ? stdCutoffs : [],
+    cutoffs: cutoffsUpToLowest(cutoffs),
+    stdCutoffs: n >= 2 ? upToLowest(stdCutoffs) : [],
     rates,
     sampleSize: n,
   }
@@ -221,10 +219,23 @@ function interpolateStd(raw: number, rawCuts: MockGradeCut[], stdCuts: MockGrade
   return Math.round(y0 + ((raw - x0) * (y1 - y0)) / (x1 - x0))
 }
 
-/** 맨 아래 등급컷보다 못하면 그 다음 등급이 나오는데, 컷이 8등급까지 없으면 그 아래도 섞여 있다. */
-function isOpenEnded(grade: number | null, cuts: MockGradeCut[]): boolean {
-  const last = Math.max(0, ...cuts.map((c) => c.grade))
-  return grade != null && last < 8 && grade > last
+/**
+ * 화면에 보이는 가장 낮은 등급. 그 아래는 '5등급 이하'로 뭉치고, 등급컷 표도 5등급까지만.
+ * (저장된 컷은 8등급까지 있을 수 있다 — 표준점수를 이어 읽을 때는 다 쓴다.)
+ */
+const LOWEST_GRADE = 5
+
+function gradeView(raw: number, cuts: MockGradeCut[]) {
+  const g = gradeFromScore(raw, cuts)
+  return { grade: g == null ? null : Math.min(g, LOWEST_GRADE), gradeOpenEnded: g != null && g >= LOWEST_GRADE }
+}
+
+function upToLowest(cuts: MockGradeCut[]): MockGradeCut[] {
+  return cuts.filter((c) => c.grade <= LOWEST_GRADE)
+}
+
+function cutoffsUpToLowest(cutoffs: Record<string, MockGradeCut[]>): Record<string, MockGradeCut[]> {
+  return Object.fromEntries(Object.entries(cutoffs).map(([k, c]) => [k, upToLowest(c)]))
 }
 
 /** 저장된 통계(전국단위·OUR-TEAM 추정치)가 하나라도 들어 있는지. */
@@ -258,14 +269,12 @@ export function savedStats(
   for (const key of new Set([COMMON_KEY, myKey])) {
     for (const [num, r] of Object.entries(n.rates?.[key] ?? {})) rates.set(Number(num), r)
   }
-  const grade = gradeFromScore(myRaw, myCuts)
   return {
-    grade,
-    gradeOpenEnded: isOpenEnded(grade, myCuts),
+    ...gradeView(myRaw, myCuts),
     std,
     pct: std != null ? pctFromStd(std) : null,
-    cutoffs,
-    stdCutoffs,
+    cutoffs: cutoffsUpToLowest(cutoffs),
+    stdCutoffs: upToLowest(stdCutoffs),
     rates,
     sampleSize,
   }

@@ -27,7 +27,7 @@ export function ScoreHero({
   score: number
   totalPoints: number
   grade: number | null
-  /** 등급컷이 5등급까지뿐이라 그 아래를 못 가를 때 — 'N등급 이하'. */
+  /** 5등급 이하를 뭉쳐 보일 때 — 'N등급 이하'. */
   gradeOpenEnded: boolean
   /** 아래 줄 — 공통·선택·표준점수·백분위. 값이 없으면 '-'. */
   parts: { label: string; value: string }[]
