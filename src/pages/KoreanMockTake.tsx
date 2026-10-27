@@ -434,6 +434,7 @@ export function KoreanMockTake() {
           <OmrCard title="선택과목" tone="take">
             <OmrColumn
               items={electiveRows}
+              alignToFive
               tone="take"
               renderAnswers={renderTakeAnswers}
               onRowClick={focusNumber}

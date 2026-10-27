@@ -329,7 +329,7 @@ export function AnswerCompareOmr({
         {electiveRows.length > 0 && (
           <div className="grid grid-cols-2">
             <OmrCard title={electiveName ?? '선택과목'} tone="result" className="rounded-none">
-              <OmrColumn items={electiveRows} tone="result" renderAnswers={render} rowHeight={rowHeight} onRowClick={onRowClick} numClass={resultNum} />
+              <OmrColumn items={electiveRows} alignToFive tone="result" renderAnswers={render} rowHeight={rowHeight} onRowClick={onRowClick} numClass={resultNum} />
             </OmrCard>
           </div>
         )}

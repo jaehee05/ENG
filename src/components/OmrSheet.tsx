@@ -43,7 +43,8 @@ export interface OmrRowItem {
 }
 
 /**
- * 문번 | 답란 한 단. 다섯 문항씩 묶어 굵은 줄로 나눈다.
+ * 문번 | 답란 한 단. 다섯 문항씩 묶어 굵은 줄로 나눈다. alignToFive 면 위에서부터 다섯 개씩이
+ * 아니라 번호 기준(…|36–40|41–45)으로 끊는다 — 선택과목 35번이 홀로 한 칸이 되는 종이 답안지처럼.
  * rowClass/numClass 로 지금 문항·확인 필요 같은 줄 표시를 얹는다.
  */
 export function OmrColumn({
@@ -54,6 +55,7 @@ export function OmrColumn({
   rowOverlay,
   numClass,
   rowHeight = 'h-[31px]',
+  alignToFive = false,
   className,
 }: {
   items: OmrRowItem[]
@@ -64,11 +66,21 @@ export function OmrColumn({
   rowOverlay?: (number: number) => string | null
   numClass?: (number: number) => string | null
   rowHeight?: string
+  /** 번호가 5의 배수 다음(1·6·11…)인 줄에서 새 묶음을 시작한다. */
+  alignToFive?: boolean
   className?: string
 }) {
   const t = omrTone(tone)
   const groups: OmrRowItem[][] = []
-  for (let i = 0; i < items.length; i += 5) groups.push(items.slice(i, i + 5))
+  if (alignToFive) {
+    for (const it of items) {
+      const last = groups[groups.length - 1]
+      if (!last || it.number % 5 === 1) groups.push([it])
+      else last.push(it)
+    }
+  } else {
+    for (let i = 0; i < items.length; i += 5) groups.push(items.slice(i, i + 5))
+  }
   return (
     <div className={cx('min-w-0', className)}>
       <div className={cx('grid grid-cols-[2.1rem_1fr] text-[10px] font-semibold border-b-2', t.line, tone === 'take' ? 'text-[#2e9b4f]' : 'text-[#1f7a45]')}>
