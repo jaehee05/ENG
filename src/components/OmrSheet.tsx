@@ -56,6 +56,7 @@ export function OmrColumn({
   numClass,
   rowHeight = 'h-[31px]',
   alignToFive = false,
+  rowLines = false,
   className,
 }: {
   items: OmrRowItem[]
@@ -68,11 +69,18 @@ export function OmrColumn({
   rowHeight?: string
   /** 번호가 5의 배수 다음(1·6·11…)인 줄에서 새 묶음을 시작한다. */
   alignToFive?: boolean
+  /**
+   * 결과 화면용 — 다섯 개씩 묶는 굵은 줄 대신 줄마다 얇은 선을 긋고, 문번·답란 사이
+   * 세로줄을 뺀다. 표처럼 한 줄씩 읽힌다.
+   */
+  rowLines?: boolean
   className?: string
 }) {
   const t = omrTone(tone)
   const groups: OmrRowItem[][] = []
-  if (alignToFive) {
+  if (rowLines) {
+    groups.push(items)
+  } else if (alignToFive) {
     for (const it of items) {
       const last = groups[groups.length - 1]
       if (!last || it.number % 5 === 1) groups.push([it])
@@ -84,12 +92,12 @@ export function OmrColumn({
   return (
     <div className={cx('min-w-0', className)}>
       <div className={cx('grid grid-cols-[2.1rem_1fr] text-[10px] font-semibold border-b-2', t.line, tone === 'take' ? 'text-[#2e9b4f]' : 'text-[#1f7a45]')}>
-        <div className={cx('py-1 text-center border-r-2', t.line, t.num)}>문번</div>
+        <div className={cx('py-1 text-center', !rowLines && 'border-r-2', t.line, t.num)}>문번</div>
         <div className="py-1 text-center whitespace-pre">{'답   란'}</div>
       </div>
       {groups.map((g, gi) => (
         <div key={gi} className={cx(gi > 0 && 'border-t-2', t.line)}>
-          {g.map((it) => {
+          {g.map((it, ri) => {
             const overlay = rowOverlay?.(it.number)
             return (
               <div
@@ -98,12 +106,14 @@ export function OmrColumn({
                 onClick={onRowClick ? () => onRowClick(it.number) : undefined}
                 className={cx(
                   'relative grid grid-cols-[2.1rem_1fr] items-stretch scroll-mt-24 scroll-mb-64',
+                  rowLines && ri > 0 && 'border-t border-[#cfe9d8]',
                   onRowClick && 'cursor-pointer',
                 )}
               >
                 <div
                   className={cx(
-                    'flex items-center justify-center border-r-2 text-[12px] tabular-nums',
+                    'flex items-center justify-center text-[12px] tabular-nums',
+                    !rowLines && 'border-r-2',
                     t.line,
                     t.num,
                     it.number % 5 === 0 ? 'font-extrabold text-[#2e9b4f]' : 'text-slate-700',
