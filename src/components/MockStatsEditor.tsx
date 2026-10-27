@@ -182,7 +182,7 @@ export function MockStatsEditor({
             placeholder="100"
             className="w-20 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
-          <span className="text-[11px] text-slate-500">명 — ‘OUR-TEAM N명 기준’으로 나와요</span>
+          <span className="text-[11px] text-slate-500">명 — 여기에 실제 응시 학생 수를 더해 ‘OUR-TEAM N명 기준’으로 나오고, 선택률에도 학생 한 명당 한 명분씩 섞여요</span>
         </label>
       )}
 
