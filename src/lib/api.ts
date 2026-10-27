@@ -1,4 +1,5 @@
-import type { WordEntry } from './types'
+import { questionPoints, type KoreanMock, type KoreanMockQuestion, type MockNationalStats, type WordEntry } from './types'
+import { COMMON_KEY } from './mockStats'
 import type { OmrGrid } from './omrGrid'
 
 interface ExtractGlossaryResponse {
@@ -194,6 +195,73 @@ export async function estimateMockCutoffs(
   return data.cutoffs ?? []
 }
 
+
+/** 해설 HTML → AI 에 넘길 짧은 글. 정답 해설 + 선지별 오답 해설. */
+function questionHint(q: KoreanMockQuestion): string | undefined {
+  const strip = (h: string) => h.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()
+  const parts = [q.explanation, q.explanationWrong].filter(Boolean).map((h) => strip(h!))
+  for (const [n, h] of Object.entries(q.explanationChoices ?? {})) if (h) parts.push(`(${n}번) ${strip(h)}`)
+  return parts.join(' ') || undefined
+}
+
+async function postNational<T>(body: unknown): Promise<T> {
+  const res = await fetch('/api/mock-national', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    let message = `요청 실패 (HTTP ${res.status})`
+    try {
+      const b = (await res.json()) as { error?: string }
+      if (b.error) message = b.error
+    } catch {
+      // ignore
+    }
+    throw new Error(message)
+  }
+  return (await res.json()) as T
+}
+
+/**
+ * 전국단위 통계 AI 추정 — 등급컷·표준점수 한 번, 묶음(공통·선택과목)마다 선택률 한 번씩
+ * 나란히 부른다. 하나로 부르면 서버 60초를 넘긴다.
+ */
+export async function estimateNationalStats(mock: KoreanMock, examText?: string): Promise<MockNationalStats> {
+  const toInput = (qs: KoreanMockQuestion[]) =>
+    qs.map((q) => ({ number: q.number, answer: q.answer, points: questionPoints(q), hint: questionHint(q) }))
+  const electives = mock.electives ?? []
+  const groups = [
+    { key: COMMON_KEY, label: electives.length ? '공통과목' : '전체 문항', questions: toInput(mock.questions) },
+    ...electives.map((el) => ({ key: el.name, label: el.name, questions: toInput(el.questions) })),
+  ].filter((g) => g.questions.length > 0)
+  const commonPts = mock.questions.reduce((s, q) => s + questionPoints(q), 0)
+  const totals: Record<string, number> = electives.length
+    ? Object.fromEntries(electives.map((el) => [el.name, commonPts + el.questions.reduce((s, q) => s + questionPoints(q), 0)]))
+    : { [COMMON_KEY]: commonPts }
+  const shared = { title: mock.title, examText: examText || undefined }
+
+  const [cuts, ...rateParts] = await Promise.all([
+    postNational<{ cutoffs: MockNationalStats['cutoffs']; stdCutoffs: MockNationalStats['stdCutoffs'] }>({
+      ...shared,
+      part: 'cutoffs',
+      totals,
+      groups: groups.map(({ label, questions }) => ({ label, questions })),
+    }),
+    ...groups.map((g) =>
+      postNational<{ rates: Record<string, number[]> }>({
+        ...shared,
+        part: 'rates',
+        groups: [{ label: g.label, questions: g.questions }],
+      }),
+    ),
+  ])
+  const rates: Record<string, Record<string, number[]>> = {}
+  groups.forEach((g, i) => {
+    if (Object.keys(rateParts[i].rates ?? {}).length) rates[g.key] = rateParts[i].rates
+  })
+  return { cutoffs: cuts.cutoffs ?? {}, stdCutoffs: cuts.stdCutoffs ?? [], rates }
+}
 
 export interface OmrAnswer {
   number: number

@@ -12,7 +12,7 @@ const STATS_SOURCE_LABEL: Record<StatsSource, string> = {
   national: '전국단위',
 }
 
-/** 맨 위 주황 점수 카드. */
+/** 맨 위 점수 카드 — 짙은 상록색. 앱 초록·결과 OMR 초록과 한 계열로 맞췄다. */
 export function ScoreHero({
   title,
   studentName,
@@ -32,7 +32,14 @@ export function ScoreHero({
   parts: { label: string; value: string }[]
 }) {
   return (
-    <div className="rounded-[28px] bg-gradient-to-br from-[#f59e0b] via-[#f97316] to-[#ea580c] px-6 pt-6 pb-7 text-white shadow-[0_18px_40px_-18px_rgba(234,88,12,0.65)]">
+    <div
+      className="rounded-[28px] px-6 pt-6 pb-7 text-white shadow-[0_18px_40px_-20px_rgba(15,47,42,0.75)]"
+      // 오른쪽 위 은은한 빛 + 짙은 상록 그라데이션 — 평면 단색보다 깊이가 생긴다.
+      style={{
+        backgroundImage:
+          'radial-gradient(circle at 92% 0%, rgba(167,243,208,0.22), transparent 45%), linear-gradient(135deg, #1f5a43 0%, #17463a 50%, #0f2f2a 100%)',
+      }}
+    >
       <p className="text-[15px] font-bold truncate">{title}</p>
       <p className="text-[12px] text-white/80 mt-0.5">{studentName}</p>
       <p className="mt-4 text-center text-[12px] text-white/85">내 점수</p>
@@ -42,7 +49,7 @@ export function ScoreHero({
       </p>
       {grade != null && (
         <div className="mt-4 flex justify-center">
-          <span className="inline-flex items-baseline gap-1 rounded-full bg-white px-5 py-1.5 text-[#ea580c] shadow-sm">
+          <span className="inline-flex items-baseline gap-1 rounded-full bg-[#d9f99d] px-5 py-1.5 text-[#14532d] shadow-sm">
             {source === 'team' && grade >= 6 ? (
               <span className="text-[15px] font-extrabold">6등급 이하</span>
             ) : (
@@ -54,10 +61,10 @@ export function ScoreHero({
           </span>
         </div>
       )}
-      <div className="mt-5 grid gap-1" style={{ gridTemplateColumns: `repeat(${parts.length}, minmax(0, 1fr))` }}>
+      <div className="mt-5 grid gap-1 border-t border-white/15 pt-4" style={{ gridTemplateColumns: `repeat(${parts.length}, minmax(0, 1fr))` }}>
         {parts.map((p) => (
           <div key={p.label} className="text-center min-w-0">
-            <p className="text-[11px] font-bold text-white/85 truncate">{p.label}</p>
+            <p className="text-[11px] font-bold text-white/70 truncate">{p.label}</p>
             <p className="mt-0.5 text-[24px] font-black tabular-nums leading-tight">{p.value}</p>
           </div>
         ))}
@@ -89,7 +96,7 @@ export function SourceTabs({
             className={cx(
               'pressable h-10 px-5 rounded-full text-[14px] font-extrabold',
               on
-                ? 'bg-gradient-to-r from-[#fb923c] to-[#f97316] text-white shadow-[0_6px_16px_-6px_rgba(249,115,22,0.6)]'
+                ? 'bg-[#17463a] text-white shadow-[0_6px_16px_-6px_rgba(15,47,42,0.6)]'
                 : 'border border-slate-300 text-slate-600 bg-white/60',
             )}
           >
@@ -149,7 +156,7 @@ export function GradeCutTable({
         </thead>
         <tbody>
           {grades.map((g) => (
-            <tr key={g} className={g === myGrade ? 'bg-orange-50' : undefined}>
+            <tr key={g} className={g === myGrade ? 'bg-[#ecfccb]' : undefined}>
               <td className={cx(TD, 'text-[12px] font-semibold text-slate-500')}>{g}</td>
               {maps.map((m, i) => (
                 <td key={i} className={cx(TD, 'font-bold text-slate-900')}>{m.get(g) ?? '-'}</td>
