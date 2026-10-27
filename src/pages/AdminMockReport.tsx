@@ -13,6 +13,7 @@ import {
 import { koreanMockRowsFromAttempts, type MockRow } from '../lib/mockAttemptScore'
 import { MockScoreTrend } from '../components/MockScoreTrend'
 import { ReportSummary } from '../components/ReportSummary'
+import { gradeLabel } from '../lib/mockStats'
 import { fmtReportDate, todayLabel } from '../lib/reportFormat'
 import type { Attempt, KoreanMock, MockScore, UserAccount } from '../lib/types'
 
@@ -193,7 +194,7 @@ export function AdminMockReport() {
               {summary.hasGrade && (
                 <ReportSummary
                   label="최근 등급"
-                  value={summary.latest != null ? `${summary.latest}등급` : '—'}
+                  value={summary.latest != null ? gradeLabel(summary.latest) : '—'}
                   /* 시험명은 길어서 카드를 밀어낸다. 이름은 아래 표에서 읽는다. */
                   sub={fmtReportDate(rows[rows.length - 1].dateISO)}
                 />
@@ -201,7 +202,7 @@ export function AdminMockReport() {
               {summary.hasGrade && (
                 <ReportSummary
                   label="최고 등급"
-                  value={summary.best != null ? `${summary.best}등급` : '—'}
+                  value={summary.best != null ? gradeLabel(summary.best) : '—'}
                 />
               )}
               {summary.hasRaw && (
@@ -270,7 +271,7 @@ export function AdminMockReport() {
                       </td>
                       <td className="py-2 text-right font-medium text-slate-900 tabular-nums">
                         {r.grade != null ? (
-                          `${r.grade}등급`
+                          gradeLabel(r.grade)
                         ) : (
                           <>
                             {/* 인쇄물에는 빈칸으로 나가고, 화면에서만 고를 수 있다. */}

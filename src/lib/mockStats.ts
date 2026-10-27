@@ -223,7 +223,12 @@ function interpolateStd(raw: number, rawCuts: MockGradeCut[], stdCuts: MockGrade
  * 화면에 보이는 가장 낮은 등급. 그 아래는 '5등급 이하'로 뭉치고, 등급컷 표도 5등급까지만.
  * (저장된 컷은 8등급까지 있을 수 있다 — 표준점수를 이어 읽을 때는 다 쓴다.)
  */
-const LOWEST_GRADE = 5
+export const LOWEST_GRADE = 5
+
+/** 등급 표기 — 5등급부터는 '5등급 이하'. 결과 화면·관리자 성적표가 같이 쓴다. */
+export function gradeLabel(g: number): string {
+  return g >= LOWEST_GRADE ? `${LOWEST_GRADE}등급 이하` : `${g}등급`
+}
 
 function gradeView(raw: number, cuts: MockGradeCut[]) {
   const g = gradeFromScore(raw, cuts)
