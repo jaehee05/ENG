@@ -46,6 +46,29 @@
   unicode-range: U+2E80-2EFF, U+2F00-2FDF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF;
 }
 
+/*
+ * 옛한글 전용 대타.
+ *
+ * 마루 부리에는 옛한글 자모(ᅀ·ᆞ·ᇫ, ㅿ·ㆍ …)가 없다. 그럼 낱자마다 다음
+ * 글꼴로 떨어지는데, 자모 조합(ᅀ+ᆞ → 한 글자)은 한 글꼴 안에서만 되므로
+ * 앞뒤 자모가 서로 다른 글꼴로 갈리면 낱자로 흩어지거나 네모로 깨진다.
+ *
+ * 옛한글 자모 구간만 통째로 나눔바른고딕 옛한글(잘라 낸 woff2)에 맡긴다.
+ * 현대 한글 음절(가-힣)과 현대 호환 자모(ㄱ-ㅣ)는 범위 밖이라 마루 부리 그대로.
+ * 고딕이라 명조인 본문과 결은 다르지만, 옛한글을 조합까지 해 주는 명조
+ * 웹폰트가 없어 이걸로 둔다. size-adjust 는 한글 글자 몸 크기를 마루 부리에
+ * 맞춘 값(마루 부리 ‘가’ 폭 970 · 높이 960, 이 글꼴 892 · 913).
+ */
+@font-face {
+  font-family: 'YetHangul';
+  src: url('/fonts/NanumBarunGothic-YetHangul-sub.woff2') format('woff2');
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+  size-adjust: 107%;
+  unicode-range: U+1100-11FF, U+A960-A97F, U+D7B0-D7FF, U+3165-318E, U+302E-302F, U+25CC;
+}
+
 /* 리치텍스트 에디터/렌더 */
 .rte-content:empty::before {
   content: attr(data-placeholder);
@@ -74,7 +97,7 @@
    건 앞과 같은 이유 — 뒤에 두면 나눔명조가 싣고 있는 몇 자만 갈린다. 한글은
    마루 부리가 다 갖고 있어 여기까지 내려오지 않는다. */
 .rte-content, .rte-content *, .rte-view, .rte-view *, .rte-mark {
-  font-family: 'MaruBuri', 'HanjaMyeongjo', 'AppleMyungjo', 'Nanum Myeongjo',
+  font-family: 'MaruBuri', 'YetHangul', 'HanjaMyeongjo', 'AppleMyungjo', 'Nanum Myeongjo',
     'Apple SD Gothic Neo', serif !important;
 }
 /* 선지 원문자(①②…)는 해설 HTML 밖에서 붙이는 글자라 위 규칙이 안 닿는다.
